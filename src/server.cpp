@@ -1,13 +1,45 @@
 #include "server.h"
+#include "logging.h"
 #include <iostream>
 
 namespace network
 {
-    server::server(short port) : io_service(), acceptor(io_service, boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), port)), socket(io_service)
+    RATIONET_EXPORT server::server(short port) : io_service(), acceptor(io_service, boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), port)), socket(io_service) {}
+
+    RATIONET_EXPORT void server::add_route(method m, std::regex path, std::function<response_ptr(request &)> callback)
+    {
+        switch (m)
+        {
+        case method::GET:
+            get_routes.push_back({path, callback});
+            break;
+        case method::POST:
+            post_routes.push_back({path, callback});
+            break;
+        case method::PUT:
+            put_routes.push_back({path, callback});
+            break;
+        case method::DELETE:
+            delete_routes.push_back({path, callback});
+            break;
+        }
+    }
+
+    RATIONET_EXPORT void server::bind(std::string address, short port)
+    {
+        auto endpoint = boost::asio::ip::tcp::endpoint(boost::asio::ip::address::from_string(address), port);
+        acceptor.open(endpoint.protocol());
+        acceptor.bind(endpoint);
+    }
+
+    RATIONET_EXPORT void server::start()
     {
         start_accept();
+        LOG("Server started on " << acceptor.local_endpoint().address().to_string() << ":" << acceptor.local_endpoint().port());
         io_service.run();
     }
+
+    RATIONET_EXPORT void server::stop() { io_service.stop(); }
 
     void server::start_accept()
     {
@@ -16,44 +48,28 @@ namespace network
             if (!ec)
             {
                 request req = parse_request(socket);
-                std::function<response_ptr(request &)> *cb = nullptr;
-                switch (req.m)
+                response_ptr res = handle_request(req);
+                boost::asio::streambuf res_buff;
+                std::ostream output(&res_buff);
+                if (res)
                 {
-                case method::GET:
-                    if (get_routes.find(req.path) != get_routes.end())
-                        cb = &get_routes[req.path];
-                    break;
-                case method::POST:
-                    if (post_routes.find(req.path) != post_routes.end())
-                        cb = &post_routes[req.path];
-                    break;
-                case method::PUT:
-                    if (put_routes.find(req.path) != put_routes.end())
-                        cb = &put_routes[req.path];
-                    break;
-                case method::DELETE:
-                    if (delete_routes.find(req.path) != delete_routes.end())
-                        cb = &delete_routes[req.path];
-                    break;
-                }
-                if (cb != nullptr)
-                {
-                    auto res = (*cb)(req);
-                    boost::asio::streambuf res_buff;
-                    std::ostream output(&res_buff);
-
                     if (auto json_res = dynamic_cast<json_response *>(res.operator->()))
-                        output << json_res;
+                        output << *json_res;
                     else
-                        output << res;
+                        output << *res;
+                    socket.async_write_some(res_buff.data(), [this](boost::system::error_code ec, [[maybe_unused]] std::size_t bytes_transferred)
+                                             {
+                        if (!ec)
+                            socket.close();
+                    });
                 } else {
-                    response res(socket, "HTTP/1.1", 404);
-                    boost::asio::streambuf res_buff;
-                    std::ostream output(&res_buff);
-                    output << res;
+                    output << response(response_code::NOT_FOUND);
+                    socket.async_write_some(res_buff.data(), [this](boost::system::error_code ec, [[maybe_unused]] std::size_t bytes_transferred)
+                                             {
+                        if (!ec)
+                            socket.close();
+                    });
                 }
-
-                socket.close();
             }
 
             start_accept(); });
@@ -124,10 +140,40 @@ namespace network
         }
 
         if (method == method::GET)
-            return request(socket, method, std::move(path), std::move(version), std::move(headers));
+            return request(method, std::move(path), std::move(version), std::move(headers));
         else if (headers.find("Content-Type") != headers.end() && headers["Content-Type"] == "application/json")
-            return json_request(socket, method, std::move(path), std::move(version), std::move(headers), json::load(input));
+            return json_request(method, std::move(path), std::move(version), std::move(headers), json::load(input));
         else
-            return request(socket, method, std::move(path), std::move(version), std::move(headers));
+            return request(method, std::move(path), std::move(version), std::move(headers));
+    }
+
+    response_ptr server::handle_request(request &req)
+    {
+        switch (req.m)
+        {
+        case method::GET:
+            for (auto &route : get_routes)
+                if (std::regex_match(req.path, route.first))
+                    return route.second(req);
+            break;
+        case method::POST:
+            for (auto &route : post_routes)
+                if (std::regex_match(req.path, route.first))
+                    return route.second(req);
+            break;
+        case method::PUT:
+            for (auto &route : put_routes)
+                if (std::regex_match(req.path, route.first))
+                    return route.second(req);
+            break;
+        case method::DELETE:
+            for (auto &route : delete_routes)
+                if (std::regex_match(req.path, route.first))
+                    return route.second(req);
+            break;
+        }
+
+        LOG_WARN("No route found for " << to_string(req.m) << " " << req.path);
+        return nullptr;
     }
 } // namespace network
