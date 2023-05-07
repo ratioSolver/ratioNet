@@ -48,6 +48,8 @@ namespace network
             if (!ec)
             {
                 request req = parse_request(socket);
+                LOG_DEBUG("Request:\r\n" << req);
+
                 response_ptr res = handle_request(req);
                 boost::asio::streambuf res_buff;
                 std::ostream output(&res_buff);
@@ -82,7 +84,11 @@ namespace network
         boost::asio::read_until(socket, req_buff, "\r\n\r\n");
         method method;
         std::string method_str, path, version;
-        input >> method_str >> path >> version;
+        std::getline(input, method_str, ' ');
+        std::getline(input, path, ' ');
+        std::getline(input, version, '\r');
+        input.get();
+
         if (method_str == "GET")
             method = method::GET;
         else if (method_str == "POST")
@@ -130,19 +136,35 @@ namespace network
         while (header != "\r")
         {
             auto colon = header.find(": ");
-            if (colon != std::string::npos)
-            {
-                auto name = header.substr(0, colon);
-                auto value = header.substr(colon + 2);
-                headers[name] = value;
-            }
+            auto name = header.substr(0, colon);
+            auto value = header.substr(colon + 2);
+            headers[name] = value;
             std::getline(input, header);
         }
+        input.get();
 
         if (method == method::GET)
             return request(method, std::move(path), std::move(version), std::move(headers));
-        else if (headers.find("Content-Type") != headers.end() && headers["Content-Type"] == "application/json")
-            return json_request(method, std::move(path), std::move(version), std::move(headers), json::load(input));
+        else if (headers.find("Content-Type") != headers.end())
+        {
+            if (headers["Content-Type"] == "application/json")
+                return json_request(method, std::move(path), std::move(version), std::move(headers), json::load(input));
+            else if (headers["Content-Type"] == "text/plain")
+            {
+                std::string body;
+                std::string line;
+                std::getline(input, line);
+                while (line != "\r")
+                {
+                    body += line;
+                    std::getline(input, line);
+                }
+
+                return text_request(method, std::move(path), std::move(version), std::move(headers), std::move(body));
+            }
+            else
+                return request(method, std::move(path), std::move(version), std::move(headers));
+        }
         else
             return request(method, std::move(path), std::move(version), std::move(headers));
     }

@@ -1,4 +1,5 @@
 #include "response.h"
+#include <fstream>
 
 namespace network
 {
@@ -24,6 +25,33 @@ namespace network
     {
         os << static_cast<const response &>(res);
         os << res.body;
+        return os;
+    }
+
+    RATIONET_EXPORT text_response::text_response(std::string body, response_code code) : text_response(std::move(body), code, to_string(code)) {}
+    RATIONET_EXPORT text_response::text_response(std::string body, int status_code, std::string status_message) : response(status_code, status_message), body(std::move(body))
+    {
+        headers["Content-Type"] = "text/plain";
+    }
+
+    RATIONET_EXPORT std::ostream &operator<<(std::ostream &os, const text_response &res)
+    {
+        os << static_cast<const response &>(res);
+        os << res.body;
+        return os;
+    }
+
+    RATIONET_EXPORT file_response::file_response(std::string path, response_code code) : file_response(std::move(path), code, to_string(code)) {}
+    RATIONET_EXPORT file_response::file_response(std::string path, int status_code, std::string status_message) : response(status_code, status_message), path(std::move(path))
+    {
+        headers["Content-Type"] = "application/octet-stream";
+    }
+
+    RATIONET_EXPORT std::ostream &operator<<(std::ostream &os, const file_response &res)
+    {
+        os << static_cast<const response &>(res);
+        std::ifstream file(res.path, std::ios::binary);
+        os << file.rdbuf();
         return os;
     }
 } // namespace network

@@ -93,4 +93,26 @@ namespace network
 
     json::json body;
   };
+
+  class text_response : public response
+  {
+  public:
+    RATIONET_EXPORT text_response(std::string body = "", response_code code = OK);
+    RATIONET_EXPORT text_response(std::string body, int status_code, std::string status_message);
+
+    RATIONET_EXPORT friend std::ostream &operator<<(std::ostream &os, const text_response &res);
+
+    std::string body;
+  };
+
+  class file_response : public response
+  {
+  public:
+    RATIONET_EXPORT file_response(std::string path, response_code code = OK);
+    RATIONET_EXPORT file_response(std::string path, int status_code, std::string status_message);
+
+    RATIONET_EXPORT friend std::ostream &operator<<(std::ostream &os, const file_response &res);
+
+    std::string path;
+  };
 } // namespace network
