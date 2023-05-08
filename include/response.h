@@ -105,6 +105,17 @@ namespace network
     std::string body;
   };
 
+  class html_response : public response
+  {
+  public:
+    RATIONET_EXPORT html_response(std::string body = "", response_code code = OK);
+    RATIONET_EXPORT html_response(std::string body, unsigned int status_code, std::string status_message);
+
+    RATIONET_EXPORT friend std::ostream &operator<<(std::ostream &os, const html_response &res);
+
+    std::string body;
+  };
+
   class file_response : public response
   {
   public:

@@ -57,6 +57,10 @@ namespace network
                 {
                     if (auto json_res = dynamic_cast<json_response *>(res.operator->()))
                         res_strm << *json_res;
+                    else if (auto html_res = dynamic_cast<html_response *>(res.operator->()))
+                        res_strm << *html_res;
+                    else if (auto text_res = dynamic_cast<text_response *>(res.operator->()))
+                        res_strm << *text_res;
                     else
                         res_strm << *res;
                     socket.async_write_some(res_buff.data(), [this](boost::system::error_code ec, [[maybe_unused]] std::size_t bytes_transferred)
@@ -195,6 +199,6 @@ namespace network
         }
 
         LOG_WARN("No route found for " << to_string(req.m) << " " << req.path);
-        throw std::runtime_error("No route found for " + to_string(req.m) + " " + req.path);
+        return nullptr;
     }
 } // namespace network

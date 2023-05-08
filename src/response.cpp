@@ -41,6 +41,19 @@ namespace network
         return os;
     }
 
+    RATIONET_EXPORT html_response::html_response(std::string body, response_code code) : html_response(std::move(body), code, to_string(code)) {}
+    RATIONET_EXPORT html_response::html_response(std::string body, unsigned int status_code, std::string status_message) : response(status_code, status_message), body(std::move(body))
+    {
+        headers["Content-Type"] = "text/html";
+    }
+
+    RATIONET_EXPORT std::ostream &operator<<(std::ostream &os, const html_response &res)
+    {
+        os << static_cast<const response &>(res);
+        os << res.body;
+        return os;
+    }
+
     RATIONET_EXPORT file_response::file_response(std::string path, response_code code) : file_response(std::move(path), code, to_string(code)) {}
     RATIONET_EXPORT file_response::file_response(std::string path, unsigned int status_code, std::string status_message) : response(status_code, status_message), path(std::move(path))
     {
