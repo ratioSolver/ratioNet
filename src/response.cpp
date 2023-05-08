@@ -4,7 +4,7 @@
 namespace network
 {
     RATIONET_EXPORT response::response(response_code code) : response(code, to_string(code)) {}
-    RATIONET_EXPORT response::response(int status_code, std::string status_message) : status_code(status_code), status_message(status_message) {}
+    RATIONET_EXPORT response::response(unsigned int status_code, std::string status_message) : status_code(status_code), status_message(status_message) {}
 
     RATIONET_EXPORT std::ostream &operator<<(std::ostream &os, const response &res)
     {
@@ -16,7 +16,7 @@ namespace network
     }
 
     RATIONET_EXPORT json_response::json_response(json::json body, response_code code) : json_response(std::move(body), code, to_string(code)) {}
-    RATIONET_EXPORT json_response::json_response(json::json body, int status_code, std::string status_message) : response(status_code, status_message), body(std::move(body))
+    RATIONET_EXPORT json_response::json_response(json::json body, unsigned int status_code, std::string status_message) : response(status_code, status_message), body(std::move(body))
     {
         headers["Content-Type"] = "application/json";
     }
@@ -29,7 +29,7 @@ namespace network
     }
 
     RATIONET_EXPORT text_response::text_response(std::string body, response_code code) : text_response(std::move(body), code, to_string(code)) {}
-    RATIONET_EXPORT text_response::text_response(std::string body, int status_code, std::string status_message) : response(status_code, status_message), body(std::move(body))
+    RATIONET_EXPORT text_response::text_response(std::string body, unsigned int status_code, std::string status_message) : response(status_code, status_message), body(std::move(body))
     {
         headers["Content-Type"] = "text/plain";
     }
@@ -42,7 +42,7 @@ namespace network
     }
 
     RATIONET_EXPORT file_response::file_response(std::string path, response_code code) : file_response(std::move(path), code, to_string(code)) {}
-    RATIONET_EXPORT file_response::file_response(std::string path, int status_code, std::string status_message) : response(status_code, status_message), path(std::move(path))
+    RATIONET_EXPORT file_response::file_response(std::string path, unsigned int status_code, std::string status_message) : response(status_code, status_message), path(std::move(path))
     {
         headers["Content-Type"] = "application/octet-stream";
     }

@@ -52,20 +52,20 @@ namespace network
 
                 response_ptr res = handle_request(req);
                 boost::asio::streambuf res_buff;
-                std::ostream output(&res_buff);
+                std::ostream res_strm(&res_buff);
                 if (res)
                 {
                     if (auto json_res = dynamic_cast<json_response *>(res.operator->()))
-                        output << *json_res;
+                        res_strm << *json_res;
                     else
-                        output << *res;
+                        res_strm << *res;
                     socket.async_write_some(res_buff.data(), [this](boost::system::error_code ec, [[maybe_unused]] std::size_t bytes_transferred)
                                              {
                         if (!ec)
                             socket.close();
                     });
                 } else {
-                    output << response(response_code::NOT_FOUND);
+                    res_strm << response(response_code::NOT_FOUND);
                     socket.async_write_some(res_buff.data(), [this](boost::system::error_code ec, [[maybe_unused]] std::size_t bytes_transferred)
                                              {
                         if (!ec)
@@ -80,14 +80,17 @@ namespace network
     request server::parse_request(boost::asio::ip::tcp::socket &socket)
     {
         boost::asio::streambuf req_buff;
-        std::istream input(&req_buff);
+        std::istream req_strm(&req_buff);
         boost::asio::read_until(socket, req_buff, "\r\n\r\n");
         method method;
         std::string method_str, path, version;
-        std::getline(input, method_str, ' ');
-        std::getline(input, path, ' ');
-        std::getline(input, version, '\r');
-        input.get();
+        std::getline(req_strm, method_str, ' ');
+        std::getline(req_strm, path, ' ');
+        std::getline(req_strm, version, '\r');
+        req_strm.get();
+
+        if (version != "HTTP/1.1")
+            throw std::runtime_error("Unsupported HTTP version: " + version);
 
         if (method_str == "GET")
             method = method::GET;
@@ -132,41 +135,37 @@ namespace network
 
         std::map<std::string, std::string> headers;
         std::string header;
-        std::getline(input, header);
-        while (header != "\r")
+        while (std::getline(req_strm, header) && header != "\r")
         {
             auto colon = header.find(": ");
-            auto name = header.substr(0, colon);
-            auto value = header.substr(colon + 2);
-            headers[name] = value;
-            std::getline(input, header);
+            headers[header.substr(0, colon)] = header.substr(colon + 2);
         }
-        input.get();
+        req_strm.get();
 
         if (method == method::GET)
-            return request(method, std::move(path), std::move(version), std::move(headers));
-        else if (headers.find("Content-Type") != headers.end())
+            return request(method, std::move(path), std::move(headers));
+        else if (auto ct_it = headers.find("Content-Type"); ct_it != headers.end())
         {
-            if (headers["Content-Type"] == "application/json")
-                return json_request(method, std::move(path), std::move(version), std::move(headers), json::load(input));
-            else if (headers["Content-Type"] == "text/plain")
+            if (ct_it->second == "application/json")
+                return json_request(method, std::move(path), std::move(headers), json::load(req_strm));
+            else if (ct_it->second == "text/plain" || ct_it->second == "text/html")
             {
                 std::string body;
                 std::string line;
-                std::getline(input, line);
+                std::getline(req_strm, line);
                 while (line != "\r")
                 {
                     body += line;
-                    std::getline(input, line);
+                    std::getline(req_strm, line);
                 }
 
-                return text_request(method, std::move(path), std::move(version), std::move(headers), std::move(body));
+                return text_request(method, std::move(path), std::move(headers), std::move(body));
             }
             else
-                return request(method, std::move(path), std::move(version), std::move(headers));
+                return request(method, std::move(path), std::move(headers));
         }
         else
-            return request(method, std::move(path), std::move(version), std::move(headers));
+            return request(method, std::move(path), std::move(headers));
     }
 
     response_ptr server::handle_request(request &req)
@@ -196,6 +195,6 @@ namespace network
         }
 
         LOG_WARN("No route found for " << to_string(req.m) << " " << req.path);
-        return nullptr;
+        throw std::runtime_error("No route found for " + to_string(req.m) + " " + req.path);
     }
 } // namespace network

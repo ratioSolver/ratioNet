@@ -72,12 +72,12 @@ namespace network
   {
   public:
     RATIONET_EXPORT response(response_code code = OK);
-    RATIONET_EXPORT response(int status_code, std::string status_message);
+    RATIONET_EXPORT response(unsigned int status_code, std::string status_message);
     virtual ~response() = default;
 
     RATIONET_EXPORT friend std::ostream &operator<<(std::ostream &os, const response &res);
 
-    int status_code;
+    unsigned int status_code;
     std::string status_message;
     std::map<std::string, std::string> headers;
   };
@@ -87,7 +87,7 @@ namespace network
   {
   public:
     RATIONET_EXPORT json_response(json::json body = json::json(), response_code code = OK);
-    RATIONET_EXPORT json_response(json::json body, int status_code, std::string status_message);
+    RATIONET_EXPORT json_response(json::json body, unsigned int status_code, std::string status_message);
 
     RATIONET_EXPORT friend std::ostream &operator<<(std::ostream &os, const json_response &res);
 
@@ -98,7 +98,7 @@ namespace network
   {
   public:
     RATIONET_EXPORT text_response(std::string body = "", response_code code = OK);
-    RATIONET_EXPORT text_response(std::string body, int status_code, std::string status_message);
+    RATIONET_EXPORT text_response(std::string body, unsigned int status_code, std::string status_message);
 
     RATIONET_EXPORT friend std::ostream &operator<<(std::ostream &os, const text_response &res);
 
@@ -109,7 +109,7 @@ namespace network
   {
   public:
     RATIONET_EXPORT file_response(std::string path, response_code code = OK);
-    RATIONET_EXPORT file_response(std::string path, int status_code, std::string status_message);
+    RATIONET_EXPORT file_response(std::string path, unsigned int status_code, std::string status_message);
 
     RATIONET_EXPORT friend std::ostream &operator<<(std::ostream &os, const file_response &res);
 

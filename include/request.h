@@ -1,5 +1,6 @@
 #pragma once
 
+#include "rationet_export.h"
 #include "json.h"
 
 namespace network
@@ -32,22 +33,22 @@ namespace network
   class request
   {
   public:
-    request(method m, std::string path, std::string version, std::map<std::string, std::string> headers);
+    RATIONET_EXPORT request(method m, std::string path, std::map<std::string, std::string> headers = {});
     virtual ~request() = default;
 
-    friend std::ostream &operator<<(std::ostream &os, const request &r);
+    RATIONET_EXPORT friend std::ostream &operator<<(std::ostream &os, const request &r);
 
     method m;
-    std::string path, version;
+    std::string path, version = "HTTP/1.1";
     std::map<std::string, std::string> headers;
   };
 
   class text_request : public request
   {
   public:
-    text_request(method m, std::string path, std::string version, std::map<std::string, std::string> headers, std::string body);
+    RATIONET_EXPORT text_request(method m, std::string path, std::map<std::string, std::string> headers, std::string body);
 
-    friend std::ostream &operator<<(std::ostream &os, const text_request &r);
+    RATIONET_EXPORT friend std::ostream &operator<<(std::ostream &os, const text_request &r);
 
     std::string body;
   };
@@ -55,9 +56,9 @@ namespace network
   class json_request : public request
   {
   public:
-    json_request(method m, std::string path, std::string version, std::map<std::string, std::string> headers, json::json body);
+    RATIONET_EXPORT json_request(method m, std::string path, std::map<std::string, std::string> headers, json::json body);
 
-    friend std::ostream &operator<<(std::ostream &os, const json_request &r);
+    RATIONET_EXPORT friend std::ostream &operator<<(std::ostream &os, const json_request &r);
 
     json::json body;
   };

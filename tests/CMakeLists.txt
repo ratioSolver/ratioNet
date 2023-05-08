@@ -1,4 +1,8 @@
-add_executable(rationet_tests test_rationet.cpp)
-target_link_libraries(rationet_tests PRIVATE ratioNet)
+add_executable(server_tests test_server.cpp)
+target_link_libraries(server_tests PRIVATE ratioNet)
 
-add_test(NAME rationetTest00 COMMAND rationet_tests)
+add_executable(client_tests test_client.cpp)
+target_link_libraries(client_tests PRIVATE ratioNet)
+
+add_test(NAME serverTest00 COMMAND server_tests)
+add_test(NAME clientTest00 COMMAND client_tests)
