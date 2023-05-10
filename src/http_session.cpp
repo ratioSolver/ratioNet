@@ -5,19 +5,17 @@
 
 namespace network
 {
-    http_session::http_session(server &srv, boost::asio::ip::tcp::socket &&socket) : srv(srv), socket(std::move(socket)) { LOG("Created HTTP session with socket " << this->socket.native_handle()); }
-    http_session::~http_session() { LOG("Destroyed HTTP session with socket " << socket.native_handle()); }
+    http_session::http_session(server &srv, boost::asio::ip::tcp::socket &&socket) : srv(srv), socket(std::move(socket)) {}
+    http_session::~http_session() {}
 
     void http_session::run()
     {
-        LOG("Running HTTP session..");
         boost::beast::http::async_read(socket, buffer, req, [this](boost::system::error_code ec, std::size_t bytes_transferred)
                                        { on_read(ec, bytes_transferred); });
     }
 
     void http_session::on_read(boost::system::error_code ec, std::size_t)
     {
-        LOG("Received: " << req);
         if (ec == boost::beast::http::error::end_of_stream)
         {
             socket.shutdown(boost::asio::ip::tcp::socket::shutdown_send, ec);
@@ -25,7 +23,6 @@ namespace network
         }
         else if (ec)
         {
-            LOG_ERR("Error on read: " << ec.message());
             delete this;
             return;
         }
@@ -33,7 +30,6 @@ namespace network
         bool found = false;
         if (boost::beast::websocket::is_upgrade(req))
         {
-            LOG("Upgrading to WebSocket..");
             for (auto &handler : srv.ws_routes)
                 if (std::regex_match(req.target().to_string(), handler.first))
                 {
@@ -42,7 +38,7 @@ namespace network
                     break;
                 }
             if (!found)
-                LOG_WARN("No WebSocket handler found for " << req.target().to_string());
+                LOG_WARN("No WebSocket handler found for " << req.target());
             delete this;
             return;
         }
@@ -100,17 +96,14 @@ namespace network
         }
         res->prepare_payload();
 
-        LOG("Sending: " << *res);
         boost::beast::http::async_write(socket, *res, [this, res](boost::system::error_code ec, std::size_t bytes_transferred)
                                         { on_write(ec, bytes_transferred, res->need_eof()); delete res; });
     }
 
     void http_session::on_write(boost::system::error_code ec, std::size_t, bool close)
     {
-        LOG("Data sent..");
         if (ec)
         {
-            LOG_ERR("Error on write: " << ec.message());
             delete this;
             return;
         }

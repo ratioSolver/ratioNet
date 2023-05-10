@@ -1,26 +1,19 @@
 #include "websocket_session.h"
 #include "server.h"
-#include "logging.h"
 
 namespace network
 {
-    websocket_session::websocket_session(server &srv, boost::asio::ip::tcp::socket &&socket, ws_handlers &handlers) : srv(srv), ws(std::move(socket)), handlers(handlers) { LOG("WebSocket session created.."); }
-    websocket_session::~websocket_session()
-    {
-        LOG("WebSocket session destroyed..");
-        srv.sessions.erase(this);
-    }
+    websocket_session::websocket_session(server &srv, boost::asio::ip::tcp::socket &&socket, ws_handlers &handlers) : srv(srv), ws(std::move(socket)), handlers(handlers) {}
+    websocket_session::~websocket_session() { srv.sessions.erase(this); }
 
     void websocket_session::run(boost::beast::http::request<boost::beast::http::string_body> req)
     {
-        LOG("Running WebSocket session..");
         ws.async_accept(req, [this](boost::system::error_code ec)
                         { on_accept(ec); });
     }
 
     void websocket_session::send(utils::c_ptr<message> msg)
     {
-        LOG("Sending: " << msg->msg);
         send_queue.push(msg);
 
         if (send_queue.size() > 1)
@@ -32,10 +25,8 @@ namespace network
 
     void websocket_session::on_accept(boost::system::error_code ec)
     {
-        LOG("WebSocket session accepted..");
         if (ec)
         {
-            LOG_ERR("Error on accept: " << ec.message());
             handlers.on_close_handler(*this);
             delete this;
             return;
@@ -52,10 +43,8 @@ namespace network
 
     void websocket_session::on_read(boost::system::error_code ec, std::size_t)
     {
-        LOG("Data received..");
         if (ec)
         {
-            LOG_ERR("Error on read: " << ec.message());
             handlers.on_close_handler(*this);
             delete this;
             return;
@@ -71,10 +60,8 @@ namespace network
 
     void websocket_session::on_write(boost::system::error_code ec, std::size_t)
     {
-        LOG("Data sent..");
         if (ec)
         {
-            LOG_ERR("Error on write: " << ec.message());
             handlers.on_close_handler(*this);
             delete this;
             return;

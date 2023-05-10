@@ -1,6 +1,6 @@
 #include "server.h"
-#include "logging.h"
 #include "http_session.h"
+#include "logging.h"
 
 namespace network
 {
@@ -15,7 +15,6 @@ namespace network
                            { stop(); });
 
         boost::asio::ip::tcp::endpoint endpoint(boost::asio::ip::make_address(address), port);
-        LOG_DEBUG("Binding to " << endpoint);
         boost::system::error_code ec;
         acceptor.open(boost::asio::ip::tcp::v4(), ec);
         if (ec)
@@ -45,7 +44,7 @@ namespace network
 
     void server::start()
     {
-        LOG("Starting server..");
+        LOG("Starting server on " << acceptor.local_endpoint());
         acceptor.async_accept(socket, [this](boost::system::error_code ec)
                               { on_accept(ec); });
         io_context.run();
@@ -53,19 +52,15 @@ namespace network
 
     void server::stop()
     {
-        LOG("Stopping server..");
         io_context.stop();
+        LOG("Server stopped.");
     }
 
     void server::on_accept(boost::system::error_code ec)
     {
         if (ec)
-        {
-            LOG_ERR("Error on accept: " << ec.message());
             return;
-        }
 
-        LOG("Accepted connection..");
         (new http_session(*this, std::move(socket)))->run();
 
         acceptor.async_accept(socket, [this](boost::system::error_code ec)
