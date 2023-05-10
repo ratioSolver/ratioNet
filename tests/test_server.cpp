@@ -9,9 +9,10 @@ int main()
         res.set(boost::beast::http::field::content_type, "text/html");
         res.body() = R"(
         <!DOCTYPE html>
-        <html>
+        <html lang="en">
             <head>
                 <title>Test</title>
+                <link rel="icon" type="image/icon" href="public/favicon.ico">
             </head>
             <body>
                 <h1>Test</h1>
@@ -33,8 +34,9 @@ int main()
             </body>
         </html>
         )"; });
-    server.add_route("/ws").on_open([](network::websocket_session &ws)
-                                    {
+    server.add_route("/ws")
+        .on_open([](network::websocket_session &ws)
+                 {
         LOG("WebSocket opened");
         ws.send("Hello"); })
         .on_message([](network::websocket_session &ws, const std::string &msg)

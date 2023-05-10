@@ -7,6 +7,10 @@
 #include <regex>
 #include <unordered_set>
 
+#ifndef FILE_SERVER_ROOT
+#define FILE_SERVER_ROOT "/public/"
+#endif
+
 namespace network
 {
   class ws_handlers
@@ -78,6 +82,7 @@ namespace network
     void on_accept(boost::system::error_code ec);
 
   private:
+    const std::string file_server_root = FILE_SERVER_ROOT;
     boost::asio::io_context io_context;
     boost::asio::signal_set signals;
     boost::asio::ip::tcp::acceptor acceptor;
