@@ -1,6 +1,7 @@
 #include "http_session.h"
-#include "logging.h"
 #include "websocket_session.h"
+#include "server.h"
+#include "logging.h"
 
 namespace network
 {
@@ -10,13 +11,13 @@ namespace network
     void http_session::run()
     {
         LOG("Running HTTP session..");
-        boost::beast::http::async_read(socket, buffer, request, [this](boost::system::error_code ec, std::size_t bytes_transferred)
+        boost::beast::http::async_read(socket, buffer, req, [this](boost::system::error_code ec, std::size_t bytes_transferred)
                                        { on_read(ec, bytes_transferred); });
     }
 
     void http_session::on_read(boost::system::error_code ec, std::size_t)
     {
-        LOG("Received: " << request);
+        LOG("Received: " << req);
         if (ec == boost::beast::http::error::end_of_stream)
         {
             socket.shutdown(boost::asio::ip::tcp::socket::shutdown_send, ec);
@@ -29,19 +30,54 @@ namespace network
             return;
         }
 
-        if (boost::beast::websocket::is_upgrade(request))
+        if (boost::beast::websocket::is_upgrade(req))
         {
-            (new websocket_session(srv, std::move(socket)))->run(std::move(request));
+            (new websocket_session(srv, std::move(socket)))->run(std::move(req));
             delete this;
             return;
         }
 
-        auto res = new boost::beast::http::response<boost::beast::http::string_body>();
-        res->version(request.version());
-        res->keep_alive(false);
-        res->set(boost::beast::http::field::server, "Beast");
-        res->set(boost::beast::http::field::content_type, "text/plain");
-        res->body() = "Hello world!";
+        auto res = new boost::beast::http::response<boost::beast::http::string_body>{boost::beast::http::status::ok, req.version()};
+        switch (req.method())
+        {
+        case boost::beast::http::verb::get:
+            for (auto &handler : srv.get_routes)
+                if (std::regex_match(req.target().to_string(), handler.first))
+                {
+                    handler.second(req, *res);
+                    break;
+                }
+            break;
+        case boost::beast::http::verb::post:
+            for (auto &handler : srv.post_routes)
+                if (std::regex_match(req.target().to_string(), handler.first))
+                {
+                    handler.second(req, *res);
+                    break;
+                }
+            break;
+        case boost::beast::http::verb::put:
+            for (auto &handler : srv.put_routes)
+                if (std::regex_match(req.target().to_string(), handler.first))
+                {
+                    handler.second(req, *res);
+                    break;
+                }
+            break;
+        case boost::beast::http::verb::delete_:
+            for (auto &handler : srv.delete_routes)
+                if (std::regex_match(req.target().to_string(), handler.first))
+                {
+                    handler.second(req, *res);
+                    break;
+                }
+            break;
+        default:
+            res->result(boost::beast::http::status::bad_request);
+            res->set(boost::beast::http::field::content_type, "text/plain");
+            res->body() = "Invalid request method";
+            break;
+        }
         res->prepare_payload();
 
         LOG("Sending: " << *res);
@@ -66,10 +102,10 @@ namespace network
             return;
         }
 
-        request = {};
+        req = {};
         buffer.consume(buffer.size());
 
-        boost::beast::http::async_read(socket, buffer, request, [this](boost::system::error_code ec, std::size_t bytes_transferred)
+        boost::beast::http::async_read(socket, buffer, req, [this](boost::system::error_code ec, std::size_t bytes_transferred)
                                        { on_read(ec, bytes_transferred); });
     }
 } // namespace network

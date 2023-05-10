@@ -5,6 +5,8 @@
 namespace network
 {
   class server;
+  using request = boost::beast::http::request<boost::beast::http::string_body>;
+  using response = boost::beast::http::response<boost::beast::http::string_body>;
 
   class http_session
   {
@@ -22,6 +24,6 @@ namespace network
     server &srv;
     boost::asio::ip::tcp::socket socket;
     boost::beast::flat_buffer buffer;
-    boost::beast::http::request<boost::beast::http::string_body> request;
+    request req;
   };
 } // namespace network
