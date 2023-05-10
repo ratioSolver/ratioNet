@@ -18,15 +18,15 @@ namespace network
                         { on_accept(ec); });
     }
 
-    void websocket_session::send(const std::string &&message)
+    void websocket_session::send(utils::c_ptr<message> msg)
     {
-        LOG("Sending: " << message);
-        send_queue.push(utils::u_ptr<std::string>(new std::string(message)));
+        LOG("Sending: " << msg->msg);
+        send_queue.push(msg);
 
         if (send_queue.size() > 1)
             return;
 
-        ws.async_write(boost::asio::buffer(*send_queue.front()), [this](boost::system::error_code ec, std::size_t bytes_transferred)
+        ws.async_write(boost::asio::buffer(send_queue.front()->msg), [this](boost::system::error_code ec, std::size_t bytes_transferred)
                        { on_write(ec, bytes_transferred); });
     }
 
@@ -79,7 +79,7 @@ namespace network
         send_queue.pop();
 
         if (!send_queue.empty())
-            ws.async_write(boost::asio::buffer(*send_queue.front()), [this](boost::system::error_code ec, std::size_t bytes_transferred)
+            ws.async_write(boost::asio::buffer(send_queue.front()->msg), [this](boost::system::error_code ec, std::size_t bytes_transferred)
                            { on_write(ec, bytes_transferred); });
     }
 } // namespace network
