@@ -1,9 +1,15 @@
 #include "websocket_session.h"
+#include "server.h"
 #include "logging.h"
 
 namespace network
 {
-    websocket_session::websocket_session(boost::asio::ip::tcp::socket &&socket) : ws(std::move(socket)) {}
+    websocket_session::websocket_session(server &srv, boost::asio::ip::tcp::socket &&socket) : srv(srv), ws(std::move(socket)) { LOG("WebSocket session created.."); }
+    websocket_session::~websocket_session()
+    {
+        LOG("WebSocket session destroyed..");
+        srv.sessions.erase(this);
+    }
 
     void websocket_session::run(boost::beast::http::request<boost::beast::http::string_body> req)
     {
@@ -33,6 +39,8 @@ namespace network
             delete this;
             return;
         }
+
+        srv.sessions.insert(this);
 
         ws.async_read(buffer, [this](boost::system::error_code ec, std::size_t bytes_transferred)
                       { on_read(ec, bytes_transferred); });

@@ -52,7 +52,7 @@ namespace network
         }
 
         LOG("Accepted connection..");
-        (new http_session(std::move(socket)))->run();
+        (new http_session(*this, std::move(socket)))->run();
 
         acceptor.async_accept(socket, [this](boost::system::error_code ec)
                               { on_accept(ec); });

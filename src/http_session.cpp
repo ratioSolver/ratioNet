@@ -4,7 +4,8 @@
 
 namespace network
 {
-    http_session::http_session(boost::asio::ip::tcp::socket &&socket) : socket(std::move(socket)) {}
+    http_session::http_session(server &srv, boost::asio::ip::tcp::socket &&socket) : srv(srv), socket(std::move(socket)) { LOG("Created HTTP session with socket " << this->socket.native_handle()); }
+    http_session::~http_session() { LOG("Destroyed HTTP session with socket " << socket.native_handle()); }
 
     void http_session::run()
     {
@@ -15,7 +16,7 @@ namespace network
 
     void http_session::on_read(boost::system::error_code ec, std::size_t)
     {
-        LOG("Received: " << boost::beast::buffers_to_string(buffer.data()));
+        LOG("Received: " << request);
         if (ec == boost::beast::http::error::end_of_stream)
         {
             socket.shutdown(boost::asio::ip::tcp::socket::shutdown_send, ec);
@@ -30,21 +31,22 @@ namespace network
 
         if (boost::beast::websocket::is_upgrade(request))
         {
-            (new websocket_session(std::move(socket)))->run(std::move(request));
+            (new websocket_session(srv, std::move(socket)))->run(std::move(request));
             delete this;
             return;
         }
 
-        boost::beast::http::response<boost::beast::http::string_body> response;
-        response.version(request.version());
-        response.keep_alive(false);
-        response.set(boost::beast::http::field::server, "Beast");
-        response.set(boost::beast::http::field::content_type, "text/plain");
-        response.body() = "Hello, world!";
-        response.prepare_payload();
-        LOG("Sending: " << response);
-        boost::beast::http::async_write(socket, response, [this, &response](boost::system::error_code ec, std::size_t bytes_transferred)
-                                        { on_write(ec, bytes_transferred, response.need_eof()); });
+        auto res = new boost::beast::http::response<boost::beast::http::string_body>();
+        res->version(request.version());
+        res->keep_alive(false);
+        res->set(boost::beast::http::field::server, "Beast");
+        res->set(boost::beast::http::field::content_type, "text/plain");
+        res->body() = "Hello world!";
+        res->prepare_payload();
+
+        LOG("Sending: " << *res);
+        boost::beast::http::async_write(socket, *res, [this, res](boost::system::error_code ec, std::size_t bytes_transferred)
+                                        { on_write(ec, bytes_transferred, res->need_eof()); delete res; });
     }
 
     void http_session::on_write(boost::system::error_code ec, std::size_t, bool close)
@@ -60,6 +62,7 @@ namespace network
         if (close)
         {
             socket.shutdown(boost::asio::ip::tcp::socket::shutdown_send, ec);
+            delete this;
             return;
         }
 
@@ -69,5 +72,4 @@ namespace network
         boost::beast::http::async_read(socket, buffer, request, [this](boost::system::error_code ec, std::size_t bytes_transferred)
                                        { on_read(ec, bytes_transferred); });
     }
-
 } // namespace network

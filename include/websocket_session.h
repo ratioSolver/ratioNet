@@ -6,10 +6,13 @@
 
 namespace network
 {
+  class server;
+
   class websocket_session
   {
   public:
-    websocket_session(boost::asio::ip::tcp::socket &&socket);
+    websocket_session(server &srv, boost::asio::ip::tcp::socket &&socket);
+    ~websocket_session();
 
     void run(boost::beast::http::request<boost::beast::http::string_body> req);
 
@@ -21,6 +24,7 @@ namespace network
     void on_write(boost::system::error_code ec, std::size_t bytes_transferred);
 
   private:
+    server &srv;
     boost::beast::flat_buffer buffer;
     boost::beast::websocket::stream<boost::beast::tcp_stream> ws;
     std::queue<utils::u_ptr<std::string>> send_queue;
