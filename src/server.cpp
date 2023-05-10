@@ -4,8 +4,16 @@
 
 namespace network
 {
-    server::server(const std::string &address, unsigned short port) : acceptor(io_context), socket(io_context)
+    server::server(const std::string &address, unsigned short port) : signals(io_context), acceptor(io_context), socket(io_context)
     {
+        signals.add(SIGINT);
+        signals.add(SIGTERM);
+#if defined(SIGQUIT)
+        signals.add(SIGQUIT);
+#endif
+        signals.async_wait([this](boost::system::error_code, int)
+                           { stop(); });
+
         boost::asio::ip::tcp::endpoint endpoint(boost::asio::ip::make_address(address), port);
         LOG_DEBUG("Binding to " << endpoint);
         boost::system::error_code ec;
@@ -41,6 +49,12 @@ namespace network
         acceptor.async_accept(socket, [this](boost::system::error_code ec)
                               { on_accept(ec); });
         io_context.run();
+    }
+
+    void server::stop()
+    {
+        LOG("Stopping server..");
+        io_context.stop();
     }
 
     void server::on_accept(boost::system::error_code ec)

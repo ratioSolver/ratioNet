@@ -4,7 +4,7 @@
 
 namespace network
 {
-    websocket_session::websocket_session(server &srv, boost::asio::ip::tcp::socket &&socket) : srv(srv), ws(std::move(socket)) { LOG("WebSocket session created.."); }
+    websocket_session::websocket_session(server &srv, boost::asio::ip::tcp::socket &&socket, ws_handlers &handlers) : srv(srv), ws(std::move(socket)), handlers(handlers) { LOG("WebSocket session created.."); }
     websocket_session::~websocket_session()
     {
         LOG("WebSocket session destroyed..");
@@ -36,12 +36,16 @@ namespace network
         if (ec)
         {
             LOG_ERR("Error on accept: " << ec.message());
+            handlers.on_close_handler(*this);
             delete this;
             return;
         }
 
         srv.sessions.insert(this);
 
+        handlers.on_open_handler(*this);
+
+        // read message..
         ws.async_read(buffer, [this](boost::system::error_code ec, std::size_t bytes_transferred)
                       { on_read(ec, bytes_transferred); });
     }
@@ -52,13 +56,12 @@ namespace network
         if (ec)
         {
             LOG_ERR("Error on read: " << ec.message());
+            handlers.on_close_handler(*this);
             delete this;
             return;
         }
 
-        // TODO: handle message
-        LOG("Received: " << boost::beast::buffers_to_string(buffer.data()));
-
+        handlers.on_message_handler(*this, boost::beast::buffers_to_string(buffer.data()));
         buffer.consume(buffer.size());
 
         // read another message..
@@ -72,6 +75,7 @@ namespace network
         if (ec)
         {
             LOG_ERR("Error on write: " << ec.message());
+            handlers.on_close_handler(*this);
             delete this;
             return;
         }

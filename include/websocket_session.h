@@ -7,6 +7,7 @@
 namespace network
 {
   class server;
+  class ws_handlers;
   class websocket_session;
 
   class message final : public utils::countable
@@ -26,7 +27,7 @@ namespace network
     friend class server;
 
   public:
-    websocket_session(server &srv, boost::asio::ip::tcp::socket &&socket);
+    websocket_session(server &srv, boost::asio::ip::tcp::socket &&socket, ws_handlers &handlers);
     ~websocket_session();
 
     void run(boost::beast::http::request<boost::beast::http::string_body> req);
@@ -45,5 +46,6 @@ namespace network
     boost::beast::flat_buffer buffer;
     boost::beast::websocket::stream<boost::beast::tcp_stream> ws;
     std::queue<utils::c_ptr<message>> send_queue;
+    ws_handlers &handlers;
   };
 } // namespace network

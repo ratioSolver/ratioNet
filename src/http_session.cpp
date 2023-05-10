@@ -30,9 +30,19 @@ namespace network
             return;
         }
 
+        bool found = false;
         if (boost::beast::websocket::is_upgrade(req))
         {
-            (new websocket_session(srv, std::move(socket)))->run(std::move(req));
+            LOG("Upgrading to WebSocket..");
+            for (auto &handler : srv.ws_routes)
+                if (std::regex_match(req.target().to_string(), handler.first))
+                {
+                    found = true;
+                    (new websocket_session(srv, std::move(socket), handler.second))->run(std::move(req));
+                    break;
+                }
+            if (!found)
+                LOG_WARN("No WebSocket handler found for " << req.target().to_string());
             delete this;
             return;
         }
@@ -44,6 +54,7 @@ namespace network
             for (auto &handler : srv.get_routes)
                 if (std::regex_match(req.target().to_string(), handler.first))
                 {
+                    found = true;
                     handler.second(req, *res);
                     break;
                 }
@@ -52,6 +63,7 @@ namespace network
             for (auto &handler : srv.post_routes)
                 if (std::regex_match(req.target().to_string(), handler.first))
                 {
+                    found = true;
                     handler.second(req, *res);
                     break;
                 }
@@ -60,6 +72,7 @@ namespace network
             for (auto &handler : srv.put_routes)
                 if (std::regex_match(req.target().to_string(), handler.first))
                 {
+                    found = true;
                     handler.second(req, *res);
                     break;
                 }
@@ -68,6 +81,7 @@ namespace network
             for (auto &handler : srv.delete_routes)
                 if (std::regex_match(req.target().to_string(), handler.first))
                 {
+                    found = true;
                     handler.second(req, *res);
                     break;
                 }
@@ -77,6 +91,12 @@ namespace network
             res->set(boost::beast::http::field::content_type, "text/plain");
             res->body() = "Invalid request method";
             break;
+        }
+        if (!found)
+        {
+            res->result(boost::beast::http::status::not_found);
+            res->set(boost::beast::http::field::content_type, "text/plain");
+            res->body() = "The resource '" + req.target().to_string() + "' was not found.";
         }
         res->prepare_payload();
 
