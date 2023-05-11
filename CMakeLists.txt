@@ -14,7 +14,10 @@ include(CMakePackageConfigHelpers)
 
 find_package(Boost REQUIRED COMPONENTS system)
 
-add_subdirectory(extern/json)
+option(RATIONET_INCLUDE_UTILS "Include utils library" ON)
+if(RATIONET_INCLUDE_UTILS)
+    add_subdirectory(extern/utils)
+endif()
 
 file(GLOB RATIONET_SOURCES src/*.cpp)
 file(GLOB RATIONET_HEADERS include/*.h)
@@ -22,7 +25,7 @@ file(GLOB RATIONET_HEADERS include/*.h)
 add_library(${PROJECT_NAME} STATIC ${RATIONET_SOURCES})
 GENERATE_EXPORT_HEADER(${PROJECT_NAME})
 target_include_directories(${PROJECT_NAME} PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>)
-target_link_libraries(${PROJECT_NAME} json Boost::system)
+target_link_libraries(${PROJECT_NAME} utils Boost::system)
 
 if(BUILD_TESTING)
     add_subdirectory(tests)
