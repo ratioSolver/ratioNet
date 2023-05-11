@@ -6,7 +6,7 @@ namespace network
     websocket_session::websocket_session(server &srv, boost::asio::ip::tcp::socket &&socket, ws_handlers &handlers) : srv(srv), ws(std::move(socket)), handlers(handlers) {}
     websocket_session::~websocket_session() { srv.sessions.erase(this); }
 
-    void websocket_session::run(boost::beast::http::request<boost::beast::http::string_body> req)
+    void websocket_session::run(boost::beast::http::request<boost::beast::http::dynamic_body> req)
     {
         ws.async_accept(req, [this](boost::system::error_code ec)
                         { on_accept(ec); });

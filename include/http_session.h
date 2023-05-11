@@ -5,7 +5,7 @@
 namespace network
 {
   class server;
-  using request = boost::beast::http::request<boost::beast::http::string_body>;
+  using request = boost::beast::http::request<boost::beast::http::dynamic_body>;
   using response = boost::beast::http::response<boost::beast::http::string_body>;
 
   class http_session

@@ -30,7 +30,7 @@ namespace network
     websocket_session(server &srv, boost::asio::ip::tcp::socket &&socket, ws_handlers &handlers);
     ~websocket_session();
 
-    void run(boost::beast::http::request<boost::beast::http::string_body> req);
+    void run(boost::beast::http::request<boost::beast::http::dynamic_body> req);
 
     void send(const std::string &&msg) { send(utils::c_ptr<message>(new message(std::move(msg)))); }
 
