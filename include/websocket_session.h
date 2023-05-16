@@ -32,11 +32,10 @@ namespace network
 
     void run(boost::beast::http::request<boost::beast::http::dynamic_body> req);
 
+    void send(utils::c_ptr<message> msg);
     void send(const std::string &&msg) { send(utils::c_ptr<message>(new message(std::move(msg)))); }
 
   private:
-    void send(utils::c_ptr<message> msg);
-
     void on_accept(boost::system::error_code ec);
     void on_read(boost::system::error_code ec, std::size_t bytes_transferred);
     void on_write(boost::system::error_code ec, std::size_t bytes_transferred);
