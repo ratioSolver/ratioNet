@@ -7,10 +7,6 @@
 #include <regex>
 #include <unordered_set>
 
-#ifndef FILE_SERVER_ROOT
-#define FILE_SERVER_ROOT "/public/"
-#endif
-
 namespace network
 {
   class ws_handlers
@@ -69,11 +65,13 @@ namespace network
       }
     }
 
-    ws_handlers &add_route(const std::string &path) noexcept
+    ws_handlers &add_ws_route(const std::string &path) noexcept
     {
       ws_routes.push_back(std::make_pair(std::regex(path), ws_handlers()));
       return ws_routes.back().second;
     }
+
+    void add_file_route(const std::string &path, const std::string &redirect) noexcept { file_routes.push_back(std::make_pair(std::regex(path), redirect)); }
 
     void start();
     void stop();
@@ -82,13 +80,13 @@ namespace network
     void on_accept(boost::system::error_code ec);
 
   private:
-    const std::string file_server_root = FILE_SERVER_ROOT;
     boost::asio::io_context io_context;
     boost::asio::signal_set signals;
     boost::asio::ip::tcp::acceptor acceptor;
     boost::asio::ip::tcp::socket socket;
     std::vector<std::pair<std::regex, std::function<void(request &, response &)>>> get_routes, post_routes, put_routes, delete_routes;
     std::vector<std::pair<std::regex, ws_handlers>> ws_routes;
+    std::vector<std::pair<std::regex, std::string>> file_routes;
     std::unordered_set<websocket_session *> sessions;
   };
 } // namespace network

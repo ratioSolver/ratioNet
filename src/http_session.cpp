@@ -141,11 +141,37 @@ namespace network
             return;
         }
 
+        if (req.target().empty())
+        {
+            LOG_WARN("Empty request target");
+            delete this;
+            return;
+        }
+        else if (req.target().size() > 1024)
+        {
+            LOG_WARN("Request target too long: " << req.target());
+            delete this;
+            return;
+        }
+        else if (req.target()[0] != '/')
+        {
+            LOG_WARN("Target does not start with '/'");
+            delete this;
+            return;
+        }
+        else if (req.target().find("..") != boost::beast::string_view::npos)
+        {
+            LOG_WARN("Target contains '..'");
+            delete this;
+            return;
+        }
+
         bool found = false;
+        std::string target = req.target().to_string();
         if (boost::beast::websocket::is_upgrade(req))
         {
             for (auto &handler : srv.ws_routes)
-                if (std::regex_match(req.target().to_string(), handler.first))
+                if (std::regex_match(target, handler.first))
                 {
                     found = true;
                     (new websocket_session(srv, std::move(socket), handler.second))->run(std::move(req));
@@ -157,44 +183,47 @@ namespace network
             return;
         }
 
-        if (req.target().to_string().substr(0, srv.file_server_root.size()) == srv.file_server_root)
-        {
-            std::string path = req.target().to_string();
-            if (path.size() > 255)
+        for (auto &file : srv.file_routes)
+            if (std::regex_match(target, file.first))
             {
-                LOG_WARN("File path too long: " << path);
-                delete this;
-                return;
-            }
-            if (path.find("..") != std::string::npos)
-            {
-                LOG_WARN("File path contains '..': " << path);
-                delete this;
-                return;
-            }
+                if (target.find('?') != boost::beast::string_view::npos)
+                    target = target.substr(0, target.find('?'));
+                auto res = new boost::beast::http::response<boost::beast::http::file_body>{boost::beast::http::status::ok, req.version()};
+                res->set(boost::beast::http::field::server, BOOST_BEAST_VERSION_STRING);
+                auto last_of = target.find_last_of('.');
+                std::unordered_map<std::string, std::string>::const_iterator mime_type_it;
+                std::string path = file.second;
+                if (last_of != boost::beast::string_view::npos)
+                {
+                    mime_type_it = mime_types.find(target.substr(last_of + 1));
+                    path += target;
+                }
+                else
+                    mime_type_it = mime_types.find(file.second.substr(file.second.find_last_of('.') + 1));
 
-            auto res = new boost::beast::http::response<boost::beast::http::file_body>{boost::beast::http::status::ok, req.version()};
-            res->set(boost::beast::http::field::server, BOOST_BEAST_VERSION_STRING);
-            auto mime_type_it = mime_types.find(path.substr(path.find_last_of('.') + 1));
-            res->set(boost::beast::http::field::content_type, mime_type_it != mime_types.end() ? mime_type_it->second : "application/octet-stream");
-            res->body().open(('.' + path).c_str(), boost::beast::file_mode::read, ec);
-            if (ec)
-            {
-                LOG_WARN("File not found: " << req.target());
-                res->result(boost::beast::http::status::not_found);
-                res->body().close();
+                res->set(boost::beast::http::field::content_type, mime_type_it != mime_types.end() ? mime_type_it->second : "application/octet-stream");
+                res->body().open(path.c_str(), boost::beast::file_mode::read, ec);
+                if (ec)
+                {
+                    LOG_WARN("File not found: " << path);
+                    res->result(boost::beast::http::status::not_found);
+                    res->body().close();
+                    delete this;
+                    return;
+                }
+                res->prepare_payload();
+
+                boost::beast::http::async_write(socket, *res, [this, res](boost::system::error_code ec, std::size_t bytes_transferred)
+                                                { on_write(ec, bytes_transferred, res->need_eof()); delete res; });
+                return;
             }
-            boost::beast::http::async_write(socket, *res, [this, res](boost::system::error_code ec, std::size_t bytes_transferred)
-                                            { on_write(ec, bytes_transferred, res->need_eof()); delete res; });
-            return;
-        }
 
         auto res = new boost::beast::http::response<boost::beast::http::string_body>{boost::beast::http::status::ok, req.version()};
         switch (req.method())
         {
         case boost::beast::http::verb::get:
             for (auto &handler : srv.get_routes)
-                if (std::regex_match(req.target().to_string(), handler.first))
+                if (std::regex_match(target, handler.first))
                 {
                     found = true;
                     handler.second(req, *res);
@@ -203,7 +232,7 @@ namespace network
             break;
         case boost::beast::http::verb::post:
             for (auto &handler : srv.post_routes)
-                if (std::regex_match(req.target().to_string(), handler.first))
+                if (std::regex_match(target, handler.first))
                 {
                     found = true;
                     handler.second(req, *res);
@@ -212,7 +241,7 @@ namespace network
             break;
         case boost::beast::http::verb::put:
             for (auto &handler : srv.put_routes)
-                if (std::regex_match(req.target().to_string(), handler.first))
+                if (std::regex_match(target, handler.first))
                 {
                     found = true;
                     handler.second(req, *res);
@@ -221,7 +250,7 @@ namespace network
             break;
         case boost::beast::http::verb::delete_:
             for (auto &handler : srv.delete_routes)
-                if (std::regex_match(req.target().to_string(), handler.first))
+                if (std::regex_match(target, handler.first))
                 {
                     found = true;
                     handler.second(req, *res);
@@ -238,7 +267,7 @@ namespace network
         {
             res->result(boost::beast::http::status::not_found);
             res->set(boost::beast::http::field::content_type, "text/plain");
-            res->body() = "The resource '" + req.target().to_string() + "' was not found.";
+            res->body() = "The resource '" + target + "' was not found.";
         }
         res->prepare_payload();
 

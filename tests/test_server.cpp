@@ -34,7 +34,7 @@ int main()
             </body>
         </html>
         )"; });
-    server.add_route("/ws")
+    server.add_ws_route("/ws")
         .on_open([](network::websocket_session &ws)
                  {
         LOG("WebSocket opened");
