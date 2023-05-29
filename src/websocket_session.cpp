@@ -6,12 +6,6 @@ namespace network
     websocket_session::websocket_session(server &srv, boost::asio::ip::tcp::socket &&socket, ws_handlers &handlers) : srv(srv), ws(std::move(socket)), handlers(handlers) {}
     websocket_session::~websocket_session() { srv.sessions.erase(this); }
 
-    void websocket_session::run(boost::beast::http::request<boost::beast::http::dynamic_body> req)
-    {
-        ws.async_accept(req, [this](boost::system::error_code ec)
-                        { on_accept(ec); });
-    }
-
     void websocket_session::send(utils::c_ptr<message> msg)
     {
         send_queue.push(msg);
@@ -21,6 +15,18 @@ namespace network
 
         ws.async_write(boost::asio::buffer(send_queue.front()->msg), [this](boost::system::error_code ec, std::size_t bytes_transferred)
                        { on_write(ec, bytes_transferred); });
+    }
+
+    void websocket_session::close(boost::beast::websocket::close_code code)
+    {
+        ws.async_close(code, [this](boost::system::error_code ec)
+                       { on_close(ec); });
+    }
+
+    void websocket_session::run(boost::beast::http::request<boost::beast::http::dynamic_body> req)
+    {
+        ws.async_accept(req, [this](boost::system::error_code ec)
+                        { on_accept(ec); });
     }
 
     void websocket_session::on_accept(boost::system::error_code ec)
@@ -72,5 +78,11 @@ namespace network
         if (!send_queue.empty())
             ws.async_write(boost::asio::buffer(send_queue.front()->msg), [this](boost::system::error_code ec, std::size_t bytes_transferred)
                            { on_write(ec, bytes_transferred); });
+    }
+
+    void websocket_session::on_close(boost::system::error_code)
+    {
+        handlers.on_close_handler(*this);
+        delete this;
     }
 } // namespace network
