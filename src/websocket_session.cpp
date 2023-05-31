@@ -83,6 +83,5 @@ namespace network
     void websocket_session::on_close(boost::system::error_code)
     {
         handlers.on_close_handler(*this);
-        delete this;
     }
 } // namespace network
