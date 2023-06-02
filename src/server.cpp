@@ -67,4 +67,20 @@ namespace network
                               { on_accept(ec); });
     }
 
+    std::map<std::string, std::string> parse_query(const std::string &query) noexcept
+    {
+        std::map<std::string, std::string> result;
+        std::string::size_type pos = 0, last = 0;
+        while ((pos = query.find('&', last)) != std::string::npos)
+        {
+            std::string::size_type eq = query.find('=', last);
+            if (eq != std::string::npos && eq < pos)
+                result.emplace(query.substr(last, eq - last), query.substr(eq + 1, pos - eq - 1));
+            last = pos + 1;
+        }
+        std::string::size_type eq = query.find('=', last);
+        if (eq != std::string::npos)
+            result.emplace(query.substr(last, eq - last), query.substr(eq + 1));
+        return result;
+    }
 } // namespace network

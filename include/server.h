@@ -89,4 +89,6 @@ namespace network
     std::vector<std::pair<std::regex, std::string>> file_routes;
     std::unordered_set<websocket_session *> sessions;
   };
+
+  std::map<std::string, std::string> parse_query(const std::string &query) noexcept;
 } // namespace network
