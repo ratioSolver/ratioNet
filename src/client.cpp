@@ -1,5 +1,4 @@
 #include "client.h"
-#include <boost/beast/ssl.hpp>
 
 namespace network
 {
