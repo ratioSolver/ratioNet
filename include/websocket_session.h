@@ -40,6 +40,7 @@ namespace network
   private:
     void run(boost::beast::http::request<boost::beast::http::dynamic_body> req);
 
+    void on_send(utils::c_ptr<message> msg);
     void on_accept(boost::system::error_code ec);
     void on_read(boost::system::error_code ec, std::size_t bytes_transferred);
     void on_write(boost::system::error_code ec, std::size_t bytes_transferred);

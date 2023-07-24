@@ -8,13 +8,9 @@ namespace network
 
     void websocket_session::send(utils::c_ptr<message> msg)
     {
-        send_queue.push(msg);
-
-        if (send_queue.size() > 1)
-            return;
-
-        ws.async_write(boost::asio::buffer(send_queue.front()->msg), [this](boost::system::error_code ec, std::size_t bytes_transferred)
-                       { on_write(ec, bytes_transferred); });
+        // post to strand to avoid concurrent write..
+        boost::asio::post(ws.get_executor(), [this, msg]()
+                          { on_send(msg); });
     }
 
     void websocket_session::close(boost::beast::websocket::close_code code)
@@ -27,6 +23,17 @@ namespace network
     {
         ws.async_accept(req, [this](boost::system::error_code ec)
                         { on_accept(ec); });
+    }
+
+    void websocket_session::on_send(utils::c_ptr<message> msg)
+    {
+        send_queue.push(msg);
+
+        if (send_queue.size() > 1)
+            return;
+
+        ws.async_write(boost::asio::buffer(send_queue.front()->msg), [this](boost::system::error_code ec, std::size_t bytes_transferred)
+                       { on_write(ec, bytes_transferred); });
     }
 
     void websocket_session::on_accept(boost::system::error_code ec)
