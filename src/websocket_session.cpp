@@ -97,5 +97,6 @@ namespace network
         }
 
         handlers.on_close_handler(*this);
+        delete this;
     }
 } // namespace network

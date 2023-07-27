@@ -52,6 +52,12 @@ namespace network
 
     void server::stop()
     {
+        LOG("Stopping server...");
+        acceptor.close();
+
+        for (auto &session : sessions)
+            session->close();
+
         io_context.stop();
         LOG("Server stopped.");
     }
