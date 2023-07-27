@@ -1,5 +1,6 @@
 #include "server.h"
 #include "logging.h"
+#include <thread>
 
 int main()
 {
@@ -46,7 +47,12 @@ int main()
         .on_close([](network::websocket_session &ws)
                   { LOG("WebSocket closed"); });
 
-    server.start();
+    auto srv_future = std::async(std::launch::async, [&server]()
+                                 { server.start(); });
+
+    std::this_thread::sleep_for(std::chrono::seconds(10));
+
+    server.stop();
 
     return 0;
 }
