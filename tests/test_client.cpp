@@ -15,6 +15,8 @@ void test_websocket()
                     {
                         LOG("Server: Received: " << msg);
                         ws.send("World"); })
+        .on_error([](network::websocket_session &ws, const boost::system::error_code &ec)
+                  { LOG("Server: " << ec.message()); })
         .on_close([](network::websocket_session &ws)
                   { LOG("Server: WebSocket closed"); });
 
@@ -28,6 +30,8 @@ void test_websocket()
                    { LOG("Client: WebSocket opened"); })
         .on_message([](const std::string &msg)
                     { LOG("Client: Received: " << msg); })
+        .on_error([](const boost::system::error_code &ec)
+                  { LOG("Client: " << ec.message()); })
         .on_close([]()
                   { LOG("Client: WebSocket closed"); });
 
@@ -36,7 +40,7 @@ void test_websocket()
                                 { client.start(); });
 
     std::this_thread::sleep_for(std::chrono::seconds(1));
-    client.send(new network::message("Hello"));
+    client.send("Hello");
 
     std::this_thread::sleep_for(std::chrono::seconds(1));
     client.close();

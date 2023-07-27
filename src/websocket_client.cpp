@@ -15,10 +15,7 @@ namespace network
         resolver.async_resolve(host, srv, std::bind(&websocket_client::on_resolve, this, std::placeholders::_1, std::placeholders::_2));
     }
 
-    void websocket_client::start()
-    {
-        io_context.run();
-    }
+    void websocket_client::start() { io_context.run(); }
 
     void websocket_client::send(message_ptr msg)
     {
@@ -114,5 +111,7 @@ namespace network
         }
 
         on_close_handler();
+
+        io_context.stop();
     }
 } // namespace network

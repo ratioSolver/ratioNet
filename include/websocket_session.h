@@ -20,7 +20,7 @@ namespace network
     ~websocket_session();
 
     void send(message_ptr msg);
-    void send(const std::string &&msg) { send(message_ptr(new message(std::move(msg)))); }
+    void send(const std::string &&msg) { send(new message(std::move(msg))); }
 
     void close(boost::beast::websocket::close_code code = boost::beast::websocket::close_code::normal);
 
