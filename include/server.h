@@ -29,11 +29,17 @@ namespace network
       on_message_handler = handler;
       return *this;
     }
+    ws_handlers &on_error(std::function<void(websocket_session &, boost::system::error_code)> handler) noexcept
+    {
+      on_error_handler = handler;
+      return *this;
+    }
 
   private:
     std::function<void(websocket_session &)> on_open_handler = [](websocket_session &) {};
     std::function<void(websocket_session &)> on_close_handler = [](websocket_session &) {};
     std::function<void(websocket_session &, const std::string &)> on_message_handler = [](websocket_session &, const std::string &) {};
+    std::function<void(websocket_session &, boost::system::error_code)> on_error_handler = [](websocket_session &, boost::system::error_code) {};
   };
 
   class server
