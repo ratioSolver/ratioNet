@@ -1,92 +1,106 @@
 #include "server.h"
-#include "http_session.h"
-#include "logging.h"
+#include <boost/asio/dispatch.hpp>
+#include <boost/asio/ssl.hpp>
 
 namespace network
 {
-    server::server(const std::string &address, unsigned short port) : signals(io_context), acceptor(io_context), socket(io_context)
-    {
-        signals.add(SIGINT);
-        signals.add(SIGTERM);
-#if defined(SIGQUIT)
-        signals.add(SIGQUIT);
-#endif
-        signals.async_wait([this](boost::system::error_code, int)
-                           { stop(); });
+    plain_http_session::plain_http_session(boost::beast::tcp_stream &&stream, boost::beast::flat_buffer &&buffer) : http_session(std::move(buffer)), stream(std::move(stream)) {}
 
-        boost::asio::ip::tcp::endpoint endpoint(boost::asio::ip::make_address(address), port);
-        boost::system::error_code ec;
-        acceptor.open(boost::asio::ip::tcp::v4(), ec);
+    void plain_http_session::run() { do_read(); }
+
+    void plain_http_session::do_eof()
+    {
+        stream.socket().shutdown(boost::asio::ip::tcp::socket::shutdown_send);
+        delete this;
+    }
+
+    ssl_http_session::ssl_http_session(boost::beast::tcp_stream &&stream, boost::asio::ssl::context &ctx, boost::beast::flat_buffer &&buffer) : http_session(std::move(buffer)), stream(std::move(stream), ctx) {}
+
+    void ssl_http_session::run()
+    {
+        boost::beast::get_lowest_layer(stream).expires_after(std::chrono::seconds(30));
+
+        stream.async_handshake(boost::asio::ssl::stream_base::server, buffer.data(), [this](boost::system::error_code ec, size_t bytes_transferred)
+                               { on_handshake(ec, bytes_transferred); });
+    }
+
+    void ssl_http_session::do_eof()
+    {
+        stream.async_shutdown([this](boost::system::error_code ec)
+                              { on_shutdown(ec); });
+    }
+
+    void ssl_http_session::on_handshake(boost::system::error_code ec, size_t bytes_transferred)
+    {
         if (ec)
         {
-            LOG_ERR("Error opening acceptor: " << ec.message());
+            LOG_ERR("Error: " << ec.message() << "\n");
             return;
         }
-        acceptor.set_option(boost::asio::socket_base::reuse_address(true), ec);
+
+        buffer.consume(bytes_transferred);
+
+        do_read();
+    }
+
+    void ssl_http_session::on_shutdown(boost::system::error_code ec)
+    {
         if (ec)
         {
-            LOG_ERR("Error setting reuse_address: " << ec.message());
-            return;
-        }
-        acceptor.bind(endpoint, ec);
-        if (ec)
-        {
-            LOG_ERR("Error binding to " << endpoint << ": " << ec.message());
-            return;
-        }
-        acceptor.listen(boost::asio::socket_base::max_listen_connections, ec);
-        if (ec)
-        {
-            LOG_ERR("Error listening: " << ec.message());
+            LOG_ERR("Error: " << ec.message() << "\n");
+            delete this;
             return;
         }
     }
 
-    void server::start()
+    detector::detector(boost::asio::ip::tcp::socket &&socket, boost::asio::ssl::context &ctx) : stream(std::move(socket)), ctx(ctx) {}
+
+    void detector::run()
     {
-        LOG("Starting server on " << acceptor.local_endpoint());
+        boost::asio::dispatch(stream.get_executor(), [this]()
+                              { on_run(); });
+    }
+
+    void detector::on_run()
+    {
+        boost::beast::async_detect_ssl(stream, buffer, [this](boost::system::error_code ec, bool result)
+                                       { on_detect(ec, result); });
+    }
+
+    void detector::on_detect(boost::system::error_code ec, bool result)
+    {
+        if (ec)
+        {
+            LOG_ERR("Error: " << ec.message() << "\n");
+            return;
+        }
+
+        if (result)
+            (new ssl_http_session(std::move(stream), ctx, std::move(buffer)))->run();
+        else
+            (new plain_http_session(std::move(stream), std::move(buffer)))->run();
+    }
+
+    server::server(boost::asio::io_context &ioc, boost::asio::ip::tcp::endpoint endpoint) : ioc(ioc), acceptor(ioc, endpoint), socket(ioc)
+    {
+    }
+
+    void server::run() { do_accept(); }
+
+    void server::do_accept()
+    {
         acceptor.async_accept(socket, [this](boost::system::error_code ec)
                               { on_accept(ec); });
-        io_context.run();
-    }
-
-    void server::stop()
-    {
-        LOG("Stopping server...");
-        acceptor.close();
-
-        for (auto &session : sessions)
-            session->close();
-
-        io_context.stop();
-        LOG("Server stopped.");
     }
 
     void server::on_accept(boost::system::error_code ec)
     {
         if (ec)
-            return;
-
-        (new http_session(*this, std::move(socket)))->run();
-
-        acceptor.async_accept(socket, [this](boost::system::error_code ec)
-                              { on_accept(ec); });
-    }
-
-    std::map<std::string, std::string> parse_query(const std::string &query) noexcept
-    {
-        std::map<std::string, std::string> result;
-        std::string::size_type pos = 0, last = 0;
-        while ((pos = query.find('&', last)) != std::string::npos)
         {
-            std::string::size_type eq = query.find('=', last);
-            if (eq != std::string::npos && eq < pos)
-                result.emplace(query.substr(last, eq - last), query.substr(eq + 1, pos - eq - 1));
-            last = pos + 1;
+            LOG_ERR("Error: " << ec.message() << "\n");
+            return;
         }
-        std::string::size_type eq = query.find('=', last);
-        if (eq != std::string::npos)
-            result.emplace(query.substr(last, eq - last), query.substr(eq + 1));
-        return result;
+
+        do_accept();
     }
 } // namespace network
