@@ -15,24 +15,17 @@ namespace network
 
   public:
     template <class Body, class Allocator>
-    void run(boost::beast::http::request<Body, boost::beast::http::basic_fields<Allocator>> req)
-    {
-      // Accept the WebSocket upgrade request
-      do_accept(std::move(req));
-    }
+    void run(boost::beast::http::request<Body, boost::beast::http::basic_fields<Allocator>> req) { do_accept(std::move(req)); }
 
     // Start the asynchronous operation
     template <class Body, class Allocator>
     void do_accept(boost::beast::http::request<Body, boost::beast::http::basic_fields<Allocator>> req)
     {
-      // Set suggested timeout settings for the websocket
       derived().get_stream().set_option(boost::beast::websocket::stream_base::timeout::suggested(boost::beast::role_type::server));
 
-      // Set a decorator to change the Server of the handshake
       derived().get_stream().set_option(boost::beast::websocket::stream_base::decorator([](boost::beast::websocket::response_type &res)
-                                                                                        { res.set(boost::beast::http::field::server, std::string(BOOST_BEAST_VERSION_STRING) + " websocket-server-async"); }));
+                                                                                        { res.set(boost::beast::http::field::server, std::string(BOOST_BEAST_VERSION_STRING)); }));
 
-      // Accept the websocket handshake
       derived().get_stream().async_accept(req, [this](boost::system::error_code ec)
                                           { on_accept(ec); });
     }
@@ -42,6 +35,7 @@ namespace network
       if (ec)
       {
         LOG_ERR("Error: " << ec.message() << "\n");
+        delete this;
         return;
       }
 
