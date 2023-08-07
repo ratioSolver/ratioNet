@@ -3,10 +3,7 @@
 
 namespace network
 {
-#ifdef USE_SSL
-    session_detector::session_detector(boost::asio::ip::tcp::socket &&socket, boost::asio::ssl::context &ctx) : stream(std::move(socket)), ctx(ctx)
-    {
-    }
+    session_detector::session_detector(boost::asio::ip::tcp::socket &&socket, boost::asio::ssl::context &ctx) : stream(std::move(socket)), ctx(ctx) {}
 
     void session_detector::run()
     {
@@ -31,13 +28,14 @@ namespace network
         if (result)
         {
             LOG_DEBUG("Detected SSL session");
+            (new ssl_http_session(std::move(stream), ctx, std::move(buffer)))->run();
         }
         else
         {
             LOG_DEBUG("Detected HTTP session");
+            (new plain_http_session(std::move(stream), std::move(buffer)))->run();
         }
     }
-#endif
 
     server::server(const std::string &address, unsigned short port, std::size_t thread_pool_size) : thread_pool_size(thread_pool_size), ioc(thread_pool_size), signals(ioc), acceptor(ioc)
     {
@@ -110,11 +108,7 @@ namespace network
         }
 
         LOG_DEBUG("Accepted connection from " << socket.remote_endpoint());
-#ifdef USE_SSL
         (new session_detector(std::move(socket), ctx))->run();
-#else
-        (new http_session(std::move(socket)))->run();
-#endif
 
         acceptor.async_accept(boost::asio::make_strand(ioc), [this](boost::system::error_code ec, boost::asio::ip::tcp::socket socket)
                               { on_accept(ec, std::move(socket)); });

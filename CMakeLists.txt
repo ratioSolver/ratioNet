@@ -14,15 +14,11 @@ include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
 find_package(Boost REQUIRED COMPONENTS system)
+find_package(OpenSSL REQUIRED)
 
 option(RATIONET_INCLUDE_UTILS "Include utils library" ON)
 if(RATIONET_INCLUDE_UTILS)
     add_subdirectory(extern/utils)
-endif()
-
-option(USE_SSL "Use SSL for connections" ON)
-if(USE_SSL)
-    find_package(OpenSSL REQUIRED)
 endif()
 
 file(GLOB RATIONET_SOURCES src/*.cpp)
@@ -31,13 +27,7 @@ file(GLOB RATIONET_HEADERS include/*.h)
 add_library(${PROJECT_NAME} STATIC ${RATIONET_SOURCES})
 GENERATE_EXPORT_HEADER(${PROJECT_NAME})
 target_include_directories(${PROJECT_NAME} PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>)
-target_link_libraries(${PROJECT_NAME} utils Boost::system)
-
-
-if(USE_SSL)
-    target_link_libraries(${PROJECT_NAME} OpenSSL::SSL OpenSSL::Crypto)
-    target_compile_definitions(${PROJECT_NAME} PUBLIC USE_SSL)
-endif()
+target_link_libraries(${PROJECT_NAME} utils Boost::system OpenSSL::SSL OpenSSL::Crypto)
 
 if(BUILD_TESTING)
     add_subdirectory(tests)
