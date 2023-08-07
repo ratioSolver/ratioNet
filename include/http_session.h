@@ -64,6 +64,20 @@ namespace network
         return;
       }
 
+      auto req = parser->release();
+
+      // Request path must be absolute and not contain "..".
+      if (req.target().empty() || req.target()[0] != '/' || req.target().find("..") != boost::beast::string_view::npos)
+      {
+        boost::beast::http::response<boost::beast::http::string_body> res{boost::beast::http::status::bad_request, req.version()};
+        res.set(boost::beast::http::field::server, "ratioNet server");
+        res.set(boost::beast::http::field::content_type, "text/html");
+        res.keep_alive(req.keep_alive());
+        res.body() = "Illegal request-target";
+        res.prepare_payload();
+        response_queue.push_back(new message_generator(std::move(res)));
+      }
+
       // If we aren't at the queue limit, try to pipeline another request
       if (response_queue.size() < queue_limit)
         do_read();
@@ -74,7 +88,7 @@ namespace network
     static constexpr std::size_t queue_limit = 8; // max responses
     std::vector<message_generator_ptr> response_queue;
 
-    boost::optional<boost::beast::http::request_parser<boost::beast::http::string_body>> parser;
+    boost::optional<boost::beast::http::request_parser<boost::beast::http::dynamic_body>> parser;
 
   protected:
     boost::beast::flat_buffer buffer;
