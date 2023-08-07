@@ -7,29 +7,18 @@ namespace network
   /**
    * @brief Base class for HTTP sessions.
    *
-   * @tparam Derived The derived class.
    */
-  template <class Derived>
   class http_session
   {
-    Derived &derived() { return static_cast<Derived &>(*this); }
-
   public:
     http_session(boost::beast::flat_buffer buffer) : buffer(std::move(buffer)) {}
+    virtual ~http_session() = default;
+
+    void run();
 
   private:
-    void do_read()
-    {
-    }
-
-  private:
-    void on_read(boost::system::error_code ec, [[maybe_unused]] size_t bytes_transferred)
-    {
-    }
-
-    void on_write(boost::system::error_code ec, [[maybe_unused]] size_t bytes_transferred)
-    {
-    }
+    void on_read(boost::system::error_code ec, size_t bytes_transferred);
+    void on_write(boost::system::error_code ec, size_t bytes_transferred, bool close);
 
   private:
     boost::optional<boost::beast::http::request_parser<boost::beast::http::string_body>> parser;

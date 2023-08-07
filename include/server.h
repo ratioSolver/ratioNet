@@ -3,6 +3,9 @@
 #include "http_session.h"
 #include <thread>
 #include <boost/asio.hpp>
+#ifdef USE_SSL
+#include <boost/asio/ssl.hpp>
+#endif
 
 namespace network
 {
