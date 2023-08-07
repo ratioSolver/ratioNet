@@ -25,6 +25,9 @@ namespace network
     void stop();
 
   private:
+    void on_accept(boost::system::error_code ec, boost::asio::ip::tcp::socket socket);
+
+  private:
     std::size_t thread_pool_size;     // The number of threads in the thread pool.
     std::vector<std::thread> threads; // The thread pool.
 
