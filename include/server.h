@@ -1,6 +1,5 @@
 #pragma once
 
-#include "websocket_session.h"
 #include "http_session.h"
 
 namespace network
