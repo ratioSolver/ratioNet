@@ -4,11 +4,34 @@
 #include <thread>
 #include <boost/asio.hpp>
 #ifdef USE_SSL
+#include <boost/beast/ssl.hpp>
 #include <boost/asio/ssl.hpp>
 #endif
 
 namespace network
 {
+#ifdef USE_SSL
+  /**
+   * @brief Detects the session type.
+   */
+  class session_detector
+  {
+  public:
+    session_detector(boost::asio::ip::tcp::socket &&socket, boost::asio::ssl::context &ctx);
+
+    void run();
+
+  private:
+    void on_run();
+    void on_detect(boost::system::error_code ec, bool result);
+
+  private:
+    boost::beast::flat_buffer buffer;
+    boost::beast::tcp_stream stream;
+    boost::asio::ssl::context &ctx;
+  };
+#endif
+
   /**
    * @brief A server.
    */

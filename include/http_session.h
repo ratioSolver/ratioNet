@@ -1,6 +1,10 @@
 #pragma once
 
-#include "websocket_session.h"
+#include <boost/beast/core.hpp>
+#include <boost/beast/http.hpp>
+#ifdef USE_SSL
+#include <boost/beast/ssl.hpp>
+#endif
 
 namespace network
 {
@@ -26,4 +30,32 @@ namespace network
   protected:
     boost::beast::flat_buffer buffer;
   };
+
+  /**
+   * @brief HTTP session for a WebSocket connection.
+   *
+   */
+  class plain_http_session : public http_session
+  {
+  public:
+    plain_http_session(boost::beast::tcp_stream &&stream, boost::beast::flat_buffer &&buffer);
+
+  private:
+    boost::beast::tcp_stream stream;
+  };
+
+#ifdef USE_SSL
+  /**
+   * @brief HTTP session for a WebSocket connection.
+   *
+   */
+  class ssl_http_session : public http_session
+  {
+  public:
+    ssl_http_session(boost::beast::ssl_stream<boost::beast::tcp_stream> &&stream, boost::asio::ssl::context &ctx, boost::beast::flat_buffer &&buffer);
+
+  private:
+    boost::beast::ssl_stream<boost::beast::tcp_stream> stream;
+  };
+#endif
 } // namespace network

@@ -3,6 +3,42 @@
 
 namespace network
 {
+#ifdef USE_SSL
+    session_detector::session_detector(boost::asio::ip::tcp::socket &&socket, boost::asio::ssl::context &ctx) : stream(std::move(socket)), ctx(ctx)
+    {
+    }
+
+    void session_detector::run()
+    {
+        boost::asio::dispatch(stream.get_executor(), [this]()
+                              { on_run(); });
+    }
+
+    void session_detector::on_run()
+    {
+        boost::beast::async_detect_ssl(stream, buffer, [this](boost::system::error_code ec, bool result)
+                                       { on_detect(ec, result); });
+    }
+
+    void session_detector::on_detect(boost::system::error_code ec, bool result)
+    {
+        if (ec)
+        {
+            LOG_ERR("Error detecting session type: " << ec.message());
+            delete this;
+            return;
+        }
+        if (result)
+        {
+            LOG_DEBUG("Detected SSL session");
+        }
+        else
+        {
+            LOG_DEBUG("Detected HTTP session");
+        }
+    }
+#endif
+
     server::server(const std::string &address, unsigned short port, std::size_t thread_pool_size) : thread_pool_size(thread_pool_size), ioc(thread_pool_size), signals(ioc), acceptor(ioc)
     {
         signals.add(SIGINT);
@@ -45,7 +81,7 @@ namespace network
     void server::start()
     {
         LOG("Starting server on " << acceptor.local_endpoint());
-        acceptor.async_accept([this](boost::system::error_code ec, boost::asio::ip::tcp::socket socket)
+        acceptor.async_accept(boost::asio::make_strand(ioc), [this](boost::system::error_code ec, boost::asio::ip::tcp::socket socket)
                               { on_accept(ec, std::move(socket)); });
 
         for (std::size_t i = 0; i < thread_pool_size; ++i)
@@ -74,7 +110,13 @@ namespace network
         }
 
         LOG_DEBUG("Accepted connection from " << socket.remote_endpoint());
-        acceptor.async_accept([this](boost::system::error_code ec, boost::asio::ip::tcp::socket socket)
+#ifdef USE_SSL
+        (new session_detector(std::move(socket), ctx))->run();
+#else
+        (new http_session(std::move(socket)))->run();
+#endif
+
+        acceptor.async_accept(boost::asio::make_strand(ioc), [this](boost::system::error_code ec, boost::asio::ip::tcp::socket socket)
                               { on_accept(ec, std::move(socket)); });
     }
 } // namespace network
