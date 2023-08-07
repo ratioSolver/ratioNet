@@ -28,7 +28,11 @@ namespace network
     std::size_t thread_pool_size;     // The number of threads in the thread pool.
     std::vector<std::thread> threads; // The thread pool.
 
-    boost::asio::io_context ioc;             // The io_context is required for all I/O.
+    boost::asio::io_context ioc; // The io_context is required for all I/O.
+#ifdef USE_SSL
+    boost::asio::ssl::context ctx{boost::asio::ssl::context::tlsv12}; // The SSL context is required, and holds certificates.
+#endif
+
     boost::asio::signal_set signals;         // The signal_set is used to register for process termination notifications.
     boost::asio::ip::tcp::acceptor acceptor; // The acceptor object used to accept incoming socket connections.
   };
