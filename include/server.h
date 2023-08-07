@@ -1,42 +1,35 @@
 #pragma once
 
 #include "http_session.h"
+#include <thread>
+#include <boost/asio.hpp>
 
 namespace network
 {
-  class detector
-  {
-  public:
-    detector(boost::asio::ip::tcp::socket &&socket, boost::asio::ssl::context &ctx);
-
-    void run();
-
-  private:
-    void on_run();
-    void on_detect(boost::system::error_code ec, bool result);
-
-    boost::beast::tcp_stream stream;
-    boost::asio::ssl::context &ctx;
-    boost::beast::flat_buffer buffer;
-  };
-
   /**
    * @brief A server.
    */
   class server
   {
   public:
-    server(boost::asio::io_context &ioc, boost::asio::ip::tcp::endpoint endpoint);
+    server(const std::string &address = "0.0.0.0", unsigned short port = 8080, std::size_t thread_pool_size = std::thread::hardware_concurrency());
 
-    void run();
+    /**
+     * @brief Run the server.
+     */
+    void start();
+
+    /**
+     * @brief Stop the server.
+     */
+    void stop();
 
   private:
-    void do_accept();
-    void on_accept(boost::system::error_code ec);
+    std::size_t thread_pool_size;     // The number of threads in the thread pool.
+    std::vector<std::thread> threads; // The thread pool.
 
-    boost::asio::io_context &ioc;
-    boost::asio::ip::tcp::acceptor acceptor;
-    boost::asio::ip::tcp::socket socket;
-    boost::beast::flat_buffer buffer;
+    boost::asio::io_context ioc;             // The io_context is required for all I/O.
+    boost::asio::signal_set signals;         // The signal_set is used to register for process termination notifications.
+    boost::asio::ip::tcp::acceptor acceptor; // The acceptor object used to accept incoming socket connections.
   };
 } // namespace network
