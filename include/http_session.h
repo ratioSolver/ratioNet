@@ -1,11 +1,26 @@
 #pragma once
 
+#include "logging.h"
+#include "memory.h"
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/beast/ssl.hpp>
+#include <vector>
 
 namespace network
 {
+  class message_generator
+  {
+  public:
+    template <bool isRequest, class Body, class Fields>
+    message_generator(boost::beast::http::message<isRequest, Body, Fields> &&msg) : msg(std::move(msg)) {}
+
+  private:
+    boost::beast::http::message<false, boost::beast::http::string_body> msg;
+  };
+
+  using message_generator_ptr = utils::u_ptr<message_generator>;
+
   /**
    * @brief Base class for HTTP sessions.
    *
@@ -35,10 +50,30 @@ namespace network
     }
 
   private:
-    void on_read(boost::system::error_code ec, size_t bytes_transferred) {}
+    void on_read(boost::system::error_code ec, size_t)
+    {
+      if (ec == boost::beast::http::error::end_of_stream)
+      {
+        derived().close();
+        return;
+      }
+      else if (ec)
+      {
+        LOG_ERR("HTTP read failed: " << ec.message());
+        delete this;
+        return;
+      }
+
+      // If we aren't at the queue limit, try to pipeline another request
+      if (response_queue.size() < queue_limit)
+        do_read();
+    }
     void on_write(boost::system::error_code ec, size_t bytes_transferred, bool close) {}
 
   private:
+    static constexpr std::size_t queue_limit = 8; // max responses
+    std::vector<message_generator_ptr> response_queue;
+
     boost::optional<boost::beast::http::request_parser<boost::beast::http::string_body>> parser;
 
   protected:
@@ -55,6 +90,7 @@ namespace network
     plain_http_session(boost::beast::tcp_stream &&stream, boost::beast::flat_buffer &&buffer);
 
     void run();
+    void close();
 
     boost::beast::tcp_stream &get_stream() { return stream; }
 
@@ -72,11 +108,13 @@ namespace network
     ssl_http_session(boost::beast::tcp_stream &&stream, boost::asio::ssl::context &ctx, boost::beast::flat_buffer &&buffer);
 
     void run();
+    void close();
 
     boost::beast::ssl_stream<boost::beast::tcp_stream> &get_stream() { return stream; }
 
   private:
     void on_handshake(boost::system::error_code ec, size_t bytes_used);
+    void on_shutdown(boost::system::error_code ec);
 
   private:
     boost::beast::ssl_stream<boost::beast::tcp_stream> stream;
