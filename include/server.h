@@ -4,7 +4,6 @@
 #include <thread>
 #include <boost/asio.hpp>
 #include <boost/beast/ssl.hpp>
-#include <boost/asio/ssl.hpp>
 
 namespace network
 {
