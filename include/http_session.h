@@ -31,11 +31,11 @@ namespace network
   template <class Derived>
   using work_ptr = utils::u_ptr<work<Derived>>;
 
-  template <class Derived, bool isRequest, class Body, class Fields>
-  class message_work : public work<Derived>
+  template <class Derived, class Body, class Fields>
+  class response : public work<Derived>
   {
   public:
-    message_work(http_session<Derived> &session, boost::beast::http::message<isRequest, Body, Fields> &&msg) : work<Derived>(session), msg(std::move(msg)) {}
+    response(http_session<Derived> &session, boost::beast::http::message<false, Body, Fields> &&msg) : work<Derived>(session), msg(std::move(msg)) {}
 
     void operator()() override
     {
@@ -45,7 +45,7 @@ namespace network
     }
 
   private:
-    boost::beast::http::message<isRequest, Body> msg;
+    boost::beast::http::message<false, Body> msg;
   };
 
   /**
@@ -67,6 +67,9 @@ namespace network
       // Make the request empty before reading,
       // otherwise the operation behavior is undefined.
       parser.emplace();
+
+      // Apply a reasonable limit to the allowed size of the body in bytes to prevent abuse.
+      parser->body_limit(1024 * 1024);
 
       // Set the timeout.
       boost::beast::get_lowest_layer(derived().get_stream()).expires_after(std::chrono::seconds(30));
@@ -102,7 +105,7 @@ namespace network
         res.keep_alive(req.keep_alive());
         res.body() = "Illegal request-target";
         res.prepare_payload();
-        response_queue.push(new message_work(*this, std::move(res)));
+        response_queue.push(new response(*this, std::move(res)));
       }
 
       // If we aren't at the queue limit, try to pipeline another request
@@ -115,7 +118,7 @@ namespace network
     static constexpr std::size_t queue_limit = 8; // max responses
     std::queue<work_ptr<Derived>> response_queue;
 
-    boost::optional<boost::beast::http::request_parser<boost::beast::http::dynamic_body>> parser;
+    boost::optional<boost::beast::http::request_parser<boost::beast::http::string_body>> parser;
 
   protected:
     boost::beast::flat_buffer buffer;
