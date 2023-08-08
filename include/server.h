@@ -46,6 +46,8 @@ namespace network
      */
     void stop();
 
+    void set_ssl_context(const std::string &certificate_chain_file, const std::string &private_key_file);
+
   private:
     void on_accept(boost::system::error_code ec, boost::asio::ip::tcp::socket socket);
 

@@ -99,6 +99,12 @@ namespace network
             thread.join();
     }
 
+    void server::set_ssl_context(const std::string &certificate_chain_file, const std::string &private_key_file)
+    {
+        ctx.use_certificate_chain_file(certificate_chain_file);
+        ctx.use_private_key_file(private_key_file, boost::asio::ssl::context::pem);
+    }
+
     void server::on_accept(boost::system::error_code ec, boost::asio::ip::tcp::socket socket)
     {
         if (ec)
