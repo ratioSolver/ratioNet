@@ -5,10 +5,110 @@
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/beast/ssl.hpp>
+#include <boost/beast/websocket.hpp>
 #include <queue>
 
 namespace network
 {
+  template <class Derived>
+  class websocket_session
+  {
+    Derived &derived() { return static_cast<Derived &>(*this); }
+
+  public:
+    void run(boost::beast::http::request<boost::beast::http::string_body> req)
+    {
+      // Set suggested timeout settings for the websocket
+      derived().get_stream().set_option(boost::beast::websocket::stream_base::timeout::suggested(boost::beast::role_type::server));
+
+      // Set a decorator to change the Server of the handshake
+      derived().get_stream().set_option(boost::beast::websocket::stream_base::decorator([](boost::beast::websocket::response_type &res)
+                                                                                        { res.set(boost::beast::http::field::server, std::string(BOOST_BEAST_VERSION_STRING) + " websocket-server-async"); }));
+
+      // Accept the websocket handshake
+      derived().get_stream().async_accept(req, [this](boost::system::error_code ec)
+                                          { on_accept(ec); });
+    }
+
+  private:
+    void on_accept(boost::system::error_code ec)
+    {
+      if (ec)
+      {
+        LOG_ERR("websocket accept failed: " << ec.message());
+        return;
+      }
+
+      // read a message..
+      do_read();
+    }
+
+    void do_read()
+    {
+      // read a message into our buffer..
+      derived().get_stream().async_read(buffer, [this](boost::system::error_code ec, size_t bytes_transferred)
+                                        { on_read(ec, bytes_transferred); });
+    }
+
+    void on_read(boost::system::error_code ec, size_t)
+    {
+      if (ec == boost::beast::websocket::error::closed)
+        return; // the websocket_session was closed..
+
+      if (ec)
+      {
+        LOG_ERR("websocket read failed: " << ec.message());
+        return;
+      }
+    }
+
+    void on_write(boost::system::error_code ec, size_t)
+    {
+      if (ec)
+      {
+        LOG_ERR("websocket write failed: " << ec.message());
+        return;
+      }
+
+      // clear the buffer..
+      buffer.consume(buffer.size());
+
+      // read another message..
+      do_read();
+    }
+
+  protected:
+    boost::beast::flat_buffer buffer;
+  };
+
+  class plain_websocket_session : public websocket_session<plain_websocket_session>
+  {
+  public:
+    plain_websocket_session(boost::beast::tcp_stream &&stream) : ws(std::move(stream)) {}
+
+    boost::beast::websocket::stream<boost::beast::tcp_stream> &get_stream() { return ws; }
+
+  private:
+    boost::beast::websocket::stream<boost::beast::tcp_stream> ws;
+  };
+
+  class ssl_websocket_session : public websocket_session<ssl_websocket_session>
+  {
+  public:
+    ssl_websocket_session(boost::beast::ssl_stream<boost::beast::tcp_stream> &&stream) : ws(std::move(stream)) {}
+
+    boost::beast::websocket::stream<boost::beast::ssl_stream<boost::beast::tcp_stream>> &get_stream() { return ws; }
+
+  private:
+    boost::beast::websocket::stream<boost::beast::ssl_stream<boost::beast::tcp_stream>> ws;
+  };
+
+  template <class Body, class Allocator>
+  void make_websocket_session(boost::beast::tcp_stream stream, boost::beast::http::request<Body, boost::beast::http::basic_fields<Allocator>> req) { (new plain_websocket_session(std::move(stream)))->run(std::move(req)); }
+
+  template <class Body, class Allocator>
+  void make_websocket_session(boost::beast::ssl_stream<boost::beast::tcp_stream> stream, boost::beast::http::request<Body, boost::beast::http::basic_fields<Allocator>> req) { (new ssl_websocket_session(std::move(stream)))->run(std::move(req)); }
+
   template <class Derived>
   class http_session;
 
@@ -63,6 +163,10 @@ namespace network
 
     Derived &derived() { return static_cast<Derived &>(*this); }
 
+    /**
+     * @brief Read a request from the client.
+     *
+     */
     void do_read()
     {
       parser.emplace();
@@ -108,6 +212,18 @@ namespace network
       else if (ec)
       {
         LOG_ERR("HTTP read failed: " << ec.message());
+        delete this;
+        return;
+      }
+
+      // we see if it is a WebSocket Upgrade..
+      if (boost::beast::websocket::is_upgrade(parser->get()))
+      {
+        // we disable the timeout..
+        boost::beast::get_lowest_layer(derived().get_stream()).expires_never();
+
+        // we transfer the stream to a new WebSocket session..
+        make_websocket_session(derived().release_stream(), parser->release());
         delete this;
         return;
       }
@@ -175,6 +291,7 @@ namespace network
     void close();
 
     boost::beast::tcp_stream &get_stream() { return stream; }
+    boost::beast::tcp_stream release_stream() { return std::move(stream); }
 
   private:
     boost::beast::tcp_stream stream;
@@ -193,6 +310,7 @@ namespace network
     void close();
 
     boost::beast::ssl_stream<boost::beast::tcp_stream> &get_stream() { return stream; }
+    boost::beast::ssl_stream<boost::beast::tcp_stream> release_stream() { return std::move(stream); }
 
   private:
     void on_handshake(boost::system::error_code ec, size_t bytes_used);
