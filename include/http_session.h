@@ -5,24 +5,44 @@
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/beast/ssl.hpp>
-#include <vector>
+#include <queue>
 
 namespace network
 {
+  template <class Derived>
+  class http_session;
+
+  template <class Derived>
   struct work
   {
+  public:
+    work(http_session<Derived> &session) : session(session) {}
     virtual ~work() = default;
+
+    virtual void operator()() = 0;
+
+  protected:
+    void on_write(boost::system::error_code ec, size_t bytes_transferred, bool close) { session.on_write(ec, bytes_transferred, close); }
+
+  protected:
+    http_session<Derived> &session;
   };
 
-  using work_ptr = utils::u_ptr<work>;
+  template <class Derived>
+  using work_ptr = utils::u_ptr<work<Derived>>;
 
-  template <bool isRequest, class Body, class Fields>
-  class message_generator : public work
+  template <class Derived, bool isRequest, class Body, class Fields>
+  class message_work : public work<Derived>
   {
   public:
-    message_generator(boost::beast::http::message<isRequest, Body, Fields> &&msg) : msg(std::move(msg)) {}
+    message_work(http_session<Derived> &session, boost::beast::http::message<isRequest, Body, Fields> &&msg) : work<Derived>(session), msg(std::move(msg)) {}
 
-    boost::beast::http::message<isRequest, Body, Fields> &get_message() { return msg; }
+    void operator()() override
+    {
+      // Write the response
+      boost::beast::http::async_write(this->session.derived().get_stream(), msg, [this](boost::system::error_code ec, size_t bytes_transferred)
+                                      { this->on_write(ec, bytes_transferred, msg.need_eof()); });
+    }
 
   private:
     boost::beast::http::message<isRequest, Body> msg;
@@ -35,6 +55,8 @@ namespace network
   template <class Derived>
   class http_session
   {
+    friend class work<Derived>;
+
   public:
     http_session(boost::beast::flat_buffer buffer) : buffer(std::move(buffer)) {}
 
@@ -45,8 +67,6 @@ namespace network
       // Make the request empty before reading,
       // otherwise the operation behavior is undefined.
       parser.emplace();
-
-      boost::beast::get_lowest_layer(derived().get_stream()).expires_after(std::chrono::seconds(30));
 
       // Set the timeout.
       boost::beast::get_lowest_layer(derived().get_stream()).expires_after(std::chrono::seconds(30));
@@ -82,7 +102,7 @@ namespace network
         res.keep_alive(req.keep_alive());
         res.body() = "Illegal request-target";
         res.prepare_payload();
-        response_queue.push_back(new message_generator(std::move(res)));
+        response_queue.push(new message_work(*this, std::move(res)));
       }
 
       // If we aren't at the queue limit, try to pipeline another request
@@ -93,7 +113,7 @@ namespace network
 
   private:
     static constexpr std::size_t queue_limit = 8; // max responses
-    std::vector<work_ptr> response_queue;
+    std::queue<work_ptr<Derived>> response_queue;
 
     boost::optional<boost::beast::http::request_parser<boost::beast::http::dynamic_body>> parser;
 
