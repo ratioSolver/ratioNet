@@ -9,17 +9,24 @@
 
 namespace network
 {
-  class message_generator
+  struct work
   {
-  public:
-    template <bool isRequest, class Body, class Fields>
-    message_generator(boost::beast::http::message<isRequest, Body, Fields> &&msg) : msg(std::move(msg)) {}
-
-  private:
-    boost::beast::http::message<false, boost::beast::http::string_body> msg;
+    virtual ~work() = default;
   };
 
-  using message_generator_ptr = utils::u_ptr<message_generator>;
+  using work_ptr = utils::u_ptr<work>;
+
+  template <bool isRequest, class Body, class Fields>
+  class message_generator : public work
+  {
+  public:
+    message_generator(boost::beast::http::message<isRequest, Body, Fields> &&msg) : msg(std::move(msg)) {}
+
+    boost::beast::http::message<isRequest, Body, Fields> &get_message() { return msg; }
+
+  private:
+    boost::beast::http::message<isRequest, Body> msg;
+  };
 
   /**
    * @brief Base class for HTTP sessions.
@@ -86,7 +93,7 @@ namespace network
 
   private:
     static constexpr std::size_t queue_limit = 8; // max responses
-    std::vector<message_generator_ptr> response_queue;
+    std::vector<work_ptr> response_queue;
 
     boost::optional<boost::beast::http::request_parser<boost::beast::http::dynamic_body>> parser;
 
