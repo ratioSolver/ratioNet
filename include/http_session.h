@@ -39,9 +39,10 @@ namespace network
 
     void operator()() override
     {
+      bool keep_alive = msg.keep_alive();
       // Write the response
-      boost::beast::http::async_write(this->session.derived().get_stream(), msg, [this](boost::system::error_code ec, size_t bytes_transferred)
-                                      { this->on_write(ec, bytes_transferred, msg.need_eof()); });
+      boost::beast::http::async_write(this->session.derived().get_stream(), msg, [this, keep_alive](boost::system::error_code ec, size_t bytes_transferred)
+                                      { this->on_write(ec, bytes_transferred, keep_alive); });
     }
 
   private:
@@ -64,19 +65,36 @@ namespace network
 
     void do_read()
     {
-      // Make the request empty before reading,
-      // otherwise the operation behavior is undefined.
       parser.emplace();
 
-      // Apply a reasonable limit to the allowed size of the body in bytes to prevent abuse.
+      // we apply a reasonable limit to the allowed size of the body in bytes to prevent abuse..
       parser->body_limit(1024 * 1024);
 
-      // Set the timeout.
+      // we set a timeout..
       boost::beast::get_lowest_layer(derived().get_stream()).expires_after(std::chrono::seconds(30));
 
-      // Read a request
+      // we read a request using the parser-oriented interface..
       boost::beast::http::async_read(derived().get_stream(), buffer, *parser, [this](boost::system::error_code ec, size_t bytes_transferred)
                                      { on_read(ec, bytes_transferred); });
+    }
+
+    /**
+     * @brief Write a response to the client.
+     *
+     * @return true if the caller should initiate a read operation, false otherwise.
+     */
+    bool do_write()
+    {
+      bool const was_full = response_queue.size() == queue_limit;
+
+      if (!response_queue.empty())
+      { // we send the response..
+        work_ptr<Derived> res = std::move(response_queue.front());
+        response_queue.pop();
+        res->operator()();
+      }
+
+      return was_full;
     }
 
   private:
@@ -96,7 +114,7 @@ namespace network
 
       auto req = parser->release();
 
-      // Request path must be absolute and not contain "..".
+      // the request path must be absolute and not contain "..".
       if (req.target().empty() || req.target()[0] != '/' || req.target().find("..") != boost::beast::string_view::npos)
       {
         boost::beast::http::response<boost::beast::http::string_body> res{boost::beast::http::status::bad_request, req.version()};
@@ -108,11 +126,31 @@ namespace network
         response_queue.push(new response(*this, std::move(res)));
       }
 
-      // If we aren't at the queue limit, try to pipeline another request
+      if (response_queue.size() == 1)
+        do_write(); // we start the write loop..
+
       if (response_queue.size() < queue_limit)
+        do_read(); // we pipeline another request..
+    }
+    void on_write(boost::system::error_code ec, size_t, bool keep_alive)
+    {
+      if (ec)
+      {
+        LOG_ERR("HTTP write failed: " << ec.message());
+        delete this;
+        return;
+      }
+
+      if (!keep_alive)
+      { // this means we should close the connection, usually because the response indicated the "Connection: close" semantic..
+        derived().close();
+        return;
+      }
+
+      // we inform the queue that a write completed..
+      if (do_write())
         do_read();
     }
-    void on_write(boost::system::error_code ec, size_t bytes_transferred, bool close) {}
 
   private:
     static constexpr std::size_t queue_limit = 8; // max responses
