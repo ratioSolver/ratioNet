@@ -10,6 +10,7 @@
 #include <queue>
 #include <thread>
 #include <functional>
+#include <regex>
 
 namespace network
 {
@@ -153,6 +154,34 @@ namespace network
 
   template <class Derived>
   class http_server_session;
+
+  class route
+  {
+  public:
+    route(boost::beast::http::verb method, std::string path) : method(method), path(path) {}
+    virtual ~route() {}
+
+    boost::beast::http::verb get_method() const { return method; }
+    std::string get_path() const { return path; }
+
+  private:
+    boost::beast::http::verb method;
+    std::string path;
+  };
+
+  using route_ptr = utils::u_ptr<route>;
+
+  template <class ReqBody, class ReqAllocator, class ResBody, class ResAllocator>
+  class route_impl : public route
+  {
+  public:
+    route_impl(boost::beast::http::verb method, std::string path, std::function<void(boost::beast::http::request<ReqBody, boost::beast::http::basic_fields<ReqAllocator>> &, boost::beast::http::response<ResBody, boost::beast::http::basic_fields<ResAllocator>> &)> handler) : route(method, path), handler(handler) {}
+
+    void handle(boost::beast::http::request<ReqBody, boost::beast::http::basic_fields<ReqAllocator>> &req, boost::beast::http::response<ResBody, boost::beast::http::basic_fields<ResAllocator>> &res) override { handler(req, res); }
+
+  private:
+    std::function<void(const boost::beast::http::request<ReqBody, boost::beast::http::basic_fields<ReqAllocator>> &, boost::beast::http::response<ResBody, boost::beast::http::basic_fields<ResAllocator>> &)> handler;
+  };
 
   template <class Derived>
   struct work
