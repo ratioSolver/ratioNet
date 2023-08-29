@@ -14,6 +14,9 @@ namespace network
   private:
     void do_read(); // Start reading a request
 
+    void on_read(boost::beast::error_code ec, std::size_t bytes_transferred);
+    void on_write(boost::beast::error_code ec, std::size_t bytes_transferred, bool close);
+
     void do_eof();
 
   private:

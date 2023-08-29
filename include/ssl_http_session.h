@@ -17,6 +17,9 @@ namespace network
     void on_handshake(boost::beast::error_code ec); // Perform the SSL handshake
     void do_read();                                 // Start reading a request
 
+    void on_read(boost::beast::error_code ec, std::size_t bytes_transferred);
+    void on_write(boost::beast::error_code ec, std::size_t bytes_transferred, bool close);
+
     void do_eof();
     void on_shutdown(boost::beast::error_code ec);
 
