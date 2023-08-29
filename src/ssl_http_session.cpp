@@ -1,4 +1,5 @@
 #include "ssl_http_session.h"
+#include "server.h"
 #include "logging.h"
 
 namespace network
@@ -46,7 +47,7 @@ namespace network
             return;
         }
 
-        work_queue.emplace(new ssl_http_work_impl(*this, parser->release()));
+        work_queue.emplace(new request_handler_impl(*this, parser->release())); // Send the request to the queue
     }
 
     void ssl_http_session::on_write(boost::beast::error_code ec, std::size_t, bool close)
