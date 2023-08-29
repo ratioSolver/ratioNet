@@ -17,6 +17,9 @@ namespace network
     void on_handshake(boost::beast::error_code ec); // Perform the SSL handshake
     void do_read();                                 // Start reading a request
 
+    void do_eof();
+    void on_shutdown(boost::beast::error_code ec);
+
   private:
     server &srv;
     boost::beast::ssl_stream<boost::beast::tcp_stream> stream;

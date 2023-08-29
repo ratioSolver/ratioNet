@@ -14,6 +14,8 @@ namespace network
   private:
     void do_read(); // Start reading a request
 
+    void do_eof();
+
   private:
     server &srv;
     boost::beast::tcp_stream stream;

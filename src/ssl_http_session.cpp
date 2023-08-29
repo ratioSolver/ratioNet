@@ -31,4 +31,20 @@ namespace network
         parser->body_limit(10000);                                                      // Set the limit on the allowed size of a message
         boost::beast::get_lowest_layer(stream).expires_after(std::chrono::seconds(30)); // Set the timeout
     }
+
+    void ssl_http_session::do_eof()
+    {
+        boost::beast::get_lowest_layer(stream).expires_after(std::chrono::seconds(30)); // Set the timeout
+        stream.async_shutdown([this](boost::beast::error_code ec)
+                              { on_shutdown(ec); }); // Perform the SSL shutdown
+    }
+
+    void ssl_http_session::on_shutdown(boost::beast::error_code ec)
+    {
+        if (ec)
+            LOG_ERR(ec.message());
+        else
+            LOG_DEBUG("SSL shutdown");
+        delete this; // Delete this session
+    }
 } // namespace network
