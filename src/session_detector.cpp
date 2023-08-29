@@ -6,7 +6,7 @@
 
 namespace network
 {
-    session_detector::session_detector(boost::asio::ip::tcp::socket &&socket, boost::asio::ssl::context &ctx) : stream(std::move(socket)), ctx(ctx)
+    session_detector::session_detector(server &srv, boost::asio::ip::tcp::socket &&socket, boost::asio::ssl::context &ctx) : srv(srv), stream(std::move(socket)), ctx(ctx)
     {
         boost::asio::dispatch(stream.get_executor(), [this]
                               { boost::beast::async_detect_ssl(stream, buffer, [this](boost::beast::error_code ec, bool result)
@@ -20,12 +20,12 @@ namespace network
         else if (result)
         {
             LOG_DEBUG("SSL connection detected");
-            new ssl_http_session(std::move(stream), ctx, std::move(buffer));
+            new ssl_http_session(srv, std::move(stream), ctx, std::move(buffer));
         }
         else
         {
             LOG_DEBUG("Plain HTTP connection detected");
-            new http_session(std::move(stream), std::move(buffer));
+            new http_session(srv, std::move(stream), std::move(buffer));
         }
         delete this;
     }
