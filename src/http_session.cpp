@@ -27,6 +27,14 @@ namespace network
             return;
         }
 
+        if (boost::beast::websocket::is_upgrade(parser->get()))
+        {                                                           // If this is a WebSocket upgrade request, transfer control to a WebSocket session
+            boost::beast::get_lowest_layer(stream).expires_never(); // Turn off the timeout on the tcp_stream, because the websocket stream has its own timeout system.
+            new websocket_session(srv, std::move(stream), parser->release());
+            delete this; // Delete this session
+            return;
+        }
+
         work_queue.emplace(new request_handler_impl(*this, parser->release())); // Send the request to the queue
     }
 
@@ -38,10 +46,8 @@ namespace network
             return;
         }
 
-        if (close)
-        { // This means we should close the connection, usually because the response indicated the "Connection: close" semantic.
+        if (close) // This means we should close the connection, usually because the response indicated the "Connection: close" semantic.
             return do_eof();
-        }
     }
 
     void http_session::do_eof()
@@ -49,5 +55,51 @@ namespace network
         boost::beast::error_code ec;
         stream.socket().shutdown(boost::asio::ip::tcp::socket::shutdown_send, ec);
         delete this; // Delete this session
+    }
+
+    void websocket_session::on_accept(boost::beast::error_code ec)
+    {
+        if (ec)
+        {
+            LOG_ERR(ec.message());
+            delete this;
+        }
+        else
+            do_read();
+    }
+
+    void websocket_session::do_read()
+    {
+        ws.async_read(buffer, [this](boost::beast::error_code ec, std::size_t bytes_transferred)
+                      { on_read(ec, bytes_transferred); });
+    }
+
+    void websocket_session::on_read(boost::beast::error_code ec, std::size_t)
+    {
+        if (ec == boost::beast::websocket::error::closed)
+        { // This indicates that the session was closed
+            delete this;
+            return;
+        }
+        else if (ec)
+        {
+            LOG_ERR(ec.message());
+            delete this;
+            return;
+        }
+    }
+
+    void websocket_session::on_write(boost::beast::error_code ec, std::size_t)
+    {
+        if (ec)
+        {
+            LOG_ERR(ec.message());
+            delete this;
+            return;
+        }
+
+        buffer.consume(buffer.size());
+
+        do_read();
     }
 } // namespace network
