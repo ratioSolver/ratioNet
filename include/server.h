@@ -31,6 +31,9 @@ namespace network
   private:
     void on_accept(boost::beast::error_code ec, boost::asio::ip::tcp::socket socket);
 
+    template <class ReqBody, class ReqFields, class ResBody, class ResFields>
+    boost::beast::http::response<ResBody, ResFields> handle_request(boost::beast::http::request<ReqBody, ReqFields> &&req);
+
   private:
     boost::asio::io_context ioc;                                      // The io_context is required for all I/O
     std::vector<std::thread> threads;                                 // The thread pool
