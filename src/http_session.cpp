@@ -3,7 +3,7 @@
 
 namespace network
 {
-    http_session::http_session(server &srv, boost::beast::tcp_stream &&stream, boost::beast::flat_buffer &&buffer) : srv(srv), stream(std::move(stream)), buffer(std::move(buffer)) { do_read(); }
+    http_session::http_session(server &srv, boost::beast::tcp_stream &&stream, boost::beast::flat_buffer &&buffer, size_t queue_limit) : srv(srv), stream(std::move(stream)), buffer(std::move(buffer)), queue_limit(queue_limit) { do_read(); }
 
     void http_session::do_read()
     {

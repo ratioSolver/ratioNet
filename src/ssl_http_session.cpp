@@ -3,7 +3,7 @@
 
 namespace network
 {
-    ssl_http_session::ssl_http_session(server &srv, boost::beast::tcp_stream &&stream, boost::asio::ssl::context &ctx, boost::beast::flat_buffer &&buffer) : srv(srv), stream(std::move(stream), ctx), buffer(std::move(buffer))
+    ssl_http_session::ssl_http_session(server &srv, boost::beast::tcp_stream &&stream, boost::asio::ssl::context &ctx, boost::beast::flat_buffer &&buffer, size_t queue_limit) : srv(srv), stream(std::move(stream), ctx), buffer(std::move(buffer)), queue_limit(queue_limit)
     {
         boost::beast::get_lowest_layer(this->stream).expires_after(std::chrono::seconds(30)); // Set the timeout
         this->stream.async_handshake(boost::asio::ssl::stream_base::server, buffer.data(), [this](boost::beast::error_code ec, std::size_t)

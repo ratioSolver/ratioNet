@@ -1,17 +1,21 @@
 #pragma once
 
+#include "memory.h"
 #include <boost/beast.hpp>
 #include <boost/beast/ssl.hpp>
 #include <boost/asio/ssl.hpp>
+#include <queue>
 
 namespace network
 {
   class server;
+  class ssl_http_work;
+  using ssl_http_work_ptr = utils::u_ptr<ssl_http_work>;
 
   class ssl_http_session
   {
   public:
-    ssl_http_session(server &srv, boost::beast::tcp_stream &&stream, boost::asio::ssl::context &ctx, boost::beast::flat_buffer &&buffer);
+    ssl_http_session(server &srv, boost::beast::tcp_stream &&stream, boost::asio::ssl::context &ctx, boost::beast::flat_buffer &&buffer, size_t queue_limit = 8);
 
   private:
     void on_handshake(boost::beast::error_code ec); // Perform the SSL handshake
@@ -28,5 +32,18 @@ namespace network
     boost::beast::ssl_stream<boost::beast::tcp_stream> stream;
     boost::beast::flat_buffer buffer;
     boost::optional<boost::beast::http::request_parser<boost::beast::http::string_body>> parser;
+    const size_t queue_limit;                 // The limit on the allowed size of the queue
+    std::queue<ssl_http_work_ptr> work_queue; // This queue is used for the work that is to be done on the session
+  };
+
+  class ssl_http_work
+  {
+    friend class ssl_http_session;
+
+  private:
+    ssl_http_work(ssl_http_session &session);
+
+  private:
+    ssl_http_session &session;
   };
 } // namespace network
