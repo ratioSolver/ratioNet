@@ -87,8 +87,8 @@ namespace network
                               { on_accept(ec, std::move(socket)); });
     }
 
-    template <class ReqBody, class ReqFields, class ResBody, class ResFields>
-    boost::beast::http::response<ResBody, ResFields> handle_request(boost::beast::http::request<ReqBody, ReqFields> &&req)
+    template <class Session, class Body, class Fields>
+    void handle_request(Session &session, boost::beast::http::request<Body, Fields> &&req)
     {
     }
 } // namespace network

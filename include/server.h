@@ -9,11 +9,17 @@
 
 namespace network
 {
+  class http_work;
+  class ssl_http_session;
+
   /**
    * @brief The server class.
    */
   class server
   {
+    friend class http_work;
+    friend class ssl_http_session;
+
   public:
     server(const std::string &address = "0.0.0.0", unsigned short port = 8080, std::size_t concurrency_hint = std::thread::hardware_concurrency());
 
@@ -31,8 +37,8 @@ namespace network
   private:
     void on_accept(boost::beast::error_code ec, boost::asio::ip::tcp::socket socket);
 
-    template <class ReqBody, class ReqFields, class ResBody, class ResFields>
-    boost::beast::http::response<ResBody, ResFields> handle_request(boost::beast::http::request<ReqBody, ReqFields> &&req);
+    template <class Session, class Body, class Fields>
+    void handle_request(Session &session, boost::beast::http::request<Body, Fields> &&req);
 
   private:
     boost::asio::io_context ioc;                                      // The io_context is required for all I/O
