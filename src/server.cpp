@@ -1,4 +1,5 @@
 #include "server.h"
+#include "session_detector.h"
 #include "logging.h"
 
 namespace network
@@ -78,6 +79,8 @@ namespace network
         else
         {
             LOG_DEBUG("Accepted connection from " << socket.remote_endpoint());
+            boost::asio::dispatch(acceptor.get_executor(), [this, socket = std::move(socket)]() mutable
+                                  { new session_detector(std::move(socket), ctx); });
         }
 
         acceptor.async_accept(boost::asio::make_strand(ioc), [this](boost::beast::error_code ec, boost::asio::ip::tcp::socket socket)
