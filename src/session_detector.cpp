@@ -1,5 +1,7 @@
 #include "session_detector.h"
 #include "logging.h"
+#include "http_session.h"
+#include "ssl_http_session.h"
 #include <boost/asio/dispatch.hpp>
 
 namespace network
@@ -18,10 +20,12 @@ namespace network
         else if (result)
         {
             LOG_DEBUG("SSL connection detected");
+            new ssl_http_session(std::move(stream), ctx, std::move(buffer));
         }
         else
         {
             LOG_DEBUG("Plain HTTP connection detected");
+            new http_session(std::move(stream), std::move(buffer));
         }
         delete this;
     }
