@@ -1,6 +1,7 @@
 #pragma once
 
 #include "memory.h"
+#include "server.h"
 #include <boost/beast.hpp>
 #include <queue>
 
@@ -12,6 +13,8 @@ namespace network
 
   class http_session
   {
+    friend class http_work;
+
   public:
     http_session(server &srv, boost::beast::tcp_stream &&stream, boost::beast::flat_buffer &&buffer, size_t queue_limit = 8);
 
@@ -36,10 +39,31 @@ namespace network
   {
     friend class http_session;
 
+  public:
+    http_work(http_session &session) : session(session) {}
+    virtual ~http_work() = default;
+
   private:
-    http_work(http_session &session);
+    virtual void do_work() = 0;
+
+  protected:
+    template <class Body, class Fields>
+    void handle_request(boost::beast::http::request<Body, Fields> &&req) { session.srv.handle_request(session, std::move(req)); }
 
   private:
     http_session &session;
+  };
+
+  template <class Body, class Fields>
+  class http_work_impl : public http_work
+  {
+  public:
+    http_work_impl(http_session &session, boost::beast::http::request<Body, Fields> &&req) : http_work(session), req(std::move(req)) {}
+
+  private:
+    void do_work() override { handle_request(std::move(req)); }
+
+  private:
+    boost::beast::http::request<Body, Fields> req;
   };
 } // namespace network

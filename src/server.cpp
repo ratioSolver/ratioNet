@@ -86,9 +86,4 @@ namespace network
         acceptor.async_accept(boost::asio::make_strand(ioc), [this](boost::beast::error_code ec, boost::asio::ip::tcp::socket socket)
                               { on_accept(ec, std::move(socket)); });
     }
-
-    template <class Session, class Body, class Fields>
-    void handle_request(Session &session, boost::beast::http::request<Body, Fields> &&req)
-    {
-    }
 } // namespace network

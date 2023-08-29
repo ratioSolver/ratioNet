@@ -25,6 +25,8 @@ namespace network
             LOG_ERR(ec.message());
             return;
         }
+
+        work_queue.emplace(new http_work_impl(*this, parser->release()));
     }
 
     void http_session::on_write(boost::beast::error_code ec, std::size_t, bool close)

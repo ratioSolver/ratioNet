@@ -1,6 +1,7 @@
 #pragma once
 
 #include "memory.h"
+#include "server.h"
 #include <boost/beast.hpp>
 #include <boost/beast/ssl.hpp>
 #include <boost/asio/ssl.hpp>
@@ -14,6 +15,8 @@ namespace network
 
   class ssl_http_session
   {
+    friend class ssl_http_work;
+
   public:
     ssl_http_session(server &srv, boost::beast::tcp_stream &&stream, boost::asio::ssl::context &ctx, boost::beast::flat_buffer &&buffer, size_t queue_limit = 8);
 
@@ -40,10 +43,31 @@ namespace network
   {
     friend class ssl_http_session;
 
+  public:
+    ssl_http_work(ssl_http_session &session) : session(session) {}
+    virtual ~ssl_http_work() = default;
+
   private:
-    ssl_http_work(ssl_http_session &session);
+    virtual void do_work() = 0;
+
+  protected:
+    template <class Body, class Fields>
+    void handle_request(boost::beast::http::request<Body, Fields> &&req) { session.srv.handle_request(session, std::move(req)); }
 
   private:
     ssl_http_session &session;
+  };
+
+  template <class Body, class Fields>
+  class ssl_http_work_impl : public ssl_http_work
+  {
+  public:
+    ssl_http_work_impl(ssl_http_session &session, boost::beast::http::request<Body, Fields> &&req) : ssl_http_work(session), req(std::move(req)) {}
+
+  private:
+    void do_work() override { handle_request(std::move(req)); }
+
+  private:
+    boost::beast::http::request<Body, Fields> req;
   };
 } // namespace network
