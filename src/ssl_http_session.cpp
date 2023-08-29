@@ -86,6 +86,12 @@ namespace network
         delete this; // Delete this session
     }
 
+    void ssl_websocket_session::close(boost::beast::websocket::close_reason const &cr)
+    {
+        ws.async_close(cr, [this](boost::beast::error_code ec)
+                       { on_close(ec); });
+    }
+
     void ssl_websocket_session::on_accept(boost::beast::error_code ec)
     {
         if (ec)
@@ -130,5 +136,14 @@ namespace network
         buffer.consume(buffer.size());
 
         do_read();
+    }
+
+    void ssl_websocket_session::on_close(boost::beast::error_code ec)
+    {
+        if (ec)
+            LOG_ERR(ec.message());
+        else
+            LOG_DEBUG("WebSocket closed");
+        delete this;
     }
 } // namespace network

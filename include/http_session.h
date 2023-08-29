@@ -48,6 +48,8 @@ namespace network
                       { on_accept(ec); });
     }
 
+    void close(boost::beast::websocket::close_reason const &cr);
+
   private:
     void on_accept(boost::beast::error_code ec);
 
@@ -55,6 +57,8 @@ namespace network
     void on_read(boost::beast::error_code ec, std::size_t bytes_transferred);
 
     void on_write(boost::beast::error_code ec, std::size_t bytes_transferred);
+
+    void on_close(boost::beast::error_code ec);
 
   private:
     server &srv;
