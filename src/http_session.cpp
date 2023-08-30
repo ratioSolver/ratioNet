@@ -5,7 +5,36 @@
 namespace network
 {
     request_handler::request_handler(http_session &session, request_ptr &&req) : session(session), req(std::move(req)) {}
-    void request_handler::handle_request() {}
+    void request_handler::handle_request()
+    {
+        if (req->get_target().empty() || req->get_target()[0] != '/' || req->get_target().find("..") != boost::beast::string_view::npos)
+        {
+            auto res = new boost::beast::http::response<boost::beast::http::string_body>(boost::beast::http::status::bad_request, req->get_version());
+            res->set(boost::beast::http::field::server, "ratioNet");
+            res->set(boost::beast::http::field::content_type, "text/html");
+            res->keep_alive(req->keep_alive());
+            if (req->get_target().empty())
+                res->body() = "The path must not be empty";
+            else if (req->get_target()[0] != '/')
+                res->body() = "The path must begin with '/'";
+            else if (req->get_target().find("..") != boost::beast::string_view::npos)
+                res->body() = "The path must not contain '..'";
+            else
+                res->body() = "Bad request";
+            res->prepare_payload();
+            boost::beast::http::async_write(session.stream, *res, [this, res](boost::beast::error_code ec, std::size_t bytes_transferred)
+                                            { session.on_write(ec, bytes_transferred, res->need_eof()); delete res; });
+            return;
+        }
+
+        std::string target = req->get_target().to_string();
+        for (auto &handler : session.srv.http_routes[req->get_method()])
+            if (std::regex_match(target, handler.first))
+            {
+                auto res = handler.second(*req);
+                return;
+            }
+    }
 
     http_session::http_session(server &srv, boost::beast::tcp_stream &&stream, boost::beast::flat_buffer &&buffer, size_t queue_limit) : srv(srv), stream(std::move(stream)), buffer(std::move(buffer)), queue_limit(queue_limit) { do_read(); }
 

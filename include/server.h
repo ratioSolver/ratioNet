@@ -127,6 +127,11 @@ namespace network
   {
   public:
     virtual ~request() = default;
+
+    virtual boost::string_view get_target() const noexcept = 0;
+    virtual boost::beast::http::verb get_method() const noexcept = 0;
+    virtual unsigned get_version() const noexcept = 0;
+    virtual bool keep_alive() const noexcept = 0;
   };
   using request_ptr = utils::u_ptr<request>;
 
@@ -135,6 +140,11 @@ namespace network
   {
   public:
     request_impl(boost::beast::http::request<Body, Fields> &&req) : req(std::move(req)) {}
+
+    boost::string_view get_target() const noexcept { return req.target(); }
+    boost::beast::http::verb get_method() const noexcept { return req.method(); }
+    unsigned get_version() const noexcept { return req.version(); }
+    bool keep_alive() const noexcept { return req.keep_alive(); }
 
     boost::beast::http::request<Body, Fields> req;
   };
@@ -149,10 +159,14 @@ namespace network
   template <class Body, class Fields>
   class response_impl : public response
   {
+    friend class http_session;
+    friend class ssl_http_session;
+
   public:
     response_impl(boost::beast::http::response<Body, Fields> &&res) : res(std::move(res)) {}
     virtual ~response_impl() = default;
 
+  private:
     boost::beast::http::response<Body, Fields> res;
   };
 
@@ -211,26 +225,7 @@ namespace network
   public:
     server(const std::string &address = "0.0.0.0", unsigned short port = 8080, std::size_t concurrency_hint = std::thread::hardware_concurrency());
 
-    void add_route(boost::beast::http::verb method, const std::string &path, std::function<response_ptr(request &)> handler) noexcept
-    {
-      switch (method)
-      {
-      case boost::beast::http::verb::get:
-        get_routes.push_back(std::make_pair(std::regex(path), handler));
-        break;
-      case boost::beast::http::verb::post:
-        post_routes.push_back(std::make_pair(std::regex(path), handler));
-        break;
-      case boost::beast::http::verb::put:
-        put_routes.push_back(std::make_pair(std::regex(path), handler));
-        break;
-      case boost::beast::http::verb::delete_:
-        delete_routes.push_back(std::make_pair(std::regex(path), handler));
-        break;
-      default:
-        break;
-      }
-    }
+    void add_route(boost::beast::http::verb method, const std::string &path, std::function<response_ptr(request &)> handler) noexcept { http_routes[method].push_back(std::make_pair(std::regex(path), handler)); }
 
     ws_handler &add_ws_route(const std::string &path) noexcept
     {
@@ -243,8 +238,6 @@ namespace network
       ws_routes.push_back(std::make_pair(std::regex(path), new ws_handler_impl<ssl_websocket_session>()));
       return *ws_routes.back().second;
     }
-
-    void add_file_route(const std::string &path, const std::string &redirect) noexcept { file_routes.push_back(std::make_pair(std::regex(path), redirect)); }
 
     /**
      * @brief Start the server.
@@ -267,8 +260,7 @@ namespace network
     boost::asio::ip::tcp::endpoint endpoint;                          // The endpoint for the server
     boost::asio::ssl::context ctx{boost::asio::ssl::context::tlsv12}; // The SSL context is required, and holds certificates
     boost::asio::ip::tcp::acceptor acceptor;                          // The acceptor receives incoming connections
-    std::vector<std::pair<std::regex, std::function<response_ptr(request &)>>> get_routes, post_routes, put_routes, delete_routes;
+    std::unordered_map<boost::beast::http::verb, std::vector<std::pair<std::regex, std::function<response_ptr(request &)>>>> http_routes;
     std::vector<std::pair<std::regex, ws_handler_ptr>> ws_routes;
-    std::vector<std::pair<std::regex, std::string>> file_routes;
   };
 } // namespace network
