@@ -1,4 +1,6 @@
 #include "http_session.h"
+#include "request.h"
+#include "response.h"
 #include "server.h"
 #include "logging.h"
 
@@ -32,8 +34,19 @@ namespace network
             if (std::regex_match(target, handler.first))
             {
                 auto res = handler.second(*req);
+                res->handle_response(session);
                 return;
             }
+
+        LOG_WARN("No handler found for " << req->get_method() << " " << target);
+        auto res = new boost::beast::http::response<boost::beast::http::string_body>(boost::beast::http::status::bad_request, req->get_version());
+        res->set(boost::beast::http::field::server, "ratioNet");
+        res->set(boost::beast::http::field::content_type, "text/html");
+        res->keep_alive(req->keep_alive());
+        res->body() = "Bad request";
+        res->prepare_payload();
+        boost::beast::http::async_write(session.stream, *res, [this, res](boost::beast::error_code ec, std::size_t bytes_transferred)
+                                        { session.on_write(ec, bytes_transferred, res->need_eof()); delete res; });
     }
 
     http_session::http_session(server &srv, boost::beast::tcp_stream &&stream, boost::beast::flat_buffer &&buffer, size_t queue_limit) : srv(srv), stream(std::move(stream)), buffer(std::move(buffer)), queue_limit(queue_limit) { do_read(); }
