@@ -211,6 +211,41 @@ namespace network
   public:
     server(const std::string &address = "0.0.0.0", unsigned short port = 8080, std::size_t concurrency_hint = std::thread::hardware_concurrency());
 
+    void add_route(boost::beast::http::verb method, const std::string &path, std::function<response_ptr(request &)> handler) noexcept
+    {
+      switch (method)
+      {
+      case boost::beast::http::verb::get:
+        get_routes.push_back(std::make_pair(std::regex(path), handler));
+        break;
+      case boost::beast::http::verb::post:
+        post_routes.push_back(std::make_pair(std::regex(path), handler));
+        break;
+      case boost::beast::http::verb::put:
+        put_routes.push_back(std::make_pair(std::regex(path), handler));
+        break;
+      case boost::beast::http::verb::delete_:
+        delete_routes.push_back(std::make_pair(std::regex(path), handler));
+        break;
+      default:
+        break;
+      }
+    }
+
+    ws_handler &add_ws_route(const std::string &path) noexcept
+    {
+      ws_routes.push_back(std::make_pair(std::regex(path), new ws_handler_impl<websocket_session>()));
+      return *ws_routes.back().second;
+    }
+
+    ws_handler &add_ssl_ws_route(const std::string &path) noexcept
+    {
+      ws_routes.push_back(std::make_pair(std::regex(path), new ws_handler_impl<ssl_websocket_session>()));
+      return *ws_routes.back().second;
+    }
+
+    void add_file_route(const std::string &path, const std::string &redirect) noexcept { file_routes.push_back(std::make_pair(std::regex(path), redirect)); }
+
     /**
      * @brief Start the server.
      */
@@ -234,5 +269,6 @@ namespace network
     boost::asio::ip::tcp::acceptor acceptor;                          // The acceptor receives incoming connections
     std::vector<std::pair<std::regex, std::function<response_ptr(request &)>>> get_routes, post_routes, put_routes, delete_routes;
     std::vector<std::pair<std::regex, ws_handler_ptr>> ws_routes;
+    std::vector<std::pair<std::regex, std::string>> file_routes;
   };
 } // namespace network
