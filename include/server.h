@@ -123,62 +123,77 @@ namespace network
       {"wmv", "video/x-ms-wmv"},
       {"avi", "video/x-msvideo"}};
 
-  template <class Session>
-  class request_handler
+  class request
   {
-    friend class http_session;
-    friend class ssl_http_session;
+  public:
+    virtual ~request() = default;
+  };
+  using request_ptr = utils::u_ptr<request>;
+
+  template <class Body, class Fields>
+  class request_impl : public request
+  {
+  public:
+    request_impl(boost::beast::http::request<Body, Fields> &&req) : req(std::move(req)) {}
+
+    boost::beast::http::request<Body, Fields> req;
+  };
+
+  class response
+  {
+  public:
+    virtual ~response() = default;
+  };
+  using response_ptr = utils::u_ptr<response>;
+
+  template <class Body, class Fields>
+  class response_impl : public response
+  {
+  public:
+    response_impl(boost::beast::http::response<Body, Fields> &&res) : res(std::move(res)) {}
+    virtual ~response_impl() = default;
+
+    boost::beast::http::response<Body, Fields> res;
+  };
+
+  class ws_handler
+  {
+  public:
+    virtual ~ws_handler() = default;
+  };
+  using ws_handler_ptr = utils::u_ptr<ws_handler>;
+
+  template <class Session>
+  class ws_handler_impl : public ws_handler
+  {
 
   public:
-    request_handler(Session &session) : session(session) {}
-    virtual ~request_handler() = default;
-
-  private:
-    virtual void handle_request() = 0;
-
-  protected:
-    template <class Body, class Fields>
-    void handle_req(boost::beast::http::request<Body, Fields> &&req)
+    ws_handler_impl<Session> &on_open(std::function<void(Session &)> handler) noexcept
     {
-      if (req.target().empty() || req.target().size() > 1024 || req.target()[0] != '/' || req.target().find("..") != boost::beast::string_view::npos)
-      {
-        boost::beast::http::response<boost::beast::http::string_body> res{boost::beast::http::status::bad_request, req.version()};
-        res.set(boost::beast::http::field::server, "ratioNet");
-        res.set(boost::beast::http::field::content_type, "text/html");
-        res.keep_alive(req.keep_alive());
-        if (req.target().empty())
-          res.body() = "Empty request target";
-        else if (req.target().size() > 1024)
-          res.body() = "Request target too long";
-        else if (req.target()[0] != '/')
-          res.body() = "Request target must begin with '/'";
-        else if (req.target().find("..") != boost::beast::string_view::npos)
-          res.body() = "Request target must not contain '..'";
-        else
-          res.body() = "Bad request";
-        res.prepare_payload();
-        boost::beast::http::async_write(session.stream, res, [this](boost::beast::error_code ec, std::size_t bytes_transferred)
-                                        { session.on_write(ec, bytes_transferred, true); });
-        return;
-      }
+      on_open_handler = handler;
+      return *this;
+    }
+    ws_handler_impl<Session> &on_close(std::function<void(Session &)> handler) noexcept
+    {
+      on_close_handler = handler;
+      return *this;
+    }
+    ws_handler_impl<Session> &on_message(std::function<void(Session &, const std::string &)> handler) noexcept
+    {
+      on_message_handler = handler;
+      return *this;
+    }
+    ws_handler_impl<Session> &on_error(std::function<void(Session &, boost::system::error_code)> handler) noexcept
+    {
+      on_error_handler = handler;
+      return *this;
     }
 
   private:
-    Session &session;
-  };
-
-  template <class Session, class Body, class Fields>
-  class request_handler_impl : public request_handler<Session>
-  {
-  public:
-    request_handler_impl(Session &session, boost::beast::http::request<Body, Fields> &&req) : request_handler<Session>(session), req(std::move(req)) {}
-    virtual ~request_handler_impl() = default;
-
-  private:
-    void handle_request() override { request_handler<Session>::handle_req(std::move(req)); }
-
-  private:
-    boost::beast::http::request<Body, Fields> req;
+    std::function<void(Session &)> on_open_handler = [](Session &) {};
+    std::function<void(Session &)> on_close_handler = [](Session &) {};
+    std::function<void(Session &, const std::string &)> on_message_handler = [](Session &, const std::string &) {};
+    std::function<void(Session &, boost::system::error_code)> on_error_handler = [](Session &, boost::system::error_code) {};
   };
 
   /**
@@ -186,8 +201,8 @@ namespace network
    */
   class server
   {
-    friend class request_handler<http_session>;
-    friend class request_handler<ssl_http_session>;
+    friend class request_handler;
+    friend class ssl_request_handler;
     friend class http_session;
     friend class websocket_session;
     friend class ssl_http_session;
@@ -217,7 +232,7 @@ namespace network
     boost::asio::ip::tcp::endpoint endpoint;                          // The endpoint for the server
     boost::asio::ssl::context ctx{boost::asio::ssl::context::tlsv12}; // The SSL context is required, and holds certificates
     boost::asio::ip::tcp::acceptor acceptor;                          // The acceptor receives incoming connections
-    std::vector<std::pair<std::regex, ws_handler>> ws_routes;
-    std::vector<std::pair<std::regex, ssl_ws_handler>> ssl_ws_routes;
+    std::vector<std::pair<std::regex, std::function<response_ptr(request &)>>> get_routes, post_routes, put_routes, delete_routes;
+    std::vector<std::pair<std::regex, ws_handler_ptr>> ws_routes;
   };
 } // namespace network

@@ -4,6 +4,9 @@
 
 namespace network
 {
+    ssl_request_handler::ssl_request_handler(ssl_http_session &session, request_ptr &&req) : session(session), req(std::move(req)) {}
+    void ssl_request_handler::handle_request() {}
+
     ssl_http_session::ssl_http_session(server &srv, boost::beast::tcp_stream &&stream, boost::asio::ssl::context &ctx, boost::beast::flat_buffer &&buffer, size_t queue_limit) : srv(srv), stream(std::move(stream), ctx), buffer(std::move(buffer)), queue_limit(queue_limit)
     {
         boost::beast::get_lowest_layer(this->stream).expires_after(std::chrono::seconds(30)); // Set the timeout
@@ -55,8 +58,8 @@ namespace network
             return;
         }
 
-        work_queue.emplace(new request_handler_impl(*this, parser->release())); // Send the request to the queue
-        if (work_queue.size() == 1)                                             // If this is the first request in the queue, we need to start the work
+        work_queue.emplace(new ssl_request_handler(*this, new request_impl(parser->release()))); // Send the request to the queue
+        if (work_queue.size() == 1)                                                              // If this is the first request in the queue, we need to start the work
             work_queue.back()->handle_request();
         if (work_queue.size() < queue_limit) // If we aren't at the queue limit, try to pipeline another request
             do_read();
@@ -108,11 +111,11 @@ namespace network
                        { on_close(ec); });
     }
 
-    boost::optional<ssl_ws_handler &> ssl_websocket_session::get_ssl_ws_handler(const std::string &path)
+    boost::optional<ws_handler &> ssl_websocket_session::get_ws_handler(const std::string &path)
     {
-        for (auto &handler : srv.ssl_ws_routes)
+        for (auto &handler : srv.ws_routes)
             if (std::regex_match(path, handler.first))
-                return handler.second;
+                return *handler.second;
         return boost::none;
     }
 

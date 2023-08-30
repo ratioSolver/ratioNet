@@ -4,6 +4,9 @@
 
 namespace network
 {
+    request_handler::request_handler(http_session &session, request_ptr &&req) : session(session), req(std::move(req)) {}
+    void request_handler::handle_request() {}
+
     http_session::http_session(server &srv, boost::beast::tcp_stream &&stream, boost::beast::flat_buffer &&buffer, size_t queue_limit) : srv(srv), stream(std::move(stream)), buffer(std::move(buffer)), queue_limit(queue_limit) { do_read(); }
 
     void http_session::do_read()
@@ -35,8 +38,8 @@ namespace network
             return;
         }
 
-        work_queue.emplace(new request_handler_impl(*this, parser->release())); // Send the request to the queue
-        if (work_queue.size() == 1)                                             // If this is the first request in the queue, we need to start the work
+        work_queue.emplace(new request_handler(*this, new request_impl(parser->release()))); // Send the request to the queue
+        if (work_queue.size() == 1)                                                          // If this is the first request in the queue, we need to start the work
             work_queue.back()->handle_request();
         if (work_queue.size() < queue_limit) // If we aren't at the queue limit, try to pipeline another request
             do_read();
@@ -85,7 +88,7 @@ namespace network
     {
         for (auto &handler : srv.ws_routes)
             if (std::regex_match(path, handler.first))
-                return handler.second;
+                return *handler.second;
         return boost::none;
     }
 
