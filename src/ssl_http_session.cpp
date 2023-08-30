@@ -56,6 +56,10 @@ namespace network
         }
 
         work_queue.emplace(new request_handler_impl(*this, parser->release())); // Send the request to the queue
+        if (work_queue.size() == 1)                                             // If this is the first request in the queue, we need to start the work
+            work_queue.back()->handle_request();
+        if (work_queue.size() < queue_limit) // If we aren't at the queue limit, try to pipeline another request
+            do_read();
     }
 
     void ssl_http_session::on_write(boost::beast::error_code ec, std::size_t, bool close)
@@ -68,6 +72,10 @@ namespace network
 
         if (close) // This means we should close the connection, usually because the response indicated the "Connection: close" semantic.
             return do_eof();
+
+        work_queue.pop();                    // Remove the current request from the queue
+        if (work_queue.size() < queue_limit) // If we aren't at the queue limit, try to pipeline another request
+            do_read();
     }
 
     void ssl_http_session::do_eof()
