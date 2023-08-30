@@ -53,6 +53,10 @@ namespace network
   {
     friend class request_handler<http_session>;
     friend class request_handler<ssl_http_session>;
+    friend class http_session;
+    friend class websocket_session;
+    friend class ssl_http_session;
+    friend class ssl_websocket_session;
 
   public:
     server(const std::string &address = "0.0.0.0", unsigned short port = 8080, std::size_t concurrency_hint = std::thread::hardware_concurrency());
@@ -83,5 +87,7 @@ namespace network
     boost::asio::ip::tcp::endpoint endpoint;                          // The endpoint for the server
     boost::asio::ssl::context ctx{boost::asio::ssl::context::tlsv12}; // The SSL context is required, and holds certificates
     boost::asio::ip::tcp::acceptor acceptor;                          // The acceptor receives incoming connections
+    std::vector<std::pair<std::regex, ws_handler>> ws_routes;
+    std::vector<std::pair<std::regex, ssl_ws_handler>> ssl_ws_routes;
   };
 } // namespace network

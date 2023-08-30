@@ -57,10 +57,28 @@ namespace network
         delete this; // Delete this session
     }
 
-    void websocket_session::close(boost::beast::websocket::close_reason const &cr)
+    websocket_session::~websocket_session() { LOG_DEBUG("WebSocket session closed"); }
+
+    void websocket_session::send(const std::string &msg)
     {
-        ws.async_close(cr, [this](boost::beast::error_code ec)
+        // post to strand to avoid concurrent write..
+        boost::asio::post(ws.get_executor(), [this, msg]()
+                          { ws.async_write(boost::asio::buffer(msg), [this](boost::beast::error_code ec, std::size_t bytes_transferred)
+                                           { on_write(ec, bytes_transferred); }); });
+    }
+
+    void websocket_session::close(boost::beast::websocket::close_code code)
+    {
+        ws.async_close(code, [this](boost::beast::error_code ec)
                        { on_close(ec); });
+    }
+
+    boost::optional<ws_handler &> websocket_session::get_ws_handler(const std::string &path)
+    {
+        for (auto &handler : srv.ws_routes)
+            if (std::regex_match(path, handler.first))
+                return handler.second;
+        return boost::none;
     }
 
     void websocket_session::on_accept(boost::beast::error_code ec)
@@ -70,8 +88,8 @@ namespace network
             LOG_ERR(ec.message());
             delete this;
         }
-        else
-            do_read();
+
+        do_read();
     }
 
     void websocket_session::do_read()
@@ -104,17 +122,15 @@ namespace network
             return;
         }
 
-        buffer.consume(buffer.size());
+        buffer.consume(buffer.size()); // Clear the buffer
 
-        do_read();
+        do_read(); // Read another message
     }
 
     void websocket_session::on_close(boost::beast::error_code ec)
     {
         if (ec)
             LOG_ERR(ec.message());
-        else
-            LOG_DEBUG("WebSocket closed");
         delete this; // Delete this session
     }
 } // namespace network

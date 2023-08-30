@@ -86,10 +86,26 @@ namespace network
         delete this; // Delete this session
     }
 
-    void ssl_websocket_session::close(boost::beast::websocket::close_reason const &cr)
+    void ssl_websocket_session::send(const std::string &msg)
     {
-        ws.async_close(cr, [this](boost::beast::error_code ec)
+        // post to strand to avoid concurrent write..
+        boost::asio::post(ws.get_executor(), [this, msg]()
+                          { ws.async_write(boost::asio::buffer(msg), [this](boost::beast::error_code ec, std::size_t bytes_transferred)
+                                           { on_write(ec, bytes_transferred); }); });
+    }
+
+    void ssl_websocket_session::close(boost::beast::websocket::close_code code)
+    {
+        ws.async_close(code, [this](boost::beast::error_code ec)
                        { on_close(ec); });
+    }
+
+    boost::optional<ssl_ws_handler &> ssl_websocket_session::get_ssl_ws_handler(const std::string &path)
+    {
+        for (auto &handler : srv.ssl_ws_routes)
+            if (std::regex_match(path, handler.first))
+                return handler.second;
+        return boost::none;
     }
 
     void ssl_websocket_session::on_accept(boost::beast::error_code ec)
@@ -99,9 +115,11 @@ namespace network
             LOG_ERR(ec.message());
             delete this;
         }
-        else
-            do_read();
+
+        do_read();
     }
+
+    ssl_websocket_session::~ssl_websocket_session() { LOG_DEBUG("WebSocket session closed"); }
 
     void ssl_websocket_session::do_read()
     {
@@ -142,8 +160,6 @@ namespace network
     {
         if (ec)
             LOG_ERR(ec.message());
-        else
-            LOG_DEBUG("WebSocket closed");
         delete this;
     }
 } // namespace network
