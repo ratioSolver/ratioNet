@@ -620,7 +620,7 @@ namespace network
     friend class websocket_session<ssl_websocket_session>;
 
   public:
-    server(const std::string &address = "0.0.0.0", unsigned short port = 8080, std::size_t concurrency_hint = std::thread::hardware_concurrency()) : ioc(concurrency_hint), signals(ioc), endpoint(boost::asio::ip::make_address(address), port), acceptor(boost::asio::make_strand(ioc))
+    server(const std::string &address = "0.0.0.0", unsigned short port = 8080, std::size_t concurrency_hint = std::thread::hardware_concurrency()) : io_ctx(concurrency_hint), signals(io_ctx), endpoint(boost::asio::ip::make_address(address), port), acceptor(boost::asio::make_strand(io_ctx))
     {
       signals.add(SIGINT);
       signals.add(SIGTERM);
@@ -629,7 +629,7 @@ namespace network
 #endif // defined(SIGQUIT)
 
       signals.async_wait([this](boost::system::error_code /*ec*/, int /*signo*/)
-                         { ioc.stop(); });
+                         { stop(); });
 
       threads.reserve(concurrency_hint);
     }
@@ -684,19 +684,19 @@ namespace network
         return;
       }
 
-      acceptor.async_accept(boost::asio::make_strand(ioc), [this](boost::beast::error_code ec, boost::asio::ip::tcp::socket socket)
+      acceptor.async_accept(boost::asio::make_strand(io_ctx), [this](boost::beast::error_code ec, boost::asio::ip::tcp::socket socket)
                             { on_accept(ec, std::move(socket)); });
 
       for (auto i = threads.size(); i > 0; --i)
         threads.emplace_back([this]
-                             { ioc.run(); });
+                             { io_ctx.run(); });
 
-      ioc.run();
+      io_ctx.run();
     }
     /**
      * @brief Stop the server.
      */
-    void stop() {}
+    void stop() { io_ctx.stop(); }
 
     void set_ssl_context(const std::string &certificate_chain_file, const std::string &private_key_file, const std::string &dh_file)
     {
@@ -719,14 +719,14 @@ namespace network
                               { new session_detector(*this, std::move(socket), ctx); });
       }
 
-      acceptor.async_accept(boost::asio::make_strand(ioc), [this](boost::beast::error_code ec, boost::asio::ip::tcp::socket socket)
+      acceptor.async_accept(boost::asio::make_strand(io_ctx), [this](boost::beast::error_code ec, boost::asio::ip::tcp::socket socket)
                             { on_accept(ec, std::move(socket)); });
     }
 
     friend boost::optional<ws_handler &> get_ws_handler(server &srv, const std::string &target);
 
   private:
-    boost::asio::io_context ioc;                                      // The io_context is required for all I/O
+    boost::asio::io_context io_ctx;                                   // The io_context is required for all I/O
     std::vector<std::thread> threads;                                 // The thread pool
     boost::asio::signal_set signals;                                  // The signal_set is used to register for process termination notifications
     boost::asio::ip::tcp::endpoint endpoint;                          // The endpoint for the server
