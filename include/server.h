@@ -250,10 +250,12 @@ namespace network
   };
 
   template <class Body, class Allocator>
-  void make_websocket_session(server &srv, boost::beast::tcp_stream stream, boost::beast::http::request<Body, boost::beast::http::basic_fields<Allocator>> req) { new plain_websocket_session(srv, std::move(stream), std::move(req)); }
+  void make_websocket_session(server &srv, boost::beast::tcp_stream stream, boost::beast::http::request<Body, boost::beast::http::basic_fields<Allocator>> req, ws_handler &handler) { new plain_websocket_session(srv, std::move(stream), std::move(req), handler); }
 
   template <class Body, class Allocator>
-  void make_websocket_session(server &srv, boost::beast::ssl_stream<boost::beast::tcp_stream> stream, boost::beast::http::request<Body, boost::beast::http::basic_fields<Allocator>> req) { new ssl_websocket_session(srv, std::move(stream), std::move(req)); }
+  void make_websocket_session(server &srv, boost::beast::ssl_stream<boost::beast::tcp_stream> stream, boost::beast::http::request<Body, boost::beast::http::basic_fields<Allocator>> req, ws_handler &handler) { new ssl_websocket_session(srv, std::move(stream), std::move(req), handler); }
+
+  boost::optional<ws_handler &> get_ws_handler(server &srv, const std::string &target);
 
   template <class Derived>
   class http_session
@@ -293,7 +295,10 @@ namespace network
       if (boost::beast::websocket::is_upgrade(parser->get()))
       {                                                                         // If this is a WebSocket upgrade request, transfer control to a WebSocket session
         boost::beast::get_lowest_layer(derived().get_stream()).expires_never(); // Turn off the timeout on the tcp_stream, because the websocket stream has its own timeout system.
-        make_websocket_session(srv, derived().release_stream(), parser->release());
+        auto req = parser->release();
+        auto handler = get_ws_handler(srv, req.target().to_string());
+        if (handler)
+          make_websocket_session(srv, derived().release_stream(), std::move(req), handler.get());
         delete this; // Delete this session
         return;
       }
@@ -413,19 +418,13 @@ namespace network
 
   public:
     template <class Body, class Allocator>
-    websocket_session(server &srv, boost::beast::http::request<Body, boost::beast::http::basic_fields<Allocator>> req) : srv(srv), handler(get_ws_handler(req.target().to_string()))
+    websocket_session(server &srv, boost::beast::http::request<Body, boost::beast::http::basic_fields<Allocator>> req, ws_handler &handler) : srv(srv), handler(handler)
     {
       derived().get_websocket().set_option(boost::beast::websocket::stream_base::timeout::suggested(boost::beast::role_type::server));
       derived().get_websocket().set_option(boost::beast::websocket::stream_base::decorator([](boost::beast::websocket::response_type &res)
                                                                                            { res.set(boost::beast::http::field::server, "ratioNet"); }));
       derived().get_websocket().async_accept(req, [this](boost::beast::error_code ec)
                                              { on_accept(ec); });
-
-      if (!handler)
-      {
-        close();
-        return;
-      }
     }
     virtual ~websocket_session() = default;
 
@@ -444,14 +443,6 @@ namespace network
     }
 
   private:
-    boost::optional<ws_handler &> get_ws_handler(const std::string &path)
-    {
-      for (auto &handler : srv.ws_routes)
-        if (std::regex_match(path, handler.first))
-          return *handler.second;
-      return boost::none;
-    }
-
     void on_accept(boost::beast::error_code ec)
     {
       if (ec)
@@ -507,7 +498,7 @@ namespace network
   private:
     server &srv;
     boost::beast::flat_buffer buffer;
-    boost::optional<ws_handler &> handler;
+    ws_handler &handler;
   };
 
   class plain_websocket_session : public websocket_session<plain_websocket_session>
@@ -516,7 +507,7 @@ namespace network
 
   public:
     template <class Body, class Allocator>
-    plain_websocket_session(server &srv, boost::beast::tcp_stream &&stream, boost::beast::http::request<Body, boost::beast::http::basic_fields<Allocator>> req) : websocket_session(srv, std::move(req)), websocket(std::move(stream)) {}
+    plain_websocket_session(server &srv, boost::beast::tcp_stream &&stream, boost::beast::http::request<Body, boost::beast::http::basic_fields<Allocator>> req, ws_handler &handler) : websocket_session(srv, std::move(req), handler), websocket(std::move(stream)) {}
     ~plain_websocket_session() {}
 
   private:
@@ -532,7 +523,7 @@ namespace network
 
   public:
     template <class Body, class Allocator>
-    ssl_websocket_session(server &srv, boost::beast::ssl_stream<boost::beast::tcp_stream> &&stream, boost::beast::http::request<Body, boost::beast::http::basic_fields<Allocator>> req) : websocket_session(srv, std::move(req)), websocket(std::move(stream)) {}
+    ssl_websocket_session(server &srv, boost::beast::ssl_stream<boost::beast::tcp_stream> &&stream, boost::beast::http::request<Body, boost::beast::http::basic_fields<Allocator>> req, ws_handler &handler) : websocket_session(srv, std::move(req), handler), websocket(std::move(stream)) {}
     ~ssl_websocket_session() {}
 
   private:
@@ -547,7 +538,6 @@ namespace network
   public:
     virtual ~ws_handler() = default;
   };
-  using ws_handler_ptr = utils::u_ptr<ws_handler>;
 
   template <class Session>
   class ws_handler_impl : public ws_handler
@@ -624,6 +614,8 @@ namespace network
   {
     friend class request_handler<plain_http_session>;
     friend class request_handler<ssl_http_session>;
+    friend class http_session<plain_http_session>;
+    friend class http_session<ssl_http_session>;
     friend class websocket_session<plain_websocket_session>;
     friend class websocket_session<ssl_websocket_session>;
 
@@ -731,6 +723,8 @@ namespace network
                             { on_accept(ec, std::move(socket)); });
     }
 
+    friend boost::optional<ws_handler &> get_ws_handler(server &srv, const std::string &target);
+
   private:
     boost::asio::io_context ioc;                                      // The io_context is required for all I/O
     std::vector<std::thread> threads;                                 // The thread pool
@@ -739,6 +733,14 @@ namespace network
     boost::asio::ssl::context ctx{boost::asio::ssl::context::tlsv12}; // The SSL context is required, and holds certificates
     boost::asio::ip::tcp::acceptor acceptor;                          // The acceptor receives incoming connections
     std::unordered_map<boost::beast::http::verb, std::vector<std::pair<std::regex, std::function<response_ptr(request &)>>>> http_routes;
-    std::vector<std::pair<std::regex, ws_handler_ptr>> ws_routes;
+    std::vector<std::pair<std::regex, utils::u_ptr<ws_handler>>> ws_routes;
   };
+
+  boost::optional<ws_handler &> get_ws_handler(server &srv, const std::string &target)
+  {
+    for (auto &handler : srv.ws_routes)
+      if (std::regex_match(target, handler.first))
+        return *handler.second;
+    return boost::none;
+  }
 } // namespace network
