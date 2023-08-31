@@ -37,17 +37,7 @@ namespace network
                                                                            { on_connect(ec, ep); });
     }
 
-    void on_connect(boost::beast::error_code ec, boost::asio::ip::tcp::resolver::results_type::endpoint_type)
-    {
-      if (ec)
-      {
-        LOG_ERR("on_connect: " << ec.message());
-        return;
-      }
-
-      // Set a timeout on the operation
-      boost::beast::get_lowest_layer(derived().get_stream()).expires_after(std::chrono::seconds(30));
-    }
+    virtual void on_connect(boost::beast::error_code ec, boost::asio::ip::tcp::resolver::results_type::endpoint_type) = 0;
 
   protected:
     boost::asio::strand<boost::asio::system_executor> strand;
@@ -61,12 +51,19 @@ namespace network
     friend class client<plain_client>;
 
   public:
-    plain_client(const std::string &host, const std::string &service = "80") : client(boost::asio::make_strand(boost::asio::system_executor()), host, service), stream(strand)
-    {
-    }
+    plain_client(const std::string &host, const std::string &service = "80") : client(boost::asio::make_strand(boost::asio::system_executor()), host, service), stream(strand) {}
 
   private:
     boost::beast::tcp_stream &get_stream() { return stream; }
+
+    void on_connect(boost::beast::error_code ec, boost::asio::ip::tcp::resolver::results_type::endpoint_type) override
+    {
+      if (ec)
+      {
+        LOG_ERR("on_connect: " << ec.message());
+        return;
+      }
+    }
 
   private:
     boost::beast::tcp_stream stream;
@@ -90,6 +87,31 @@ namespace network
 
   private:
     boost::beast::ssl_stream<boost::beast::tcp_stream> &get_stream() { return stream; }
+
+    void on_connect(boost::beast::error_code ec, boost::asio::ip::tcp::resolver::results_type::endpoint_type) override
+    {
+      if (ec)
+      {
+        LOG_ERR("on_connect: " << ec.message());
+        return;
+      }
+
+      // Set a timeout on the operation
+      boost::beast::get_lowest_layer(stream).expires_after(std::chrono::seconds(30));
+
+      // Perform the SSL handshake
+      stream.async_handshake(boost::asio::ssl::stream_base::client, [this](boost::beast::error_code ec)
+                             { on_handshake(ec); });
+    }
+
+    void on_handshake(boost::beast::error_code ec)
+    {
+      if (ec)
+      {
+        LOG_ERR("on_handshake: " << ec.message());
+        return;
+      }
+    }
 
   private:
     boost::asio::ssl::context ctx{boost::asio::ssl::context::tlsv12}; // The SSL context is required, and holds certificates
