@@ -17,7 +17,7 @@ Welcome to the `ratioNet` documentation. This framework provides a powerful and 
 - **Examples and Tutorials**: The repository includes examples and tutorials to help you understand how to use the framework effectively in different scenarios.
 
 ## Getting Started
-Follow these steps to get started with the C++ Network Framework:
+Follow these steps to get started with `ratioNet`:
 
 Clone the Repository: Start by cloning this repository to your local machine:
 
@@ -29,7 +29,7 @@ git clone https://github.com/ratioSolver/ratioNet.git
 
 ## Usage
 
-Here's a simple example of how to use the C++ Network Framework to create an HTTP server:
+Here's a simple example of how to use `ratioNet` to create an HTTP server:
 
 ```cpp
 #include <server.h>
