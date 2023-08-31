@@ -21,6 +21,8 @@ namespace network
   class plain_http_session;
   class ssl_http_session;
   class ws_handler;
+  template <class Session>
+  class websocket_session;
   class plain_websocket_session;
   class ssl_websocket_session;
 
@@ -401,14 +403,58 @@ namespace network
     void on_shutdown(boost::beast::error_code ec)
     {
       if (ec)
+      {
         LOG_ERR(ec.message());
+      }
       else
+      {
         LOG_DEBUG("SSL shutdown");
+      }
       delete this; // Delete this session
     }
 
   private:
     boost::beast::ssl_stream<boost::beast::tcp_stream> stream;
+  };
+
+  class ws_handler
+  {
+  public:
+    virtual ~ws_handler() = default;
+  };
+
+  template <class Session>
+  class ws_handler_impl : public ws_handler
+  {
+    friend class websocket_session<Session>;
+
+  public:
+    ws_handler_impl<Session> &on_open(std::function<void(Session &)> handler) noexcept
+    {
+      on_open_handler = handler;
+      return *this;
+    }
+    ws_handler_impl<Session> &on_close(std::function<void(Session &)> handler) noexcept
+    {
+      on_close_handler = handler;
+      return *this;
+    }
+    ws_handler_impl<Session> &on_message(std::function<void(Session &, const std::string &)> handler) noexcept
+    {
+      on_message_handler = handler;
+      return *this;
+    }
+    ws_handler_impl<Session> &on_error(std::function<void(Session &, boost::beast::error_code)> handler) noexcept
+    {
+      on_error_handler = handler;
+      return *this;
+    }
+
+  private:
+    std::function<void(Session &)> on_open_handler = [](Session &) {};
+    std::function<void(Session &)> on_close_handler = [](Session &) {};
+    std::function<void(Session &, const std::string &)> on_message_handler = [](Session &, const std::string &) {};
+    std::function<void(Session &, boost::beast::error_code)> on_error_handler = [](Session &, boost::beast::error_code) {};
   };
 
   template <class Derived>
@@ -448,8 +494,11 @@ namespace network
       if (ec)
       {
         LOG_ERR(ec.message());
+        static_cast<ws_handler_impl<Derived> &>(handler).on_error_handler(derived(), ec);
         delete this;
       }
+
+      static_cast<ws_handler_impl<Derived> &>(handler).on_open_handler(derived());
 
       do_read();
     }
@@ -469,9 +518,12 @@ namespace network
       else if (ec)
       {
         LOG_ERR(ec.message());
+        static_cast<ws_handler_impl<Derived> &>(handler).on_error_handler(derived(), ec);
         delete this;
         return;
       }
+
+      static_cast<ws_handler_impl<Derived> &>(handler).on_message_handler(derived(), boost::beast::buffers_to_string(buffer.data()));
     }
 
     void on_write(boost::beast::error_code ec, std::size_t)
@@ -479,6 +531,7 @@ namespace network
       if (ec)
       {
         LOG_ERR(ec.message());
+        static_cast<ws_handler_impl<Derived> &>(handler).on_error_handler(derived(), ec);
         delete this;
         return;
       }
@@ -491,7 +544,12 @@ namespace network
     void on_close(boost::beast::error_code ec)
     {
       if (ec)
+      {
         LOG_ERR(ec.message());
+        static_cast<ws_handler_impl<Derived> &>(handler).on_error_handler(derived(), ec);
+      }
+
+      static_cast<ws_handler_impl<Derived> &>(handler).on_close_handler(derived());
       delete this;
     }
 
@@ -533,45 +591,6 @@ namespace network
     boost::beast::websocket::stream<boost::beast::ssl_stream<boost::beast::tcp_stream>> websocket;
   };
 
-  class ws_handler
-  {
-  public:
-    virtual ~ws_handler() = default;
-  };
-
-  template <class Session>
-  class ws_handler_impl : public ws_handler
-  {
-
-  public:
-    ws_handler_impl<Session> &on_open(std::function<void(Session &)> handler) noexcept
-    {
-      on_open_handler = handler;
-      return *this;
-    }
-    ws_handler_impl<Session> &on_close(std::function<void(Session &)> handler) noexcept
-    {
-      on_close_handler = handler;
-      return *this;
-    }
-    ws_handler_impl<Session> &on_message(std::function<void(Session &, const std::string &)> handler) noexcept
-    {
-      on_message_handler = handler;
-      return *this;
-    }
-    ws_handler_impl<Session> &on_error(std::function<void(Session &, boost::system::error_code)> handler) noexcept
-    {
-      on_error_handler = handler;
-      return *this;
-    }
-
-  private:
-    std::function<void(Session &)> on_open_handler = [](Session &) {};
-    std::function<void(Session &)> on_close_handler = [](Session &) {};
-    std::function<void(Session &, const std::string &)> on_message_handler = [](Session &, const std::string &) {};
-    std::function<void(Session &, boost::system::error_code)> on_error_handler = [](Session &, boost::system::error_code) {};
-  };
-
   class session_detector
   {
   public:
@@ -586,7 +605,9 @@ namespace network
     void on_detect(boost::beast::error_code ec, bool result)
     {
       if (ec)
+      {
         LOG_ERR(ec.message());
+      }
       else if (result)
       {
         LOG_DEBUG("SSL connection detected");
@@ -628,7 +649,7 @@ namespace network
       signals.add(SIGQUIT);
 #endif // defined(SIGQUIT)
 
-      signals.async_wait([this](boost::system::error_code /*ec*/, int /*signo*/)
+      signals.async_wait([this](boost::beast::error_code /*ec*/, int /*signo*/)
                          { stop(); });
 
       threads.reserve(concurrency_hint);
@@ -655,7 +676,7 @@ namespace network
     {
       LOG("Starting server on " << endpoint);
 
-      boost::system::error_code ec;
+      boost::beast::error_code ec;
       acceptor.open(endpoint.protocol(), ec);
       if (ec)
       {

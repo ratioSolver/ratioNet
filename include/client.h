@@ -5,6 +5,7 @@
 #include <boost/beast/ssl.hpp>
 #include <boost/asio.hpp>
 #include <boost/asio/system_executor.hpp>
+#include <functional>
 
 namespace network
 {
@@ -21,12 +22,16 @@ namespace network
 #if defined(SIGQUIT)
       signals.add(SIGQUIT);
 #endif
-      signals.async_wait([this](boost::system::error_code, int)
+      signals.async_wait([this](boost::beast::error_code, int)
                          { close(); });
 
       resolver.async_resolve(host, service, [this](boost::beast::error_code ec, boost::asio::ip::tcp::resolver::results_type results)
                              { on_resolve(ec, results); });
     }
+
+    void set_on_connect_handler(std::function<void()> handler) { on_connect_handler = handler; }
+    void set_on_error_handler(std::function<void(boost::beast::error_code)> handler) { on_connect_handler = handler; }
+    void set_on_close_handler(std::function<void()> handler) { on_close_handler = handler; }
 
     virtual void close() = 0;
 
@@ -51,6 +56,9 @@ namespace network
 
   protected:
     boost::asio::strand<boost::asio::system_executor> strand;
+    std::function<void()> on_connect_handler = []() {};
+    std::function<void(boost::beast::error_code)> on_error_handler = [](boost::beast::error_code) {};
+    std::function<void()> on_close_handler = []() {};
 
   private:
     boost::asio::signal_set signals;
@@ -72,13 +80,18 @@ namespace network
       if (ec)
       {
         LOG_ERR("on_connect: " << ec.message());
+        on_error_handler(ec);
         return;
       }
+
+      on_connect_handler();
     }
 
     void close() override
     {
       stream.socket().shutdown(boost::asio::ip::tcp::socket::shutdown_both);
+
+      on_close_handler();
     }
 
   private:
@@ -97,6 +110,7 @@ namespace network
       {
         boost::beast::error_code ec{static_cast<int>(::ERR_get_error()), boost::asio::error::get_ssl_category()};
         LOG_ERR("SSL_set_tlsext_host_name: " << ec.message());
+        on_error_handler(ec);
         return;
       }
     }
@@ -109,6 +123,7 @@ namespace network
       if (ec)
       {
         LOG_ERR("on_connect: " << ec.message());
+        on_error_handler(ec);
         return;
       }
 
@@ -125,8 +140,11 @@ namespace network
       if (ec)
       {
         LOG_ERR("on_handshake: " << ec.message());
+        on_error_handler(ec);
         return;
       }
+
+      on_connect_handler();
     }
 
     void close() override
@@ -150,8 +168,11 @@ namespace network
       if (ec)
       {
         LOG_ERR("on_shutdown: " << ec.message());
+        on_error_handler(ec);
         return;
       }
+
+      on_close_handler();
     }
 
   private:
