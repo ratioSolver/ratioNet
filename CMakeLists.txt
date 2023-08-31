@@ -24,19 +24,19 @@ endif()
 file(GLOB RATIONET_SOURCES src/*.cpp)
 file(GLOB RATIONET_HEADERS include/*.h)
 
-add_library(${PROJECT_NAME} STATIC ${RATIONET_SOURCES})
+add_library(${PROJECT_NAME} INTERFACE ${RATIONET_SOURCES} ${RATIONET_HEADERS})
 GENERATE_EXPORT_HEADER(${PROJECT_NAME})
-target_include_directories(${PROJECT_NAME} PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>)
-target_link_libraries(${PROJECT_NAME} utils Boost::system OpenSSL::SSL OpenSSL::Crypto)
+target_include_directories(${PROJECT_NAME} INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>)
+target_link_libraries(${PROJECT_NAME} INTERFACE utils Boost::system OpenSSL::SSL OpenSSL::Crypto)
 
 if(BUILD_TESTING)
     add_subdirectory(tests)
 endif()
 
 if(MSVC)
-    target_compile_options(${PROJECT_NAME} PRIVATE /W4)
+    target_compile_options(${PROJECT_NAME} INTERFACE /W4)
 else()
-    target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -pedantic)
+    target_compile_options(${PROJECT_NAME} INTERFACE -Wall -Wextra -pedantic)
 endif()
 
 install(
