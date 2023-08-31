@@ -182,10 +182,18 @@ namespace network
   using response_ptr = utils::u_ptr<response>;
 
   template <class Session, class Body, class Fields>
+  void handle_res(Session &session, boost::beast::http::response<Body, Fields> &&res)
+  {
+    bool close = res.need_eof();
+    boost::beast::http::async_write(session.get_stream(), res, [&session, close](boost::beast::error_code ec, std::size_t bytes_transferred)
+                                    { session.on_write(ec, bytes_transferred, close); });
+  }
+
+  template <class Session, class Body, class Fields>
   class response_impl : public response
   {
   public:
-    response_impl(Session &session, boost::beast::http::response<Body, Fields> &&res) : res(std::move(res)) {}
+    response_impl(Session &session, boost::beast::http::response<Body, Fields> &&res) : session(session), res(std::move(res)) {}
     virtual ~response_impl() = default;
 
   private:
@@ -193,8 +201,7 @@ namespace network
     {
       res.set(boost::beast::http::field::server, "ratioNet");
       res.prepare_payload();
-      boost::beast::http::async_write(session.stream, res, [this](boost::beast::error_code ec, std::size_t bytes_transferred)
-                                      { session.on_write(ec, bytes_transferred, res.need_eof()); });
+      handle_res(session, std::move(res));
     }
 
   private:
@@ -329,6 +336,9 @@ namespace network
 
     virtual void do_eof() = 0;
 
+    template <class Session, class Body, class Fields>
+    friend void handle_res(Session &session, boost::beast::http::response<Body, Fields> &&res);
+
   protected:
     server &srv;
     boost::beast::flat_buffer buffer;
@@ -350,6 +360,9 @@ namespace network
   private:
     boost::beast::tcp_stream &get_stream() { return stream; }
     boost::beast::tcp_stream release_stream() { return std::move(stream); }
+
+    template <class Session, class Body, class Fields>
+    friend void handle_res(Session &session, boost::beast::http::response<Body, Fields> &&res);
 
     void do_eof() override
     {
@@ -378,6 +391,9 @@ namespace network
   private:
     boost::beast::ssl_stream<boost::beast::tcp_stream> &get_stream() { return stream; }
     boost::beast::ssl_stream<boost::beast::tcp_stream> release_stream() { return std::move(stream); }
+
+    template <class Session, class Body, class Fields>
+    friend void handle_res(Session &session, boost::beast::http::response<Body, Fields> &&res);
 
     void on_handshake(boost::beast::error_code ec)
     {
@@ -743,6 +759,9 @@ namespace network
       acceptor.async_accept(boost::asio::make_strand(io_ctx), [this](boost::beast::error_code ec, boost::asio::ip::tcp::socket socket)
                             { on_accept(ec, std::move(socket)); });
     }
+
+    template <class Session, class Body, class Fields>
+    friend void handle_res(Session &session, boost::beast::http::response<Body, Fields> &&res);
 
     friend boost::optional<ws_handler &> get_ws_handler(server &srv, const std::string &target);
 
