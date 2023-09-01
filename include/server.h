@@ -194,8 +194,8 @@ namespace network
   template <class Body, class Allocator>
   void make_websocket_session(server &srv, boost::beast::ssl_stream<boost::beast::tcp_stream> stream, boost::beast::http::request<Body, boost::beast::http::basic_fields<Allocator>> req, ws_handler &handler) { new ssl_websocket_session(srv, std::move(stream), std::move(req), handler); }
 
-  boost::optional<http_handler &> get_http_handler(server &srv, boost::beast::http::verb method, const std::string &target);
-  boost::optional<ws_handler &> get_ws_handler(server &srv, const std::string &target);
+  boost::optional<http_handler &> get_http_handler(server &srv, boost::beast::http::verb method, const std::string &target, bool ssl);
+  boost::optional<ws_handler &> get_ws_handler(server &srv, const std::string &target, bool ssl);
 
   template <class Derived>
   class http_session
@@ -208,6 +208,8 @@ namespace network
   public:
     http_session(server &srv, boost::beast::flat_buffer &&buffer) : srv(srv), buffer(std::move(buffer)) {}
     virtual ~http_session() = default;
+
+    virtual bool is_ssl() const = 0;
 
     template <class Body>
     void do_write(boost::beast::http::response<Body> *res)
@@ -244,7 +246,7 @@ namespace network
       {                                                                         // If this is a WebSocket upgrade request, transfer control to a WebSocket session
         boost::beast::get_lowest_layer(derived().get_stream()).expires_never(); // Turn off the timeout on the tcp_stream, because the websocket stream has its own timeout system.
         auto req = parser->release();
-        auto handler = get_ws_handler(srv, req.target().to_string());
+        auto handler = get_ws_handler(srv, req.target().to_string(), is_ssl());
         if (handler)
           make_websocket_session(srv, derived().release_stream(), std::move(req), handler.get());
         delete this; // Delete this session
@@ -277,7 +279,7 @@ namespace network
       }
 
       std::string target = req.target().to_string();
-      auto handler = get_http_handler(srv, req.method(), target);
+      auto handler = get_http_handler(srv, req.method(), target, is_ssl());
       if (handler)
       {
         request_impl<Derived, Body> req_impl(derived(), std::move(req));
@@ -328,6 +330,8 @@ namespace network
   public:
     plain_http_session(server &srv, boost::beast::tcp_stream &&str, boost::beast::flat_buffer &&buffer) : http_session(srv, std::move(buffer)), stream(std::move(str)) { do_read(); }
 
+    bool is_ssl() const override { return false; }
+
   private:
     boost::beast::tcp_stream &get_stream() { return stream; }
     boost::beast::tcp_stream release_stream() { return std::move(stream); }
@@ -355,6 +359,8 @@ namespace network
       stream.async_handshake(boost::asio::ssl::stream_base::server, buffer.data(), [this](boost::beast::error_code ec, std::size_t)
                              { on_handshake(ec); }); // Perform the SSL handshake
     }
+
+    bool is_ssl() const override { return true; }
 
   private:
     boost::beast::ssl_stream<boost::beast::tcp_stream> &get_stream() { return stream; }
@@ -648,10 +654,15 @@ namespace network
     ws_handler &add_ws_route(const std::string &path, bool ssl = false) noexcept
     {
       if (ssl)
+      {
         ws_routes.push_back(std::make_pair(std::regex(path), new ws_handler_impl<ssl_websocket_session>()));
+        return *ws_routes.back().second;
+      }
       else
-        ws_routes.push_back(std::make_pair(std::regex(path), new ws_handler_impl<plain_websocket_session>()));
-      return *ws_routes.back().second;
+      {
+        wss_routes.push_back(std::make_pair(std::regex(path), new ws_handler_impl<plain_websocket_session>()));
+        return *wss_routes.back().second;
+      }
     }
 
     /**
@@ -729,8 +740,8 @@ namespace network
                             { on_accept(ec, std::move(socket)); });
     }
 
-    friend boost::optional<http_handler &> get_http_handler(server &srv, boost::beast::http::verb method, const std::string &target);
-    friend boost::optional<ws_handler &> get_ws_handler(server &srv, const std::string &target);
+    friend boost::optional<http_handler &> get_http_handler(server &srv, boost::beast::http::verb method, const std::string &target, bool ssl);
+    friend boost::optional<ws_handler &> get_ws_handler(server &srv, const std::string &target, bool ssl);
 
   private:
     boost::asio::io_context io_ctx;                                   // The io_context is required for all I/O
@@ -739,21 +750,21 @@ namespace network
     boost::asio::ip::tcp::endpoint endpoint;                          // The endpoint for the server
     boost::asio::ssl::context ctx{boost::asio::ssl::context::tlsv12}; // The SSL context is required, and holds certificates
     boost::asio::ip::tcp::acceptor acceptor;                          // The acceptor receives incoming connections
-    std::unordered_map<boost::beast::http::verb, std::vector<std::pair<std::regex, utils::u_ptr<http_handler>>>> http_routes;
-    std::vector<std::pair<std::regex, utils::u_ptr<ws_handler>>> ws_routes;
+    std::unordered_map<boost::beast::http::verb, std::vector<std::pair<std::regex, utils::u_ptr<http_handler>>>> http_routes, https_routes;
+    std::vector<std::pair<std::regex, utils::u_ptr<ws_handler>>> ws_routes, wss_routes;
   };
 
-  boost::optional<http_handler &> get_http_handler(server &srv, boost::beast::http::verb method, const std::string &target)
+  boost::optional<http_handler &> get_http_handler(server &srv, boost::beast::http::verb method, const std::string &target, bool ssl = false)
   {
-    for (auto &handler : srv.http_routes[method])
+    for (auto &handler : ssl ? srv.https_routes[method] : srv.http_routes[method])
       if (std::regex_match(target, handler.first))
         return *handler.second;
     return boost::none;
   }
 
-  boost::optional<ws_handler &> get_ws_handler(server &srv, const std::string &target)
+  boost::optional<ws_handler &> get_ws_handler(server &srv, const std::string &target, bool ssl = false)
   {
-    for (auto &handler : srv.ws_routes)
+    for (auto &handler : ssl ? srv.wss_routes : srv.ws_routes)
       if (std::regex_match(target, handler.first))
         return *handler.second;
     return boost::none;
