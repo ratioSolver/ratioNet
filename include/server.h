@@ -142,11 +142,6 @@ namespace network
   {
   public:
     virtual ~request() = default;
-
-    virtual boost::string_view get_target() const noexcept = 0;
-    virtual boost::beast::http::verb get_method() const noexcept = 0;
-    virtual unsigned get_version() const noexcept = 0;
-    virtual bool keep_alive() const noexcept = 0;
   };
   using request_ptr = utils::u_ptr<request>;
 
@@ -156,106 +151,42 @@ namespace network
   public:
     request_impl(Session &session, boost::beast::http::request<Body, Fields> &&req) : session(session), req(std::move(req)) {}
 
-    boost::string_view get_target() const noexcept { return req.target(); }
-    boost::beast::http::verb get_method() const noexcept { return req.method(); }
-    unsigned get_version() const noexcept { return req.version(); }
-    bool keep_alive() const noexcept { return req.keep_alive(); }
-
-    Session &get_session() const noexcept { return session; }
-
   private:
     Session &session;
     boost::beast::http::request<Body, Fields> req;
   };
 
-  class response
+  class http_handler
   {
-    friend class request_handler<plain_http_session>;
-    friend class request_handler<ssl_http_session>;
-
   public:
-    virtual ~response() = default;
+    virtual ~http_handler() = default;
 
-  private:
-    virtual void handle_response() = 0;
+    virtual void handle_response(const request &&req) = 0;
   };
-  using response_ptr = utils::u_ptr<response>;
+  using http_handler_ptr = utils::u_ptr<http_handler>;
 
-  template <class Session, class Body, class Fields>
-  void handle_res(Session &session, boost::beast::http::response<Body, Fields> &&res)
+  template <class Session, class ReqBody, class ReqFields, class ResBody, class ResFields>
+  class http_handler_impl
   {
-    bool close = res.need_eof();
-    boost::beast::http::async_write(session.get_stream(), res, [&session, close](boost::beast::error_code ec, std::size_t bytes_transferred)
-                                    { session.on_write(ec, bytes_transferred, close); });
-  }
+    friend class request_impl<Session, ReqBody, ReqFields>;
 
-  template <class Session, class Body, class Fields>
-  class response_impl : public response
-  {
   public:
-    response_impl(Session &session, boost::beast::http::response<Body, Fields> &&res) : session(session), res(std::move(res)) {}
-    virtual ~response_impl() = default;
+    http_handler_impl(std::function<void(boost::beast::http::request<ReqBody, ReqFields> &, boost::beast::http::response<ResBody, ResFields> &)> &&handler) : handler(std::move(handler)) {}
 
-  private:
-    void handle_response() override
+    void handle_response(const request &&req) override
     {
-      res.set(boost::beast::http::field::server, "ratioNet");
-      res.prepare_payload();
-      handle_res(session, std::move(res));
-    }
-
-  private:
-    Session &session;
-    boost::beast::http::response<Body, Fields> res;
-  };
-
-  template <class Session>
-  class request_handler
-  {
-  public:
-    request_handler(Session &session, request_ptr &&req) : session(session), req(std::move(req)) {}
-
-    void handle_request()
-    {
-      if (req->get_target().empty() || req->get_target()[0] != '/' || req->get_target().find("..") != boost::beast::string_view::npos)
-      {
-        auto res = new boost::beast::http::response<boost::beast::http::string_body>(boost::beast::http::status::bad_request, req->get_version());
-        res->set(boost::beast::http::field::server, "ratioNet");
-        res->set(boost::beast::http::field::content_type, "text/html");
-        res->keep_alive(req->keep_alive());
-        if (req->get_target().empty())
-          res->body() = "The path must not be empty";
-        else if (req->get_target()[0] != '/')
-          res->body() = "The path must begin with '/'";
-        else if (req->get_target().find("..") != boost::beast::string_view::npos)
-          res->body() = "The path must not contain '..'";
-        else
-          res->body() = "Bad request";
-        res->prepare_payload();
-        boost::beast::http::async_write(session.get_stream(), *res, [this, res](boost::beast::error_code ec, std::size_t bytes_transferred)
-                                        { session.on_write(ec, bytes_transferred, res->need_eof()); delete res; });
-        return;
-      }
-
-      std::string target = req->get_target().to_string();
-      for (auto &handler : session.srv.http_routes[req->get_method()])
-        if (std::regex_match(target, handler.first))
-          return handler.second(*req)->handle_response();
-
-      LOG_WARN("No handler found for " << req->get_method() << " " << target);
-      auto res = new boost::beast::http::response<boost::beast::http::string_body>(boost::beast::http::status::bad_request, req->get_version());
+      auto &req_impl = static_cast<const request_impl<Session, ReqBody, ReqFields> &>(req);
+      auto res = new boost::beast::http::response<ResBody, ResFields>(boost::beast::http::status::ok, req_impl.get_version());
       res->set(boost::beast::http::field::server, "ratioNet");
       res->set(boost::beast::http::field::content_type, "text/html");
-      res->keep_alive(req->keep_alive());
-      res->body() = "Bad request";
+      res->keep_alive(req_impl.keep_alive());
+      handler(req_impl.req, *res);
       res->prepare_payload();
-      boost::beast::http::async_write(session.get_stream(), *res, [this, res](boost::beast::error_code ec, std::size_t bytes_transferred)
-                                      { session.on_write(ec, bytes_transferred, res->need_eof()); delete res; });
+      req_impl.session.do_write(res);
     }
 
   private:
-    Session &session;
-    request_ptr req;
+    std::function<void(boost::beast::http::request<ReqBody, ReqFields> &, boost::beast::http::response<ResBody, ResFields> &)> handler;
   };
 
   template <class Body, class Allocator>
@@ -264,6 +195,7 @@ namespace network
   template <class Body, class Allocator>
   void make_websocket_session(server &srv, boost::beast::ssl_stream<boost::beast::tcp_stream> stream, boost::beast::http::request<Body, boost::beast::http::basic_fields<Allocator>> req, ws_handler &handler) { new ssl_websocket_session(srv, std::move(stream), std::move(req), handler); }
 
+  boost::optional<http_handler &> get_http_handler(server &srv, boost::beast::http::verb method, const std::string &target);
   boost::optional<ws_handler &> get_ws_handler(server &srv, const std::string &target);
 
   template <class Derived>
@@ -275,8 +207,16 @@ namespace network
     Derived &derived() { return static_cast<Derived &>(*this); }
 
   public:
-    http_session(server &srv, boost::beast::flat_buffer &&buffer, size_t queue_limit = 8) : srv(srv), buffer(std::move(buffer)), queue_limit(queue_limit) {}
+    http_session(server &srv, boost::beast::flat_buffer &&buffer) : srv(srv), buffer(std::move(buffer)) {}
     virtual ~http_session() = default;
+
+    template <class Body, class Fields>
+    void do_write(boost::beast::http::response<Body, Fields> *res)
+    {
+      bool close = res->need_eof();
+      boost::beast::http::async_write(derived().get_stream(), *res, [this, close, res](boost::beast::error_code ec, std::size_t bytes_transferred)
+                                      { on_write(ec, bytes_transferred, close); delete res; });
+    }
 
   protected:
     void do_read()
@@ -312,12 +252,51 @@ namespace network
         return;
       }
 
-      work_queue.emplace(new request_handler(derived(), new request_impl(derived(), parser->release()))); // Send the request to the queue
-      if (work_queue.size() == 1)                                                                         // If this is the first request in the queue, we need to start the work
-        work_queue.back()->handle_request();
-      if (work_queue.size() < queue_limit) // If we aren't at the queue limit, try to pipeline another request
-        do_read();
+      handle_request(parser->release()); // Handle the HTTP request
     }
+
+    template <class Body, class Fields>
+    void handle_request(boost::beast::http::request<Body, Fields> &&req)
+    {
+      if (req.target().empty() || req.target()[0] != '/' || req.target().find("..") != boost::beast::string_view::npos)
+      {
+        auto res = new boost::beast::http::response<boost::beast::http::string_body>(boost::beast::http::status::bad_request, req.version());
+        res->set(boost::beast::http::field::server, "ratioNet");
+        res->set(boost::beast::http::field::content_type, "text/html");
+        res->keep_alive(req.keep_alive());
+        if (req.target().empty())
+          res->body() = "The path must not be empty";
+        else if (req.target()[0] != '/')
+          res->body() = "The path must begin with '/'";
+        else if (req.target().find("..") != boost::beast::string_view::npos)
+          res->body() = "The path must not contain '..'";
+        else
+          res->body() = "Bad request";
+        res->prepare_payload();
+        do_write(res);
+        return;
+      }
+
+      std::string target = req.target().to_string();
+      auto handler = get_http_handler(srv, req.method(), target);
+      if (handler)
+      {
+        request_impl<Derived, Body, Fields> req_impl(derived(), std::move(req));
+        return handler.get().handle_response(std::move(req_impl));
+      }
+      else
+      {
+        LOG_WARN("No handler found for " << req.method() << " " << target);
+        auto res = new boost::beast::http::response<boost::beast::http::string_body>(boost::beast::http::status::bad_request, req.version());
+        res->set(boost::beast::http::field::server, "ratioNet");
+        res->set(boost::beast::http::field::content_type, "text/html");
+        res->keep_alive(req.keep_alive());
+        res->body() = "Bad request";
+        res->prepare_payload();
+        do_write(res);
+      }
+    }
+
     void on_write(boost::beast::error_code ec, std::size_t, bool close)
     {
       if (ec)
@@ -329,15 +308,10 @@ namespace network
       if (close) // This means we should close the connection, usually because the response indicated the "Connection: close" semantic.
         return do_eof();
 
-      work_queue.pop();                    // Remove the current request from the queue
-      if (work_queue.size() < queue_limit) // If we aren't at the queue limit, try to pipeline another request
-        do_read();
+      do_read();
     }
 
     virtual void do_eof() = 0;
-
-    template <class Session, class Body, class Fields>
-    friend void handle_res(Session &session, boost::beast::http::response<Body, Fields> &&res);
 
   protected:
     server &srv;
@@ -345,8 +319,6 @@ namespace network
 
   private:
     boost::optional<boost::beast::http::request_parser<boost::beast::http::string_body>> parser;
-    const size_t queue_limit;                                      // The limit on the allowed size of the queue
-    std::queue<utils::u_ptr<request_handler<Derived>>> work_queue; // This queue is used for the work that is to be done on the session
   };
 
   class plain_http_session : public http_session<plain_http_session>
@@ -355,14 +327,11 @@ namespace network
     friend class request_handler<plain_http_session>;
 
   public:
-    plain_http_session(server &srv, boost::beast::tcp_stream &&str, boost::beast::flat_buffer &&buffer, size_t queue_limit = 8) : http_session(srv, std::move(buffer), queue_limit), stream(std::move(str)) { do_read(); }
+    plain_http_session(server &srv, boost::beast::tcp_stream &&str, boost::beast::flat_buffer &&buffer) : http_session(srv, std::move(buffer)), stream(std::move(str)) { do_read(); }
 
   private:
     boost::beast::tcp_stream &get_stream() { return stream; }
     boost::beast::tcp_stream release_stream() { return std::move(stream); }
-
-    template <class Session, class Body, class Fields>
-    friend void handle_res(Session &session, boost::beast::http::response<Body, Fields> &&res);
 
     void do_eof() override
     {
@@ -381,7 +350,7 @@ namespace network
     friend class request_handler<ssl_http_session>;
 
   public:
-    ssl_http_session(server &srv, boost::beast::tcp_stream &&str, boost::asio::ssl::context &ctx, boost::beast::flat_buffer &&buffer, size_t queue_limit = 8) : http_session(srv, std::move(buffer), queue_limit), stream(std::move(str), ctx)
+    ssl_http_session(server &srv, boost::beast::tcp_stream &&str, boost::asio::ssl::context &ctx, boost::beast::flat_buffer &&buffer) : http_session(srv, std::move(buffer)), stream(std::move(str), ctx)
     {
       boost::beast::get_lowest_layer(stream).expires_after(std::chrono::seconds(30)); // Set the timeout
       stream.async_handshake(boost::asio::ssl::stream_base::server, buffer.data(), [this](boost::beast::error_code ec, std::size_t)
@@ -391,9 +360,6 @@ namespace network
   private:
     boost::beast::ssl_stream<boost::beast::tcp_stream> &get_stream() { return stream; }
     boost::beast::ssl_stream<boost::beast::tcp_stream> release_stream() { return std::move(stream); }
-
-    template <class Session, class Body, class Fields>
-    friend void handle_res(Session &session, boost::beast::http::response<Body, Fields> &&res);
 
     void on_handshake(boost::beast::error_code ec)
     {
@@ -671,17 +637,21 @@ namespace network
       threads.reserve(concurrency_hint);
     }
 
-    void add_route(boost::beast::http::verb method, const std::string &path, std::function<response_ptr(request &)> handler) noexcept { http_routes[method].push_back(std::make_pair(std::regex(path), handler)); }
-
-    ws_handler &add_ws_route(const std::string &path) noexcept
+    template <class ReqBody, class ReqFields, class ResBody, class ResFields>
+    void add_route(boost::beast::http::verb method, const std::string &path, std::function<void(boost::beast::http::request<ReqBody, ReqFields> &, boost::beast::http::response<ResBody, ResFields> &)> handler, bool ssl = false) noexcept
     {
-      ws_routes.push_back(std::make_pair(std::regex(path), new ws_handler_impl<plain_websocket_session>()));
-      return *ws_routes.back().second;
+      if (ssl)
+        http_routes[method].push_back(std::make_pair(std::regex(path), new http_handler_impl<ssl_http_session, ReqBody, ReqFields, ResBody, ResFields>(std::move(handler))));
+      else
+        http_routes[method].push_back(std::make_pair(std::regex(path), new http_handler_impl<plain_http_session, ReqBody, ReqFields, ResBody, ResFields>(std::move(handler))));
     }
 
-    ws_handler &add_ssl_ws_route(const std::string &path) noexcept
+    ws_handler &add_ws_route(const std::string &path, bool ssl = false) noexcept
     {
-      ws_routes.push_back(std::make_pair(std::regex(path), new ws_handler_impl<ssl_websocket_session>()));
+      if (ssl)
+        ws_routes.push_back(std::make_pair(std::regex(path), new ws_handler_impl<ssl_websocket_session>()));
+      else
+        ws_routes.push_back(std::make_pair(std::regex(path), new ws_handler_impl<plain_websocket_session>()));
       return *ws_routes.back().second;
     }
 
@@ -760,9 +730,7 @@ namespace network
                             { on_accept(ec, std::move(socket)); });
     }
 
-    template <class Session, class Body, class Fields>
-    friend void handle_res(Session &session, boost::beast::http::response<Body, Fields> &&res);
-
+    friend boost::optional<http_handler &> get_http_handler(server &srv, boost::beast::http::verb method, const std::string &target);
     friend boost::optional<ws_handler &> get_ws_handler(server &srv, const std::string &target);
 
   private:
@@ -772,9 +740,17 @@ namespace network
     boost::asio::ip::tcp::endpoint endpoint;                          // The endpoint for the server
     boost::asio::ssl::context ctx{boost::asio::ssl::context::tlsv12}; // The SSL context is required, and holds certificates
     boost::asio::ip::tcp::acceptor acceptor;                          // The acceptor receives incoming connections
-    std::unordered_map<boost::beast::http::verb, std::vector<std::pair<std::regex, std::function<response_ptr(request &)>>>> http_routes;
+    std::unordered_map<boost::beast::http::verb, std::vector<std::pair<std::regex, utils::u_ptr<http_handler>>>> http_routes;
     std::vector<std::pair<std::regex, utils::u_ptr<ws_handler>>> ws_routes;
   };
+
+  boost::optional<http_handler &> get_http_handler(server &srv, boost::beast::http::verb method, const std::string &target)
+  {
+    for (auto &handler : srv.http_routes[method])
+      if (std::regex_match(target, handler.first))
+        return *handler.second;
+    return boost::none;
+  }
 
   boost::optional<ws_handler &> get_ws_handler(server &srv, const std::string &target)
   {
