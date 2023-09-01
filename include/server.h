@@ -713,7 +713,13 @@ namespace network
     /**
      * @brief Stop the server.
      */
-    void stop() { io_ctx.stop(); }
+    void stop()
+    {
+      LOG("Stopping server");
+      io_ctx.stop();
+      for (auto &thread : threads)
+        thread.join();
+    }
 
     void set_ssl_context(const std::string &certificate_chain_file, const std::string &private_key_file, const std::string &dh_file)
     {
