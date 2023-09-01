@@ -15,7 +15,8 @@ namespace network
     Derived &derived() { return static_cast<Derived &>(*this); }
 
   public:
-    client(boost::asio::strand<boost::asio::system_executor> strand) : strand(strand), signals(strand), resolver(strand)
+    client(
+        boost::asio::strand<boost::asio::system_executor> strand, std::function<void()> on_connect_handler = []() {}, std::function<void(boost::beast::error_code)> on_error_handler = [](boost::beast::error_code) {}, std::function<void()> on_close_handler = []() {}) : strand(strand), signals(strand), resolver(strand), on_connect_handler(on_connect_handler), on_error_handler(on_error_handler), on_close_handler(on_close_handler)
     {
       signals.add(SIGINT);
       signals.add(SIGTERM);
@@ -182,14 +183,16 @@ namespace network
 
   protected:
     boost::asio::strand<boost::asio::system_executor> strand;
-    std::function<void()> on_connect_handler = []() {};
-    std::function<void(boost::beast::error_code)> on_error_handler = [](boost::beast::error_code) {};
-    std::function<void()> on_close_handler = []() {};
 
   private:
     boost::asio::signal_set signals;
     boost::asio::ip::tcp::resolver resolver;
     boost::beast::flat_buffer buffer;
+
+  protected:
+    std::function<void()> on_connect_handler;
+    std::function<void(boost::beast::error_code)> on_error_handler;
+    std::function<void()> on_close_handler;
   };
 
   class plain_client : public client<plain_client>
@@ -197,7 +200,11 @@ namespace network
     friend class client<plain_client>;
 
   public:
-    plain_client(const std::string &host, const std::string &port = "80") : client(boost::asio::make_strand(boost::asio::system_executor())), stream(strand) { do_resolve(host, port); }
+    plain_client(
+        const std::string &host, const std::string &port = "80", std::function<void()> on_connect_handler = []() {}, std::function<void(boost::beast::error_code)> on_error_handler = [](boost::beast::error_code) {}, std::function<void()> on_close_handler = []() {}) : client(boost::asio::make_strand(boost::asio::system_executor()), on_connect_handler, on_error_handler, on_close_handler), stream(strand)
+    {
+      do_resolve(host, port);
+    }
 
   private:
     boost::beast::tcp_stream &get_stream() { return stream; }
@@ -230,7 +237,8 @@ namespace network
     friend class client<ssl_client>;
 
   public:
-    ssl_client(const std::string &host, const std::string &port = "443") : client(boost::asio::make_strand(boost::asio::system_executor())), stream(strand, ctx)
+    ssl_client(
+        const std::string &host, const std::string &port = "443", std::function<void()> on_connect_handler = []() {}, std::function<void(boost::beast::error_code)> on_error_handler = [](boost::beast::error_code) {}, std::function<void()> on_close_handler = []() {}) : client(boost::asio::make_strand(boost::asio::system_executor()), on_connect_handler, on_error_handler, on_close_handler), stream(strand, ctx)
     {
       // Set SNI Hostname (many hosts need this to handshake successfully)
       if (!SSL_set_tlsext_host_name(stream.native_handle(), host.c_str()))
