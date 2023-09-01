@@ -721,11 +721,10 @@ namespace network
         thread.join();
     }
 
-    void set_ssl_context(const std::string &certificate_chain_file, const std::string &private_key_file, const std::string &dh_file)
+    void set_ssl_context(const std::string &certificate_file, const std::string &private_key_file)
     {
-      ctx.use_certificate_chain_file(certificate_chain_file);
+      ctx.use_certificate_file(certificate_file, boost::asio::ssl::context::pem);
       ctx.use_private_key_file(private_key_file, boost::asio::ssl::context::pem);
-      ctx.use_tmp_dh_file(dh_file);
     }
 
   private:
@@ -754,7 +753,7 @@ namespace network
     std::vector<std::thread> threads;                                 // The thread pool
     boost::asio::signal_set signals;                                  // The signal_set is used to register for process termination notifications
     boost::asio::ip::tcp::endpoint endpoint;                          // The endpoint for the server
-    boost::asio::ssl::context ctx{boost::asio::ssl::context::tlsv12}; // The SSL context is required, and holds certificates
+    boost::asio::ssl::context ctx{boost::asio::ssl::context::sslv23}; // The SSL context is required, and holds certificates
     boost::asio::ip::tcp::acceptor acceptor;                          // The acceptor receives incoming connections
     std::unordered_map<boost::beast::http::verb, std::vector<std::pair<std::regex, utils::u_ptr<http_handler>>>> http_routes, https_routes;
     std::vector<std::pair<std::regex, utils::u_ptr<ws_handler>>> ws_routes, wss_routes;
