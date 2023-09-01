@@ -4,13 +4,11 @@ int main()
 {
   network::server server;
 
-  std::function<void(const boost::beast::http::request<boost::beast::http::string_body> &, boost::beast::http::response<boost::beast::http::string_body> &)> handler = [](const boost::beast::http::request<boost::beast::http::string_body> &req, boost::beast::http::response<boost::beast::http::string_body> &res)
-  {
-    res.body() = "Hello, world!";
-    res.prepare_payload();
-  };
-
-  server.add_route(boost::beast::http::verb::get, "/", handler);
+  server.add_route(boost::beast::http::verb::get, "/", std::function{[](const boost::beast::http::request<boost::beast::http::string_body> &, boost::beast::http::response<boost::beast::http::string_body> &res)
+                                                                     {
+                                                                       res.set(boost::beast::http::field::content_type, "html");
+                                                                       res.body() = R"(<html><body><h1>Hello, world!</h1></body></html>)";
+                                                                     }});
 
   server.start();
 
