@@ -145,15 +145,15 @@ namespace network
   };
   using request_ptr = utils::u_ptr<request>;
 
-  template <class Session, class Body, class Fields>
+  template <class Session, class Body>
   class request_impl : public request
   {
   public:
-    request_impl(Session &session, boost::beast::http::request<Body, Fields> &&req) : session(session), req(std::move(req)) {}
+    request_impl(Session &session, boost::beast::http::request<Body> &&req) : session(session), req(std::move(req)) {}
 
   private:
     Session &session;
-    boost::beast::http::request<Body, Fields> req;
+    boost::beast::http::request<Body> req;
   };
 
   class http_handler
@@ -165,18 +165,18 @@ namespace network
   };
   using http_handler_ptr = utils::u_ptr<http_handler>;
 
-  template <class Session, class ReqBody, class ReqFields, class ResBody, class ResFields>
+  template <class Session, class ReqBody, class ResBody>
   class http_handler_impl
   {
-    friend class request_impl<Session, ReqBody, ReqFields>;
+    friend class request_impl<Session, ReqBody>;
 
   public:
-    http_handler_impl(std::function<void(boost::beast::http::request<ReqBody, ReqFields> &, boost::beast::http::response<ResBody, ResFields> &)> &&handler) : handler(std::move(handler)) {}
+    http_handler_impl(std::function<void(boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> &&handler) : handler(std::move(handler)) {}
 
     void handle_response(const request &&req) override
     {
-      auto &req_impl = static_cast<const request_impl<Session, ReqBody, ReqFields> &>(req);
-      auto res = new boost::beast::http::response<ResBody, ResFields>(boost::beast::http::status::ok, req_impl.get_version());
+      auto &req_impl = static_cast<const request_impl<Session, ReqBody> &>(req);
+      auto res = new boost::beast::http::response<ResBody>(boost::beast::http::status::ok, req_impl.get_version());
       res->set(boost::beast::http::field::server, "ratioNet");
       res->set(boost::beast::http::field::content_type, "text/html");
       res->keep_alive(req_impl.keep_alive());
@@ -186,7 +186,7 @@ namespace network
     }
 
   private:
-    std::function<void(boost::beast::http::request<ReqBody, ReqFields> &, boost::beast::http::response<ResBody, ResFields> &)> handler;
+    std::function<void(boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> handler;
   };
 
   template <class Body, class Allocator>
@@ -210,8 +210,8 @@ namespace network
     http_session(server &srv, boost::beast::flat_buffer &&buffer) : srv(srv), buffer(std::move(buffer)) {}
     virtual ~http_session() = default;
 
-    template <class Body, class Fields>
-    void do_write(boost::beast::http::response<Body, Fields> *res)
+    template <class Body>
+    void do_write(boost::beast::http::response<Body> *res)
     {
       bool close = res->need_eof();
       boost::beast::http::async_write(derived().get_stream(), *res, [this, close, res](boost::beast::error_code ec, std::size_t bytes_transferred)
@@ -255,8 +255,8 @@ namespace network
       handle_request(parser->release()); // Handle the HTTP request
     }
 
-    template <class Body, class Fields>
-    void handle_request(boost::beast::http::request<Body, Fields> &&req)
+    template <class Body>
+    void handle_request(boost::beast::http::request<Body> &&req)
     {
       if (req.target().empty() || req.target()[0] != '/' || req.target().find("..") != boost::beast::string_view::npos)
       {
@@ -281,7 +281,7 @@ namespace network
       auto handler = get_http_handler(srv, req.method(), target);
       if (handler)
       {
-        request_impl<Derived, Body, Fields> req_impl(derived(), std::move(req));
+        request_impl<Derived, Body> req_impl(derived(), std::move(req));
         return handler.get().handle_response(std::move(req_impl));
       }
       else
@@ -637,13 +637,13 @@ namespace network
       threads.reserve(concurrency_hint);
     }
 
-    template <class ReqBody, class ReqFields, class ResBody, class ResFields>
-    void add_route(boost::beast::http::verb method, const std::string &path, std::function<void(boost::beast::http::request<ReqBody, ReqFields> &, boost::beast::http::response<ResBody, ResFields> &)> handler, bool ssl = false) noexcept
+    template <class ReqBody, class ResBody>
+    void add_route(boost::beast::http::verb method, const std::string &path, std::function<void(boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> handler, bool ssl = false) noexcept
     {
       if (ssl)
-        http_routes[method].push_back(std::make_pair(std::regex(path), new http_handler_impl<ssl_http_session, ReqBody, ReqFields, ResBody, ResFields>(std::move(handler))));
+        http_routes[method].push_back(std::make_pair(std::regex(path), new http_handler_impl<ssl_http_session, ReqBody, ResBody>(std::move(handler))));
       else
-        http_routes[method].push_back(std::make_pair(std::regex(path), new http_handler_impl<plain_http_session, ReqBody, ReqFields, ResBody, ResFields>(std::move(handler))));
+        http_routes[method].push_back(std::make_pair(std::regex(path), new http_handler_impl<plain_http_session, ReqBody, ResBody>(std::move(handler))));
     }
 
     ws_handler &add_ws_route(const std::string &path, bool ssl = false) noexcept
