@@ -361,8 +361,8 @@ namespace network
     {
       LOG_DEBUG("SSL handshake");
       boost::beast::get_lowest_layer(stream).expires_after(std::chrono::seconds(30)); // Set the timeout
-      stream.async_handshake(boost::asio::ssl::stream_base::server, buffer.data(), [this](boost::beast::error_code ec, std::size_t)
-                             { on_handshake(ec); }); // Perform the SSL handshake
+      stream.async_handshake(boost::asio::ssl::stream_base::server, buffer.data(), [this](boost::beast::error_code ec, std::size_t bytes_used)
+                             { on_handshake(ec, bytes_used); }); // Perform the SSL handshake
     }
 
     bool is_ssl() const override { return true; }
@@ -371,7 +371,7 @@ namespace network
     boost::beast::ssl_stream<boost::beast::tcp_stream> &get_stream() { return stream; }
     boost::beast::ssl_stream<boost::beast::tcp_stream> release_stream() { return std::move(stream); }
 
-    void on_handshake(boost::beast::error_code ec)
+    void on_handshake(boost::beast::error_code ec, std::size_t bytes_used)
     {
       LOG_DEBUG("SSL handshake done");
       if (ec)
@@ -381,9 +381,8 @@ namespace network
       }
       else
       {
-        buffer.consume(buffer.size()); // Consume the portion of the buffer used by the handshake
-
-        do_read();
+        buffer.consume(bytes_used); // Consume the portion of the buffer used by the handshake
+        do_read();                  // Start reading a new request
       }
     }
 
