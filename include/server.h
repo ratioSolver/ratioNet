@@ -214,6 +214,7 @@ namespace network
     template <class Body>
     void do_write(boost::beast::http::response<Body> *res)
     {
+      LOG_DEBUG("Writing response");
       bool close = res->need_eof();
       boost::beast::http::async_write(derived().get_stream(), *res, [this, close, res](boost::beast::error_code ec, std::size_t bytes_transferred)
                                       { on_write(ec, bytes_transferred, close); delete res; });
@@ -222,6 +223,7 @@ namespace network
   protected:
     void do_read()
     {
+      LOG_DEBUG("Reading request");
       parser.emplace();                                                                               // Construct a new parser for each message
       parser->body_limit(10000);                                                                      // Set the limit on the allowed size of a message
       boost::beast::get_lowest_layer(derived().get_stream()).expires_after(std::chrono::seconds(30)); // Set the timeout
@@ -233,6 +235,7 @@ namespace network
   private:
     void on_read(boost::beast::error_code ec, std::size_t)
     {
+      LOG_DEBUG("Request read");
       if (ec == boost::beast::http::error::end_of_stream)
         return do_eof();
 
@@ -300,6 +303,7 @@ namespace network
 
     void on_write(boost::beast::error_code ec, std::size_t, bool close)
     {
+      LOG_DEBUG("Response written");
       if (ec)
       {
         LOG_ERR(ec.message());
@@ -355,6 +359,7 @@ namespace network
   public:
     ssl_http_session(server &srv, boost::beast::tcp_stream &&str, boost::asio::ssl::context &ctx, boost::beast::flat_buffer &&buffer) : http_session(srv, std::move(buffer)), stream(std::move(str), ctx)
     {
+      LOG_DEBUG("SSL handshake");
       boost::beast::get_lowest_layer(stream).expires_after(std::chrono::seconds(30)); // Set the timeout
       stream.async_handshake(boost::asio::ssl::stream_base::server, buffer.data(), [this](boost::beast::error_code ec, std::size_t)
                              { on_handshake(ec); }); // Perform the SSL handshake
@@ -368,6 +373,7 @@ namespace network
 
     void on_handshake(boost::beast::error_code ec)
     {
+      LOG_DEBUG("SSL handshake done");
       if (ec)
       {
         LOG_ERR(ec.message());
@@ -583,6 +589,7 @@ namespace network
   public:
     session_detector(server &srv, boost::asio::ip::tcp::socket &&socket, boost::asio::ssl::context &ctx) : srv(srv), stream(std::move(socket)), ctx(ctx)
     {
+      LOG_DEBUG("Detecting connection type");
       boost::asio::dispatch(stream.get_executor(), [this]
                             { boost::beast::async_detect_ssl(stream, buffer, [this](boost::beast::error_code ec, bool result)
                                                              { on_detect(ec, result); }); });
@@ -721,10 +728,13 @@ namespace network
         thread.join();
     }
 
-    void set_ssl_context(const std::string &certificate_file, const std::string &private_key_file)
+    void set_ssl_context(const std::string &certificate_file, const std::string &private_key_file, const std::string &dh_file)
     {
+      ctx.set_options(boost::asio::ssl::context::default_workarounds | boost::asio::ssl::context::no_sslv2 | boost::asio::ssl::context::single_dh_use);
+
       ctx.use_certificate_file(certificate_file, boost::asio::ssl::context::pem);
       ctx.use_private_key_file(private_key_file, boost::asio::ssl::context::pem);
+      ctx.use_tmp_dh_file(dh_file);
     }
 
   private:
