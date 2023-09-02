@@ -313,7 +313,7 @@ namespace network
     }
 
   private:
-    boost::asio::ssl::context ctx{boost::asio::ssl::context::tlsv12}; // The SSL context is required, and holds certificates
+    boost::asio::ssl::context ctx{boost::asio::ssl::context::tlsv13}; // The SSL context is required, and holds certificates
     boost::beast::ssl_stream<boost::beast::tcp_stream> stream;
   };
 } // namespace network
