@@ -1,6 +1,6 @@
 #include "server.h"
 
-void test_simple()
+void test_plain()
 {
   network::server server;
 
@@ -43,7 +43,7 @@ void test_ssl()
 
 int main()
 {
-  test_simple();
+  test_plain();
 
   test_ssl();
 
