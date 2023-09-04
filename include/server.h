@@ -377,6 +377,7 @@ namespace network
       if (ec)
       {
         LOG_ERR(ec.message());
+        LOG_ERR(ec.category().name());
         delete this;
       }
       else
@@ -588,13 +589,19 @@ namespace network
   public:
     session_detector(server &srv, boost::asio::ip::tcp::socket &&socket, boost::asio::ssl::context &ctx) : srv(srv), stream(std::move(socket)), ctx(ctx)
     {
-      LOG_DEBUG("Detecting connection type");
       boost::asio::dispatch(stream.get_executor(), [this]
-                            { boost::beast::async_detect_ssl(stream, buffer, [this](boost::beast::error_code ec, bool result)
-                                                             { on_detect(ec, result); }); });
+                            { on_run(); });
     }
 
   private:
+    void on_run()
+    {
+      LOG_DEBUG("Detecting connection type");
+      stream.expires_after(std::chrono::seconds(30)); // Set the timeout
+      boost::beast::async_detect_ssl(stream, buffer, [this](boost::beast::error_code ec, bool result)
+                                     { on_detect(ec, result); }); // Detect SSL
+    }
+
     void on_detect(boost::beast::error_code ec, bool result)
     {
       if (ec)
@@ -707,8 +714,7 @@ namespace network
         return;
       }
 
-      acceptor.async_accept(boost::asio::make_strand(io_ctx), [this](boost::beast::error_code ec, boost::asio::ip::tcp::socket socket)
-                            { on_accept(ec, std::move(socket)); });
+      do_accept();
 
       for (auto i = threads.size(); i > 0; --i)
         threads.emplace_back([this]
@@ -737,6 +743,13 @@ namespace network
     }
 
   private:
+    void do_accept()
+    {
+      LOG_DEBUG("Accepting connection");
+      acceptor.async_accept(boost::asio::make_strand(io_ctx), [this](boost::beast::error_code ec, boost::asio::ip::tcp::socket socket)
+                            { on_accept(ec, std::move(socket)); });
+    }
+
     void on_accept(boost::beast::error_code ec, boost::asio::ip::tcp::socket socket)
     {
       if (ec)
@@ -746,12 +759,10 @@ namespace network
       else
       {
         LOG_DEBUG("Accepted connection from " << socket.remote_endpoint());
-        boost::asio::dispatch(acceptor.get_executor(), [this, socket = std::move(socket)]() mutable
-                              { new session_detector(*this, std::move(socket), ctx); });
+        new session_detector(*this, std::move(socket), ctx);
       }
 
-      acceptor.async_accept(boost::asio::make_strand(io_ctx), [this](boost::beast::error_code ec, boost::asio::ip::tcp::socket socket)
-                            { on_accept(ec, std::move(socket)); });
+      do_accept();
     }
 
     friend boost::optional<http_handler &> get_http_handler(server &srv, boost::beast::http::verb method, const std::string &target, bool ssl);
