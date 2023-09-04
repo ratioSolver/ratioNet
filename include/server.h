@@ -143,7 +143,6 @@ namespace network
   public:
     virtual ~request() = default;
   };
-  using request_ptr = utils::u_ptr<request>;
 
   template <class Session, class Body>
   class request_impl : public request
@@ -162,7 +161,6 @@ namespace network
 
     virtual void handle_response(const request &&req) = 0;
   };
-  using http_handler_ptr = utils::u_ptr<http_handler>;
 
   template <class Session, class ReqBody, class ResBody>
   class http_handler_impl : public http_handler
@@ -282,8 +280,7 @@ namespace network
       }
 
       std::string target = req.target().to_string();
-      auto handler = get_http_handler(srv, req.method(), target, is_ssl());
-      if (handler)
+      if (auto handler = get_http_handler(srv, req.method(), target, is_ssl()); handler)
       {
         request_impl<Derived, Body> req_impl(derived(), std::move(req));
         return handler.get().handle_response(std::move(req_impl));
@@ -357,7 +354,7 @@ namespace network
     friend class request_handler<ssl_http_session>;
 
   public:
-    ssl_http_session(server &srv, boost::beast::tcp_stream &&str, boost::asio::ssl::context &ctx, boost::beast::flat_buffer &&buffer) : http_session(srv, std::move(buffer)), stream(std::move(str), ctx)
+    ssl_http_session(server &srv, boost::beast::tcp_stream &&str, boost::asio::ssl::context &ctx, boost::beast::flat_buffer &&bfr) : http_session(srv, std::move(bfr)), stream(std::move(str), ctx)
     {
       LOG_DEBUG("SSL handshake");
       boost::beast::get_lowest_layer(stream).expires_after(std::chrono::seconds(30)); // Set the timeout
@@ -377,7 +374,6 @@ namespace network
       if (ec)
       {
         LOG_ERR(ec.message());
-        LOG_ERR(ec.category().name());
         delete this;
       }
       else
@@ -659,7 +655,7 @@ namespace network
     void add_route(boost::beast::http::verb method, const std::string &path, std::function<void(const boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> handler, bool ssl = false) noexcept
     {
       if (ssl)
-        http_routes[method].push_back(std::make_pair(std::regex(path), new http_handler_impl<ssl_http_session, ReqBody, ResBody>(std::move(handler))));
+        https_routes[method].push_back(std::make_pair(std::regex(path), new http_handler_impl<ssl_http_session, ReqBody, ResBody>(std::move(handler))));
       else
         http_routes[method].push_back(std::make_pair(std::regex(path), new http_handler_impl<plain_http_session, ReqBody, ResBody>(std::move(handler))));
     }
@@ -668,13 +664,13 @@ namespace network
     {
       if (ssl)
       {
-        ws_routes.push_back(std::make_pair(std::regex(path), new ws_handler_impl<ssl_websocket_session>()));
-        return *ws_routes.back().second;
+        wss_routes.push_back(std::make_pair(std::regex(path), new ws_handler_impl<ssl_websocket_session>()));
+        return *wss_routes.back().second;
       }
       else
       {
-        wss_routes.push_back(std::make_pair(std::regex(path), new ws_handler_impl<plain_websocket_session>()));
-        return *wss_routes.back().second;
+        ws_routes.push_back(std::make_pair(std::regex(path), new ws_handler_impl<plain_websocket_session>()));
+        return *ws_routes.back().second;
       }
     }
 

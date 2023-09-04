@@ -35,7 +35,7 @@ void test_ssl()
   auto t = new std::thread{[&server]
                            { server.start(); }};
 
-  std::this_thread::sleep_for(std::chrono::seconds(1000));
+  std::this_thread::sleep_for(std::chrono::seconds(10));
   server.stop();
   t->join();
   delete t;
@@ -43,7 +43,7 @@ void test_ssl()
 
 int main()
 {
-  // test_simple();
+  test_simple();
 
   test_ssl();
 
