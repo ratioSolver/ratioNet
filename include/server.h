@@ -775,7 +775,7 @@ namespace network
     std::vector<std::pair<std::regex, utils::u_ptr<ws_handler>>> ws_routes, wss_routes;
   };
 
-  boost::optional<http_handler &> get_http_handler(server &srv, boost::beast::http::verb method, const std::string &target, bool ssl = false)
+  inline boost::optional<http_handler &> get_http_handler(server &srv, boost::beast::http::verb method, const std::string &target, bool ssl = false)
   {
     for (auto &handler : ssl ? srv.https_routes[method] : srv.http_routes[method])
       if (std::regex_match(target, handler.first))
@@ -783,7 +783,7 @@ namespace network
     return boost::none;
   }
 
-  boost::optional<ws_handler &> get_ws_handler(server &srv, const std::string &target, bool ssl = false)
+  inline boost::optional<ws_handler &> get_ws_handler(server &srv, const std::string &target, bool ssl = false)
   {
     for (auto &handler : ssl ? srv.wss_routes : srv.ws_routes)
       if (std::regex_match(target, handler.first))

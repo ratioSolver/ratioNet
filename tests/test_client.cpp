@@ -1,5 +1,6 @@
 #include "client.h"
 #include <thread>
+#include <iostream>
 
 int main()
 {
