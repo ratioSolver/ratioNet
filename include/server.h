@@ -177,9 +177,24 @@ namespace network
       res->set(boost::beast::http::field::server, "ratioNet");
       res->set(boost::beast::http::field::content_type, "text/html");
       res->keep_alive(req_impl.req.keep_alive());
-      handler(req_impl.req, *res);
-      res->prepare_payload();
-      req_impl.session.do_write(res);
+      try
+      {
+        handler(req_impl.req, *res);
+        res->prepare_payload();
+        req_impl.session.do_write(res);
+      }
+      catch (const std::exception &e)
+      {
+        delete res;
+        LOG_ERR(e.what());
+        auto c_res = new boost::beast::http::response<boost::beast::http::string_body>(boost::beast::http::status::bad_request, req_impl.req.version());
+        c_res->set(boost::beast::http::field::server, "ratioNet");
+        c_res->set(boost::beast::http::field::content_type, "text/html");
+        c_res->keep_alive(req_impl.req.keep_alive());
+        c_res->body() = e.what();
+        c_res->prepare_payload();
+        req_impl.session.do_write(c_res);
+      }
     }
 
   private:
@@ -320,7 +335,7 @@ namespace network
     boost::beast::flat_buffer buffer;
 
   private:
-    boost::optional<boost::beast::http::request_parser<boost::beast::http::string_body>> parser;
+    boost::optional<boost::beast::http::request_parser<boost::beast::http::string_body>> parser; // The parser for reading the request. The parser is stored in an optional container so we can construct it from scratch it at the beginning of each new message.
   };
 
   class plain_http_session : public http_session<plain_http_session>
