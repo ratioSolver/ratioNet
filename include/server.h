@@ -461,6 +461,15 @@ namespace network
     std::function<void(Session &, boost::beast::error_code)> on_error_handler = [](Session &, boost::beast::error_code) {};
   };
 
+  class message final : public utils::countable
+  {
+  public:
+    message(const std::string &msg) : msg(msg) {}
+    message(const std::string &&msg) : msg(std::move(msg)) {}
+
+    std::string msg;
+  };
+
   template <class Derived>
   class websocket_session
   {
@@ -470,12 +479,13 @@ namespace network
     websocket_session(server &srv, ws_handler &handler) : srv(srv), handler(handler) {}
     virtual ~websocket_session() = default;
 
-    void send(const std::string &msg)
+    void send(const std::string &&msg) { send(utils::c_ptr<message>(new message(std::move(msg)))); }
+
+    void send(utils::c_ptr<message> msg)
     {
       // post to strand to avoid concurrent write..
       boost::asio::post(derived().get_websocket().get_executor(), [this, msg]()
-                        { derived().get_websocket().async_write(boost::asio::buffer(msg), [this](boost::beast::error_code ec, std::size_t bytes_transferred)
-                                                                { on_write(ec, bytes_transferred); }); });
+                        { enqueue(std::move(msg)); });
     }
 
     void close(boost::beast::websocket::close_code code = boost::beast::websocket::close_code::normal)
@@ -537,6 +547,21 @@ namespace network
       do_read(); // Read another message
     }
 
+    void enqueue(utils::c_ptr<message> msg)
+    {
+      send_queue.push(std::move(msg));
+
+      if (send_queue.size() > 1)
+        return; // already sending
+
+      do_write();
+    }
+
+    void do_write()
+    {
+      derived().get_websocket().async_write(boost::asio::buffer(send_queue.front()->msg), [this](boost::beast::error_code ec, std::size_t bytes_transferred)
+                                            { on_write(ec, bytes_transferred); });
+    }
     void on_write(boost::beast::error_code ec, std::size_t)
     {
       if (ec)
@@ -546,6 +571,11 @@ namespace network
         delete this;
         return;
       }
+
+      send_queue.pop();
+
+      if (!send_queue.empty())
+        do_write();
     }
 
     void on_close(boost::beast::error_code ec)
@@ -563,6 +593,7 @@ namespace network
   private:
     server &srv;
     boost::beast::flat_buffer buffer;
+    std::queue<utils::c_ptr<message>> send_queue;
     ws_handler &handler;
   };
 
