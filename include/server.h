@@ -531,6 +531,10 @@ namespace network
       }
 
       static_cast<ws_handler_impl<Derived> &>(handler).on_message_handler(derived(), boost::beast::buffers_to_string(buffer.data()));
+
+      buffer.consume(buffer.size()); // Clear the buffer
+
+      do_read(); // Read another message
     }
 
     void on_write(boost::beast::error_code ec, std::size_t)
@@ -542,10 +546,6 @@ namespace network
         delete this;
         return;
       }
-
-      buffer.consume(buffer.size()); // Clear the buffer
-
-      do_read(); // Read another message
     }
 
     void on_close(boost::beast::error_code ec)
