@@ -467,15 +467,7 @@ namespace network
     Derived &derived() { return static_cast<Derived &>(*this); }
 
   public:
-    template <class Body, class Allocator>
-    websocket_session(server &srv, boost::beast::http::request<Body, boost::beast::http::basic_fields<Allocator>> req, ws_handler &handler) : srv(srv), handler(handler)
-    {
-      derived().get_websocket().set_option(boost::beast::websocket::stream_base::timeout::suggested(boost::beast::role_type::server));
-      derived().get_websocket().set_option(boost::beast::websocket::stream_base::decorator([](boost::beast::websocket::response_type &res)
-                                                                                           { res.set(boost::beast::http::field::server, "ratioNet"); }));
-      derived().get_websocket().async_accept(req, [this](boost::beast::error_code ec)
-                                             { on_accept(ec); });
-    }
+    websocket_session(server &srv, ws_handler &handler) : srv(srv), handler(handler) {}
     virtual ~websocket_session() = default;
 
     void send(const std::string &msg)
@@ -490,6 +482,17 @@ namespace network
     {
       derived().get_websocket().async_close(code, [this](boost::beast::error_code ec)
                                             { on_close(ec); });
+    }
+
+  protected:
+    template <class Body, class Allocator>
+    void do_accept(boost::beast::http::request<Body, boost::beast::http::basic_fields<Allocator>> req)
+    {
+      derived().get_websocket().set_option(boost::beast::websocket::stream_base::timeout::suggested(boost::beast::role_type::server));
+      derived().get_websocket().set_option(boost::beast::websocket::stream_base::decorator([](boost::beast::websocket::response_type &res)
+                                                                                           { res.set(boost::beast::http::field::server, "ratioNet"); }));
+      derived().get_websocket().async_accept(req, [this](boost::beast::error_code ec)
+                                             { on_accept(ec); });
     }
 
   private:
@@ -569,7 +572,7 @@ namespace network
 
   public:
     template <class Body, class Allocator>
-    plain_websocket_session(server &srv, boost::beast::tcp_stream &&stream, boost::beast::http::request<Body, boost::beast::http::basic_fields<Allocator>> req, ws_handler &handler) : websocket_session(srv, std::move(req), handler), websocket(std::move(stream)) {}
+    plain_websocket_session(server &srv, boost::beast::tcp_stream &&stream, boost::beast::http::request<Body, boost::beast::http::basic_fields<Allocator>> req, ws_handler &handler) : websocket_session(srv, handler), websocket(std::move(stream)) { do_accept(std::move(req)); }
     ~plain_websocket_session() {}
 
   private:
@@ -585,7 +588,7 @@ namespace network
 
   public:
     template <class Body, class Allocator>
-    ssl_websocket_session(server &srv, boost::beast::ssl_stream<boost::beast::tcp_stream> &&stream, boost::beast::http::request<Body, boost::beast::http::basic_fields<Allocator>> req, ws_handler &handler) : websocket_session(srv, std::move(req), handler), websocket(std::move(stream)) {}
+    ssl_websocket_session(server &srv, boost::beast::ssl_stream<boost::beast::tcp_stream> &&stream, boost::beast::http::request<Body, boost::beast::http::basic_fields<Allocator>> req, ws_handler &handler) : websocket_session(srv, handler), websocket(std::move(stream)) { do_accept(std::move(req)); }
     ~ssl_websocket_session() {}
 
   private:
