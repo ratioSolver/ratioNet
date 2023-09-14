@@ -186,7 +186,7 @@ namespace network
       catch (const std::exception &e)
       {
         delete res;
-        LOG_ERR(e.what());
+        LOG_WARN(e.what());
         auto c_res = new boost::beast::http::response<boost::beast::http::string_body>(boost::beast::http::status::bad_request, req_impl.req.version());
         c_res->set(boost::beast::http::field::server, "ratioNet");
         c_res->set(boost::beast::http::field::content_type, "text/html");
@@ -227,7 +227,6 @@ namespace network
     template <class Body>
     void do_write(boost::beast::http::response<Body> *res)
     {
-      LOG_DEBUG("Writing response");
       bool close = res->need_eof();
       boost::beast::http::async_write(derived().get_stream(), *res, [this, close, res](boost::beast::error_code ec, std::size_t bytes_transferred)
                                       { on_write(ec, bytes_transferred, close); delete res; });
@@ -236,7 +235,6 @@ namespace network
   protected:
     void do_read()
     {
-      LOG_DEBUG("Reading request");
       parser.emplace();                                                                               // Construct a new parser for each message
       parser->body_limit(10000);                                                                      // Set the limit on the allowed size of a message
       boost::beast::get_lowest_layer(derived().get_stream()).expires_after(std::chrono::seconds(30)); // Set the timeout
@@ -248,7 +246,6 @@ namespace network
   private:
     void on_read(boost::beast::error_code ec, std::size_t)
     {
-      LOG_DEBUG("Request read");
       if (ec == boost::beast::http::error::end_of_stream)
         return do_eof();
 
@@ -315,7 +312,6 @@ namespace network
 
     void on_write(boost::beast::error_code ec, std::size_t, bool close)
     {
-      LOG_DEBUG("Response written");
       if (ec)
       {
         LOG_ERR(ec.message());
@@ -371,7 +367,6 @@ namespace network
   public:
     ssl_http_session(server &srv, boost::beast::tcp_stream &&str, boost::asio::ssl::context &ctx, boost::beast::flat_buffer &&bfr) : http_session(srv, std::move(bfr)), stream(std::move(str), ctx)
     {
-      LOG_DEBUG("SSL handshake");
       boost::beast::get_lowest_layer(stream).expires_after(std::chrono::seconds(30)); // Set the timeout
       stream.async_handshake(boost::asio::ssl::stream_base::server, buffer.data(), [this](boost::beast::error_code ec, std::size_t bytes_used)
                              { on_handshake(ec, bytes_used); }); // Perform the SSL handshake
@@ -385,7 +380,6 @@ namespace network
 
     void on_handshake(boost::beast::error_code ec, std::size_t bytes_used)
     {
-      LOG_DEBUG("SSL handshake done");
       if (ec)
       {
         LOG_ERR(ec.message());
@@ -409,10 +403,6 @@ namespace network
       if (ec)
       {
         LOG_ERR(ec.message());
-      }
-      else
-      {
-        LOG_DEBUG("SSL shutdown");
       }
       delete this; // Delete this session
     }
@@ -510,7 +500,6 @@ namespace network
     {
       if (ec)
       {
-        LOG_ERR(ec.message());
         static_cast<ws_handler_impl<Derived> &>(handler).on_error_handler(derived(), ec);
         delete this;
       }
@@ -534,7 +523,6 @@ namespace network
       }
       else if (ec)
       {
-        LOG_ERR(ec.message());
         static_cast<ws_handler_impl<Derived> &>(handler).on_error_handler(derived(), ec);
         delete this;
         return;
@@ -566,7 +554,6 @@ namespace network
     {
       if (ec)
       {
-        LOG_ERR(ec.message());
         static_cast<ws_handler_impl<Derived> &>(handler).on_error_handler(derived(), ec);
         delete this;
         return;
@@ -581,10 +568,7 @@ namespace network
     void on_close(boost::beast::error_code ec)
     {
       if (ec)
-      {
-        LOG_ERR(ec.message());
         static_cast<ws_handler_impl<Derived> &>(handler).on_error_handler(derived(), ec);
-      }
 
       static_cast<ws_handler_impl<Derived> &>(handler).on_close_handler(derived());
       delete this;
@@ -641,7 +625,6 @@ namespace network
   private:
     void on_run()
     {
-      LOG_DEBUG("Detecting connection type");
       stream.expires_after(std::chrono::seconds(30)); // Set the timeout
       boost::beast::async_detect_ssl(stream, buffer, [this](boost::beast::error_code ec, bool result)
                                      { on_detect(ec, result); }); // Detect SSL
@@ -654,15 +637,9 @@ namespace network
         LOG_ERR(ec.message());
       }
       else if (result)
-      {
-        LOG_DEBUG("SSL connection detected");
         new ssl_http_session(srv, std::move(stream), ctx, std::move(buffer));
-      }
       else
-      {
-        LOG_DEBUG("Plain HTTP connection detected");
         new plain_http_session(srv, std::move(stream), std::move(buffer));
-      }
       delete this;
     }
 
@@ -790,7 +767,6 @@ namespace network
   private:
     void do_accept()
     {
-      LOG_DEBUG("Accepting connection");
       acceptor.async_accept(boost::asio::make_strand(io_ctx), [this](boost::beast::error_code ec, boost::asio::ip::tcp::socket socket)
                             { on_accept(ec, std::move(socket)); });
     }
