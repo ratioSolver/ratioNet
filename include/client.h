@@ -32,10 +32,10 @@ namespace network
     void set_on_close_handler(std::function<void()> handler) { on_close_handler = handler; }
 
     template <class Body, class Fields>
-    void get(const std::string &target, std::function<void(boost::beast::http::response<Body, Fields> &&, boost::beast::error_code)> handler) { send(boost::beast::http::request<boost::beast::http::empty_body>{boost::beast::http::verb::get, target, 11}, handler); }
+    void get(const std::string &target, std::function<void(const boost::beast::http::response<Body, Fields> &, boost::beast::error_code)> handler) { send(boost::beast::http::request<boost::beast::http::empty_body>{boost::beast::http::verb::get, target, 11}, handler); }
 
     template <class Body, class Fields>
-    void get(const std::string &target, std::unordered_map<std::string, std::string> &fields, std::function<void(boost::beast::http::response<Body, Fields> &&, boost::beast::error_code)> handler)
+    void get(const std::string &target, std::unordered_map<std::string, std::string> &fields, std::function<void(const boost::beast::http::response<Body, Fields> &, boost::beast::error_code)> handler)
     {
       boost::beast::http::request<boost::beast::http::string_body> req{boost::beast::http::verb::get, target, 11};
       for (auto &field : fields)
@@ -44,7 +44,7 @@ namespace network
     }
 
     template <class Body, class Fields>
-    void post(const std::string &target, const std::string &body, std::function<void(boost::beast::http::response<Body, Fields> &&, boost::beast::error_code)> handler)
+    void post(const std::string &target, const std::string &body, std::function<void(const boost::beast::http::response<Body, Fields> &, boost::beast::error_code)> handler)
     {
       boost::beast::http::request<boost::beast::http::string_body> req{boost::beast::http::verb::post, target, 11};
       req.body() = body;
@@ -52,7 +52,7 @@ namespace network
     }
 
     template <class Body, class Fields>
-    void post(const std::string &target, const std::string &body, std::unordered_map<std::string, std::string> &fields, std::function<void(boost::beast::http::response<Body, Fields> &&, boost::beast::error_code)> handler)
+    void post(const std::string &target, const std::string &body, std::unordered_map<std::string, std::string> &fields, std::function<void(const boost::beast::http::response<Body, Fields> &, boost::beast::error_code)> handler)
     {
       boost::beast::http::request<boost::beast::http::string_body> req{boost::beast::http::verb::post, target, 11};
       for (auto &field : fields)
@@ -62,7 +62,7 @@ namespace network
     }
 
     template <class Body, class Fields>
-    void put(const std::string &target, const std::string &body, std::function<void(boost::beast::http::response<Body, Fields> &&, boost::beast::error_code)> handler)
+    void put(const std::string &target, const std::string &body, std::function<void(const boost::beast::http::response<Body, Fields> &, boost::beast::error_code)> handler)
     {
       boost::beast::http::request<boost::beast::http::string_body> req{boost::beast::http::verb::put, target, 11};
       req.body() = body;
@@ -70,7 +70,7 @@ namespace network
     }
 
     template <class Body, class Fields>
-    void put(const std::string &target, const std::string &body, std::unordered_map<std::string, std::string> &fields, std::function<void(boost::beast::http::response<Body, Fields> &&, boost::beast::error_code)> handler)
+    void put(const std::string &target, const std::string &body, std::unordered_map<std::string, std::string> &fields, std::function<void(const boost::beast::http::response<Body, Fields> &, boost::beast::error_code)> handler)
     {
       boost::beast::http::request<boost::beast::http::string_body> req{boost::beast::http::verb::put, target, 11};
       for (auto &field : fields)
@@ -80,7 +80,7 @@ namespace network
     }
 
     template <class Body, class Fields>
-    void patch(const std::string &target, const std::string &body, std::function<void(boost::beast::http::response<Body, Fields> &&, boost::beast::error_code)> handler)
+    void patch(const std::string &target, const std::string &body, std::function<void(const boost::beast::http::response<Body, Fields> &, boost::beast::error_code)> handler)
     {
       boost::beast::http::request<boost::beast::http::string_body> req{boost::beast::http::verb::patch, target, 11};
       req.body() = body;
@@ -88,7 +88,7 @@ namespace network
     }
 
     template <class Body, class Fields>
-    void patch(const std::string &target, const std::string &body, std::unordered_map<std::string, std::string> &fields, std::function<void(boost::beast::http::response<Body, Fields> &&, boost::beast::error_code)> handler)
+    void patch(const std::string &target, const std::string &body, std::unordered_map<std::string, std::string> &fields, std::function<void(const boost::beast::http::response<Body, Fields> &, boost::beast::error_code)> handler)
     {
       boost::beast::http::request<boost::beast::http::string_body> req{boost::beast::http::verb::patch, target, 11};
       for (auto &field : fields)
@@ -98,10 +98,10 @@ namespace network
     }
 
     template <class Body, class Fields>
-    void del(const std::string &target, std::function<void(boost::beast::http::response<Body, Fields> &&, boost::beast::error_code)> handler) { send(boost::beast::http::request<boost::beast::http::empty_body>{boost::beast::http::verb::delete_, target, 11}, handler); }
+    void del(const std::string &target, std::function<void(const boost::beast::http::response<Body, Fields> &, boost::beast::error_code)> handler) { send(boost::beast::http::request<boost::beast::http::empty_body>{boost::beast::http::verb::delete_, target, 11}, handler); }
 
     template <class Body, class Fields>
-    void del(const std::string &target, std::unordered_map<std::string, std::string> &fields, std::function<void(boost::beast::http::response<Body, Fields> &&, boost::beast::error_code)> handler)
+    void del(const std::string &target, std::unordered_map<std::string, std::string> &fields, std::function<void(const boost::beast::http::response<Body, Fields> &, boost::beast::error_code)> handler)
     {
       boost::beast::http::request<boost::beast::http::string_body> req{boost::beast::http::verb::delete_, target, 11};
       for (auto &field : fields)
@@ -110,7 +110,7 @@ namespace network
     }
 
     template <class ReqBody, class ReqFields, class ResBody, class ResFields>
-    void send(boost::beast::http::request<ReqBody, ReqFields> &&req, std::function<void(boost::beast::http::response<ResBody, ResFields> &&, boost::beast::error_code)> handler)
+    void send(boost::beast::http::request<ReqBody, ReqFields> &&req, std::function<void(const boost::beast::http::response<ResBody, ResFields> &, boost::beast::error_code)> handler)
     {
       req.prepare_payload();
 
@@ -151,7 +151,7 @@ namespace network
     virtual void on_connect(boost::beast::error_code ec, boost::asio::ip::tcp::resolver::results_type::endpoint_type) = 0;
 
     template <class ResBody, class ResFields>
-    void on_write(std::function<void(boost::beast::http::response<ResBody, ResFields> &&, boost::beast::error_code)> handler, boost::beast::error_code ec, std::size_t)
+    void on_write(std::function<void(const boost::beast::http::response<ResBody, ResFields> &, boost::beast::error_code)> handler, boost::beast::error_code ec, std::size_t)
     {
       if (ec)
       {
@@ -168,7 +168,7 @@ namespace network
     }
 
     template <class ResBody, class ResFields>
-    void on_read(std::function<void(boost::beast::http::response<ResBody, ResFields> &&, boost::beast::error_code)> handler, boost::beast::http::response<ResBody, ResFields> *res, boost::beast::error_code ec, std::size_t)
+    void on_read(std::function<void(const boost::beast::http::response<ResBody, ResFields> &, boost::beast::error_code)> handler, const boost::beast::http::response<ResBody, ResFields> *res, boost::beast::error_code ec, std::size_t)
     {
       if (ec)
       {
