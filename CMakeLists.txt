@@ -16,6 +16,12 @@ include(CMakePackageConfigHelpers)
 find_package(Boost REQUIRED COMPONENTS system)
 find_package(OpenSSL REQUIRED)
 
+set(TLS_VERSIONS tlsv11 tlsv12 tlsv13)
+set(TLS_VERSION tlsv12 CACHE STRING "Specify the desired TLS version")
+set_property(CACHE TLS_VERSION PROPERTY STRINGS ${TLS_VERSIONS})
+
+message(STATUS "TLS version:            ${TLS_VERSION}")
+
 option(RATIONET_INCLUDE_UTILS "Include utils library" ON)
 if(RATIONET_INCLUDE_UTILS)
     add_subdirectory(extern/utils)
@@ -26,6 +32,7 @@ file(GLOB RATIONET_HEADERS include/*.h)
 add_library(${PROJECT_NAME} INTERFACE ${RATIONET_HEADERS})
 GENERATE_EXPORT_HEADER(${PROJECT_NAME})
 target_include_directories(${PROJECT_NAME} INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>)
+target_compile_definitions(${PROJECT_NAME} INTERFACE TLS_VERSION=${TLS_VERSION})
 target_link_libraries(${PROJECT_NAME} INTERFACE utils Boost::system OpenSSL::SSL OpenSSL::Crypto)
 
 if(BUILD_TESTING)
