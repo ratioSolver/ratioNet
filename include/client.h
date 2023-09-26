@@ -100,8 +100,8 @@ namespace network
       send(req, handler);
     }
 
-    template <class ReqBody, class ReqFields, class ResBody, class ResFields>
-    void send(boost::beast::http::request<ReqBody, ReqFields> *req, std::function<void(const boost::beast::http::response<ResBody, ResFields> &, boost::beast::error_code)> handler)
+    template <class ReqBody, class ResBody>
+    void send(boost::beast::http::request<ReqBody> *req, std::function<void(const boost::beast::http::response<ResBody> &, boost::beast::error_code)> handler)
     {
       req->prepare_payload();
 

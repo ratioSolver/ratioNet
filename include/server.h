@@ -201,11 +201,11 @@ namespace network
     std::function<void(const boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> handler;
   };
 
-  template <class Body, class Allocator>
-  void make_websocket_session(server &srv, boost::beast::tcp_stream stream, boost::beast::http::request<Body, boost::beast::http::basic_fields<Allocator>> req, ws_handler &handler) { new plain_websocket_session(srv, std::move(stream), std::move(req), handler); }
+  template <class Body>
+  void make_websocket_session(server &srv, boost::beast::tcp_stream stream, boost::beast::http::request<Body> req, ws_handler &handler) { new plain_websocket_session(srv, std::move(stream), std::move(req), handler); }
 
-  template <class Body, class Allocator>
-  void make_websocket_session(server &srv, boost::beast::ssl_stream<boost::beast::tcp_stream> stream, boost::beast::http::request<Body, boost::beast::http::basic_fields<Allocator>> req, ws_handler &handler) { new ssl_websocket_session(srv, std::move(stream), std::move(req), handler); }
+  template <class Body>
+  void make_websocket_session(server &srv, boost::beast::ssl_stream<boost::beast::tcp_stream> stream, boost::beast::http::request<Body> req, ws_handler &handler) { new ssl_websocket_session(srv, std::move(stream), std::move(req), handler); }
 
   boost::optional<http_handler &> get_http_handler(server &srv, boost::beast::http::verb method, const std::string &target, bool ssl);
   boost::optional<ws_handler &> get_ws_handler(server &srv, const std::string &target, bool ssl);
@@ -485,8 +485,8 @@ namespace network
     }
 
   protected:
-    template <class Body, class Allocator>
-    void do_accept(boost::beast::http::request<Body, boost::beast::http::basic_fields<Allocator>> req)
+    template <class Body>
+    void do_accept(boost::beast::http::request<Body> req)
     {
       derived().get_websocket().set_option(boost::beast::websocket::stream_base::timeout::suggested(boost::beast::role_type::server));
       derived().get_websocket().set_option(boost::beast::websocket::stream_base::decorator([](boost::beast::websocket::response_type &res)
@@ -586,8 +586,8 @@ namespace network
     friend class websocket_session<plain_websocket_session>;
 
   public:
-    template <class Body, class Allocator>
-    plain_websocket_session(server &srv, boost::beast::tcp_stream &&stream, boost::beast::http::request<Body, boost::beast::http::basic_fields<Allocator>> req, ws_handler &handler) : websocket_session(srv, handler), websocket(std::move(stream)) { do_accept(std::move(req)); }
+    template <class Body>
+    plain_websocket_session(server &srv, boost::beast::tcp_stream &&stream, boost::beast::http::request<Body> req, ws_handler &handler) : websocket_session(srv, handler), websocket(std::move(stream)) { do_accept(std::move(req)); }
     ~plain_websocket_session() {}
 
   private:
@@ -602,8 +602,8 @@ namespace network
     friend class websocket_session<ssl_websocket_session>;
 
   public:
-    template <class Body, class Allocator>
-    ssl_websocket_session(server &srv, boost::beast::ssl_stream<boost::beast::tcp_stream> &&stream, boost::beast::http::request<Body, boost::beast::http::basic_fields<Allocator>> req, ws_handler &handler) : websocket_session(srv, handler), websocket(std::move(stream)) { do_accept(std::move(req)); }
+    template <class Body>
+    ssl_websocket_session(server &srv, boost::beast::ssl_stream<boost::beast::tcp_stream> &&stream, boost::beast::http::request<Body> req, ws_handler &handler) : websocket_session(srv, handler), websocket(std::move(stream)) { do_accept(std::move(req)); }
     ~ssl_websocket_session() {}
 
   private:
