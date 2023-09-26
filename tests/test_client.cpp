@@ -2,10 +2,39 @@
 #include <thread>
 #include <iostream>
 
+std::function<void(const boost::beast::http::response<boost::beast::http::string_body> &, boost::beast::error_code)> handler = [](const boost::beast::http::response<boost::beast::http::string_body> &res, boost::beast::error_code ec)
+{
+    if (ec)
+    {
+        std::cout << "Error: " << ec.message() << std::endl;
+        return;
+    }
+    std::cout << "Result: " << res << std::endl;
+    std::cout << res.body() << std::endl;
+};
+
+void test_plain_client()
+{
+    network::plain_client client("www.boredapi.com", "80", [&client]()
+                                 {
+                                    std::cout << "Connected!" << std::endl;
+                                    client.get("/api/activity", {{boost::beast::http::field::content_type, "application/json"}}, handler); });
+    std::this_thread::sleep_for(std::chrono::seconds(100));
+}
+
+void test_ssl_client()
+{
+    network::ssl_client client("www.boredapi.com", "443", [&client]()
+                               {
+                                    std::cout << "Connected!" << std::endl;
+                                    client.get("/api/activity", handler); });
+    std::this_thread::sleep_for(std::chrono::seconds(100));
+}
+
 int main()
 {
-    network::ssl_client client("localhost", "8080", []()
-                               { std::cout << "Connected!" << std::endl; });
-    std::this_thread::sleep_for(std::chrono::seconds(1000));
+    test_plain_client();
+    test_ssl_client();
+
     return 0;
 }
