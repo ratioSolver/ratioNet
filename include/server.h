@@ -138,17 +138,17 @@ namespace network
       {"wmv", "video/x-ms-wmv"},
       {"avi", "video/x-msvideo"}};
 
-  class request
+  class server_request
   {
   public:
-    virtual ~request() = default;
+    virtual ~server_request() = default;
   };
 
   template <class Session, class Body>
-  class request_impl : public request
+  class server_request_impl : public server_request
   {
   public:
-    request_impl(Session &session, boost::beast::http::request<Body> &&req) : session(session), req(std::move(req)) {}
+    server_request_impl(Session &session, boost::beast::http::request<Body> &&req) : session(session), req(std::move(req)) {}
 
     Session &session;
     boost::beast::http::request<Body> req;
@@ -159,20 +159,20 @@ namespace network
   public:
     virtual ~http_handler() = default;
 
-    virtual void handle_response(const request &&req) = 0;
+    virtual void handle_request(const server_request &&req) = 0;
   };
 
   template <class Session, class ReqBody, class ResBody>
   class http_handler_impl : public http_handler
   {
-    friend class request_impl<Session, ReqBody>;
+    friend class server_request_impl<Session, ReqBody>;
 
   public:
     http_handler_impl(std::function<void(const boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> &&handler) : handler(std::move(handler)) {}
 
-    void handle_response(const request &&req) override
+    void handle_request(const server_request &&req) override
     {
-      auto &req_impl = static_cast<const request_impl<Session, ReqBody> &>(req);
+      auto &req_impl = static_cast<const server_request_impl<Session, ReqBody> &>(req);
       auto res = new boost::beast::http::response<ResBody>(boost::beast::http::status::ok, req_impl.req.version());
       res->set(boost::beast::http::field::server, "ratioNet");
       res->set(boost::beast::http::field::content_type, "text/html");
@@ -294,8 +294,8 @@ namespace network
       std::string target = req.target().to_string();
       if (auto handler = get_http_handler(srv, req.method(), target, is_ssl()); handler)
       {
-        request_impl<Derived, Body> req_impl(derived(), std::move(req));
-        return handler.get().handle_response(std::move(req_impl));
+        server_request_impl<Derived, Body> req_impl(derived(), std::move(req));
+        return handler.get().handle_request(std::move(req_impl));
       }
       else
       {
