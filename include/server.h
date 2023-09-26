@@ -165,8 +165,6 @@ namespace network
   template <class Session, class ReqBody, class ResBody>
   class http_handler_impl : public http_handler
   {
-    friend class server_request_impl<Session, ReqBody>;
-
   public:
     http_handler_impl(std::function<void(const boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> &&handler) : handler(std::move(handler)) {}
 

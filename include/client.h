@@ -10,6 +10,25 @@
 
 namespace network
 {
+  class client_request
+  {
+  public:
+    virtual ~client_request() = default;
+
+    virtual void handle_request() = 0;
+  };
+
+  template <class Session, class ReqBody, class ResBody>
+  class client_request_impl : public client_request
+  {
+  public:
+    client_request_impl(Session &session, boost::beast::http::request<ReqBody> &&req, std::function<void(const boost::beast::http::response<ResBody> &, boost::beast::error_code)> &&handler) : session(session), req(std::move(req)), handler(std::move(handler)) {}
+
+    Session &session;
+    boost::beast::http::request<ReqBody> req;
+    std::function<void(const boost::beast::http::response<ResBody> &, boost::beast::error_code)> handler;
+  };
+
   template <class Derived>
   class client
   {
