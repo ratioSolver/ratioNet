@@ -120,6 +120,50 @@ namespace network
       send(utils::u_ptr<boost::beast::http::request<boost::beast::http::string_body>>(req), handler);
     }
 
+    template <class Body>
+    void put(const std::string &target, const std::string &body, const std::function<void(const boost::beast::http::response<Body> &, boost::beast::error_code)> &handler) { put(target, body, {}, handler); }
+
+    template <class Body>
+    void put(const std::string &target, const std::string &body, const std::unordered_map<boost::beast::http::field, std::string> &fields, const std::function<void(const boost::beast::http::response<Body> &, boost::beast::error_code)> &handler)
+    {
+      auto req = new boost::beast::http::request<boost::beast::http::string_body>{boost::beast::http::verb::put, target, 11};
+      req->set(boost::beast::http::field::host, host);
+      req->set(boost::beast::http::field::user_agent, "ratioNet");
+      for (auto &field : fields)
+        req->set(field.first, field.second);
+      req->body() = body;
+      send(utils::u_ptr<boost::beast::http::request<boost::beast::http::string_body>>(req), handler);
+    }
+
+    template <class Body>
+    void patch(const std::string &target, const std::string &body, const std::function<void(const boost::beast::http::response<Body> &, boost::beast::error_code)> &handler) { patch(target, body, {}, handler); }
+
+    template <class Body>
+    void patch(const std::string &target, const std::string &body, const std::unordered_map<boost::beast::http::field, std::string> &fields, const std::function<void(const boost::beast::http::response<Body> &, boost::beast::error_code)> &handler)
+    {
+      auto req = new boost::beast::http::request<boost::beast::http::string_body>{boost::beast::http::verb::patch, target, 11};
+      req->set(boost::beast::http::field::host, host);
+      req->set(boost::beast::http::field::user_agent, "ratioNet");
+      for (auto &field : fields)
+        req->set(field.first, field.second);
+      req->body() = body;
+      send(utils::u_ptr<boost::beast::http::request<boost::beast::http::string_body>>(req), handler);
+    }
+
+    template <class Body>
+    void del(const std::string &target, const std::function<void(const boost::beast::http::response<Body> &, boost::beast::error_code)> &handler) { del(target, {}, handler); }
+
+    template <class Body>
+    void del(const std::string &target, const std::unordered_map<boost::beast::http::field, std::string> &fields, const std::function<void(const boost::beast::http::response<Body> &, boost::beast::error_code)> &handler)
+    {
+      auto req = new boost::beast::http::request<boost::beast::http::empty_body>{boost::beast::http::verb::delete_, target, 11};
+      req->set(boost::beast::http::field::host, host);
+      req->set(boost::beast::http::field::user_agent, "ratioNet");
+      for (auto &field : fields)
+        req->set(field.first, field.second);
+      send(utils::u_ptr<boost::beast::http::request<boost::beast::http::empty_body>>(req), handler);
+    }
+
     template <class ReqBody, class ResBody>
     void send(utils::u_ptr<boost::beast::http::request<ReqBody>> req, const std::function<void(const boost::beast::http::response<ResBody> &, boost::beast::error_code)> &handler)
     {
