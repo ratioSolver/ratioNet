@@ -16,8 +16,8 @@
 namespace network
 {
   class server;
-  template <class Session>
-  class request_handler;
+  template <class Derived>
+  class http_session;
   class plain_http_session;
   class ssl_http_session;
   class ws_handler;
@@ -156,10 +156,42 @@ namespace network
 
   class http_handler
   {
+    friend class http_session<plain_http_session>;
+    friend class http_session<ssl_http_session>;
+
   public:
     virtual ~http_handler() = default;
 
+  private:
     virtual void handle_request(const server_request &&req) = 0;
+
+  protected:
+    template <class Session, class ReqBody, class ResBody>
+    void handle_request(Session &session, const boost::beast::http::request<ReqBody> &req, std::function<void(const boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> handler)
+    {
+      auto res = new boost::beast::http::response<ResBody>(boost::beast::http::status::ok, req.version());
+      res->set(boost::beast::http::field::server, "ratioNet");
+      res->set(boost::beast::http::field::content_type, "text/html");
+      res->keep_alive(req.keep_alive());
+      try
+      {
+        handler(req, *res);
+        res->prepare_payload();
+        session.do_write(res);
+      }
+      catch (const std::exception &e)
+      {
+        delete res;
+        LOG_WARN(e.what());
+        auto c_res = new boost::beast::http::response<boost::beast::http::string_body>(boost::beast::http::status::bad_request, req.version());
+        c_res->set(boost::beast::http::field::server, "ratioNet");
+        c_res->set(boost::beast::http::field::content_type, "text/html");
+        c_res->keep_alive(req.keep_alive());
+        c_res->body() = e.what();
+        c_res->prepare_payload();
+        session.do_write(c_res);
+      }
+    }
   };
 
   template <class Session, class ReqBody, class ResBody>
@@ -168,32 +200,8 @@ namespace network
   public:
     http_handler_impl(std::function<void(const boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> &&handler) : handler(std::move(handler)) {}
 
-    void handle_request(const server_request &&req) override
-    {
-      auto &req_impl = static_cast<const server_request_impl<Session, ReqBody> &>(req);
-      auto res = new boost::beast::http::response<ResBody>(boost::beast::http::status::ok, req_impl.req.version());
-      res->set(boost::beast::http::field::server, "ratioNet");
-      res->set(boost::beast::http::field::content_type, "text/html");
-      res->keep_alive(req_impl.req.keep_alive());
-      try
-      {
-        handler(req_impl.req, *res);
-        res->prepare_payload();
-        req_impl.session.do_write(res);
-      }
-      catch (const std::exception &e)
-      {
-        delete res;
-        LOG_WARN(e.what());
-        auto c_res = new boost::beast::http::response<boost::beast::http::string_body>(boost::beast::http::status::bad_request, req_impl.req.version());
-        c_res->set(boost::beast::http::field::server, "ratioNet");
-        c_res->set(boost::beast::http::field::content_type, "text/html");
-        c_res->keep_alive(req_impl.req.keep_alive());
-        c_res->body() = e.what();
-        c_res->prepare_payload();
-        req_impl.session.do_write(c_res);
-      }
-    }
+  private:
+    void handle_request(const server_request &&req) override { http_handler::handle_request(static_cast<const server_request_impl<Session, ReqBody> &>(req).session, static_cast<const server_request_impl<Session, ReqBody> &>(req).req, handler); }
 
   private:
     std::function<void(const boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> handler;
@@ -211,9 +219,6 @@ namespace network
   template <class Derived>
   class http_session
   {
-    friend class request_handler<plain_http_session>;
-    friend class request_handler<ssl_http_session>;
-
     Derived &derived() { return static_cast<Derived &>(*this); }
 
   public:
@@ -291,10 +296,7 @@ namespace network
 
       std::string target = req.target().to_string();
       if (auto handler = get_http_handler(srv, req.method(), target, is_ssl()); handler)
-      {
-        server_request_impl<Derived, Body> req_impl(derived(), std::move(req));
-        return handler.get().handle_request(std::move(req_impl));
-      }
+        return handler.get().handle_request(server_request_impl<Derived, Body>(derived(), std::move(req)));
       else
       {
         LOG_WARN("No handler found for " << req.method() << " " << target);
@@ -335,7 +337,6 @@ namespace network
   class plain_http_session : public http_session<plain_http_session>
   {
     friend class http_session<plain_http_session>;
-    friend class request_handler<plain_http_session>;
 
   public:
     plain_http_session(server &srv, boost::beast::tcp_stream &&str, boost::beast::flat_buffer &&buffer) : http_session(srv, std::move(buffer)), stream(std::move(str)) { do_read(); }
@@ -360,7 +361,6 @@ namespace network
   class ssl_http_session : public http_session<ssl_http_session>
   {
     friend class http_session<ssl_http_session>;
-    friend class request_handler<ssl_http_session>;
 
   public:
     ssl_http_session(server &srv, boost::beast::tcp_stream &&str, boost::asio::ssl::context &ctx, boost::beast::flat_buffer &&bfr) : http_session(srv, std::move(bfr)), stream(std::move(str), ctx)
@@ -653,13 +653,6 @@ namespace network
    */
   class server
   {
-    friend class request_handler<plain_http_session>;
-    friend class request_handler<ssl_http_session>;
-    friend class http_session<plain_http_session>;
-    friend class http_session<ssl_http_session>;
-    friend class websocket_session<plain_websocket_session>;
-    friend class websocket_session<ssl_websocket_session>;
-
   public:
     server(const std::string &address = "0.0.0.0", unsigned short port = 8080, std::size_t concurrency_hint = std::thread::hardware_concurrency()) : io_ctx(concurrency_hint), signals(io_ctx), endpoint(boost::asio::ip::make_address(address), port), acceptor(boost::asio::make_strand(io_ctx))
     {
