@@ -17,6 +17,10 @@ void test_plain_client()
     network::plain_client client("www.boredapi.com", "80", [&client]()
                                  { std::cout << "Connected!" << std::endl; });
     std::this_thread::sleep_for(std::chrono::seconds(100));
+
+    auto req = new boost::beast::http::request<boost::beast::http::string_body>(boost::beast::http::verb::get, "/", 11);
+    client.send(utils::u_ptr<boost::beast::http::request<boost::beast::http::string_body>>(req), handler);
+    std::this_thread::sleep_for(std::chrono::seconds(100));
 }
 
 void test_ssl_client()

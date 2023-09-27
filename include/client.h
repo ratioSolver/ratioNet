@@ -35,7 +35,7 @@ namespace network
       boost::beast::get_lowest_layer(session.get_stream()).expires_after(std::chrono::seconds(30));
 
       // Send the HTTP request to the remote host
-      boost::beast::http::async_write(session.get_stream(), req, [session, handler](boost::beast::error_code ec, std::size_t bytes_transferred)
+      boost::beast::http::async_write(session.get_stream(), req, [&session, &handler](boost::beast::error_code ec, std::size_t bytes_transferred)
                                       { session.on_write(handler, ec, bytes_transferred); });
     }
   };
@@ -44,7 +44,7 @@ namespace network
   class client_request_impl : public client_request
   {
   public:
-    client_request_impl(Session &session, utils::u_ptr<boost::beast::http::request<ReqBody>> req, std::function<void(const boost::beast::http::response<ResBody> &, boost::beast::error_code)> &&handler) : session(session), req(std::move(req)), handler(std::move(handler)) {}
+    client_request_impl(Session &session, utils::u_ptr<boost::beast::http::request<ReqBody>> req, std::function<void(const boost::beast::http::response<ResBody> &, boost::beast::error_code)> &&handler) : session(session), req(std::move(req)), handler(handler) {}
 
   private:
     void handle_request() override { client_request::handle_request(session, *req, handler); }
@@ -52,7 +52,7 @@ namespace network
   private:
     Session &session;
     utils::u_ptr<boost::beast::http::request<ReqBody>> req;
-    std::function<void(const boost::beast::http::response<ResBody> &, boost::beast::error_code)> handler;
+    std::function<void(const boost::beast::http::response<ResBody> &, boost::beast::error_code)> &handler;
   };
 
   std::function<void()> default_on_connect_handler = []() {};
@@ -62,6 +62,8 @@ namespace network
   template <class Derived>
   class client
   {
+    friend class client_request;
+
     Derived &derived() { return static_cast<Derived &>(*this); }
 
   public:
@@ -79,21 +81,24 @@ namespace network
     virtual void close() = 0;
 
     template <class ReqBody, class ResBody>
-    void send(utils::u_ptr<boost::beast::http::request<ReqBody>> req, std::function<void(const boost::beast::http::response<ResBody> &, boost::beast::error_code)> &&handler)
+    void send(utils::u_ptr<boost::beast::http::request<ReqBody>> req, std::function<void(const boost::beast::http::response<ResBody> &, boost::beast::error_code)> &handler)
     {
       req->prepare_payload();
 
-      enqueue(std::move(req),
-              std::move(handler));
+      boost::asio::post(strand, [this, req = std::move(req), handler = std::move(handler)]() mutable
+                        { enqueue(std::move(req), handler); });
+    }
 
-      boost::asio::post(strand, [this, req = std::move(req), handler = std::move(handler)]()
-                        { enqueue(std::move(req),
-                                  std::move(handler)); });
+  protected:
+    void do_resolve()
+    {
+      resolver.async_resolve(host, port, [this](boost::beast::error_code ec, boost::asio::ip::tcp::resolver::results_type results)
+                             { on_resolve(ec, results); });
     }
 
   private:
     template <class ReqBody, class ResBody>
-    void enqueue(utils::u_ptr<boost::beast::http::request<ReqBody>> req, std::function<void(const boost::beast::http::response<ResBody> &, boost::beast::error_code)> &&handler)
+    void enqueue(utils::u_ptr<boost::beast::http::request<ReqBody>> req, std::function<void(const boost::beast::http::response<ResBody> &, boost::beast::error_code)> &handler)
     {
       requests.push(new client_request_impl<Derived, ReqBody, ResBody>(derived(), std::move(req), std::move(handler)));
 
@@ -103,11 +108,45 @@ namespace network
       requests.front()->handle_request();
     }
 
-  protected:
-    void do_resolve()
+    template <class Body>
+    void on_write(std::function<void(const boost::beast::http::response<Body> &, boost::beast::error_code)> handler, boost::beast::error_code ec, std::size_t)
     {
-      resolver.async_resolve(host, port, [this](boost::beast::error_code ec, boost::asio::ip::tcp::resolver::results_type results)
-                             { on_resolve(ec, results); });
+      if (ec)
+      {
+        LOG_ERR("on_write: " << ec.message());
+        on_error_handler(ec);
+        return;
+      }
+
+      requests.pop();
+
+      if (!requests.empty()) // If we still have work to do, make this call again..
+        requests.front()->handle_request();
+
+      auto res = new boost::beast::http::response<Body>();
+
+      // Receive the HTTP response
+      boost::beast::http::async_read(derived().get_stream(), buffer, *res, [this, handler = std::move(handler), res](boost::beast::error_code ec, std::size_t bytes_transferred)
+                                     { on_read(handler, res, ec, bytes_transferred); });
+    }
+
+    template <class Body>
+    void on_read(std::function<void(const boost::beast::http::response<Body> &, boost::beast::error_code)> handler, const boost::beast::http::response<Body> *res, boost::beast::error_code ec, std::size_t)
+    {
+      if (ec)
+      {
+        LOG_ERR("on_read: " << ec.message());
+        on_error_handler(ec);
+        return;
+      }
+
+      handler(*res, ec);
+
+      if (res->need_eof()) // This means we should close the connection, usually because the response indicated the "Connection: close" semantic.
+        close();
+
+      // We're done with the response so delete it
+      delete res;
     }
 
   private:
@@ -152,6 +191,7 @@ namespace network
   class plain_client : public client<plain_client>
   {
     friend class client<plain_client>;
+    friend class client_request;
 
   public:
     plain_client(const std::string &host, const std::string &port = "80", std::function<void()> on_connect_handler = default_on_connect_handler, std::function<void(boost::beast::error_code)> on_error_handler = default_on_error_handler, std::function<void()> on_close_handler = default_on_close_handler) : client(host, port, boost::asio::make_strand(boost::asio::system_executor()), on_connect_handler, on_error_handler, on_close_handler), stream(strand) { do_resolve(); }
@@ -185,6 +225,7 @@ namespace network
   class ssl_client : public client<ssl_client>
   {
     friend class client<ssl_client>;
+    friend class client_request;
 
   public:
     ssl_client(const std::string &host, const std::string &port = "443", std::function<void()> on_connect_handler = default_on_connect_handler, std::function<void(boost::beast::error_code)> on_error_handler = default_on_error_handler, std::function<void()> on_close_handler = default_on_close_handler) : client(host, port, boost::asio::make_strand(boost::asio::system_executor()), on_connect_handler, on_error_handler, on_close_handler), stream(strand, ctx)
