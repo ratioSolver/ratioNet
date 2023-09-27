@@ -29,7 +29,7 @@ namespace network
 
   protected:
     template <class Session, class ReqBody, class ResBody>
-    void handle_request(Session &session, boost::beast::http::request<ReqBody> &req, std::function<void(const boost::beast::http::response<ResBody> &, boost::beast::error_code)> &handler)
+    void handle_request(Session &session, boost::beast::http::request<ReqBody> &req, const std::function<void(const boost::beast::http::response<ResBody> &, boost::beast::error_code)> &handler)
     {
       // Set a timeout on the operation
       boost::beast::get_lowest_layer(session.get_stream()).expires_after(std::chrono::seconds(30));
@@ -44,7 +44,7 @@ namespace network
   class client_request_impl : public client_request
   {
   public:
-    client_request_impl(Session &session, utils::u_ptr<boost::beast::http::request<ReqBody>> req, std::function<void(const boost::beast::http::response<ResBody> &, boost::beast::error_code)> &handler) : session(session), req(std::move(req)), handler(handler) {}
+    client_request_impl(Session &session, utils::u_ptr<boost::beast::http::request<ReqBody>> req, const std::function<void(const boost::beast::http::response<ResBody> &, boost::beast::error_code)> &handler) : session(session), req(std::move(req)), handler(handler) {}
 
   private:
     void handle_request() override { client_request::handle_request(session, *req, handler); }
@@ -52,14 +52,14 @@ namespace network
   private:
     Session &session;
     utils::u_ptr<boost::beast::http::request<ReqBody>> req;
-    std::function<void(const boost::beast::http::response<ResBody> &, boost::beast::error_code)> &handler;
+    const std::function<void(const boost::beast::http::response<ResBody> &, boost::beast::error_code)> &handler;
   };
 
-  std::function<void()> default_on_connect_handler = []()
+  inline std::function<void()> default_on_connect_handler = []()
   { LOG("Connected!"); };
-  std::function<void(boost::beast::error_code)> default_on_error_handler = [](boost::beast::error_code ec)
+  inline std::function<void(boost::beast::error_code)> default_on_error_handler = [](boost::beast::error_code ec)
   { LOG_ERR("on_error: " << ec.message()); };
-  std::function<void()> default_on_close_handler = []()
+  inline std::function<void()> default_on_close_handler = []()
   { LOG("Closed!"); };
 
   template <class Derived>
@@ -91,10 +91,10 @@ namespace network
     virtual void close() = 0;
 
     template <class Body>
-    void get(const std::string &target, std::function<void(const boost::beast::http::response<Body> &, boost::beast::error_code)> &handler) { get(target, {}, handler); }
+    void get(const std::string &target, const std::function<void(const boost::beast::http::response<Body> &, boost::beast::error_code)> &handler) { get(target, {}, handler); }
 
     template <class Body>
-    void get(const std::string &target, const std::unordered_map<boost::beast::http::field, std::string> &fields, std::function<void(const boost::beast::http::response<Body> &, boost::beast::error_code)> &handler)
+    void get(const std::string &target, const std::unordered_map<boost::beast::http::field, std::string> &fields, const std::function<void(const boost::beast::http::response<Body> &, boost::beast::error_code)> &handler)
     {
       auto req = new boost::beast::http::request<boost::beast::http::empty_body>{boost::beast::http::verb::get, target, 11};
       req->set(boost::beast::http::field::host, host);
@@ -104,8 +104,23 @@ namespace network
       send(utils::u_ptr<boost::beast::http::request<boost::beast::http::empty_body>>(req), handler);
     }
 
+    template <class Body>
+    void post(const std::string &target, const std::string &body, const std::function<void(const boost::beast::http::response<Body> &, boost::beast::error_code)> &handler) { post(target, body, {}, handler); }
+
+    template <class Body>
+    void post(const std::string &target, const std::string &body, const std::unordered_map<boost::beast::http::field, std::string> &fields, const std::function<void(const boost::beast::http::response<Body> &, boost::beast::error_code)> &handler)
+    {
+      auto req = new boost::beast::http::request<boost::beast::http::string_body>{boost::beast::http::verb::post, target, 11};
+      req->set(boost::beast::http::field::host, host);
+      req->set(boost::beast::http::field::user_agent, "ratioNet");
+      for (auto &field : fields)
+        req->set(field.first, field.second);
+      req->body() = body;
+      send(utils::u_ptr<boost::beast::http::request<boost::beast::http::string_body>>(req), handler);
+    }
+
     template <class ReqBody, class ResBody>
-    void send(utils::u_ptr<boost::beast::http::request<ReqBody>> req, std::function<void(const boost::beast::http::response<ResBody> &, boost::beast::error_code)> &handler)
+    void send(utils::u_ptr<boost::beast::http::request<ReqBody>> req, const std::function<void(const boost::beast::http::response<ResBody> &, boost::beast::error_code)> &handler)
     {
       req->prepare_payload();
 
@@ -122,7 +137,7 @@ namespace network
 
   private:
     template <class ReqBody, class ResBody>
-    void enqueue(utils::u_ptr<boost::beast::http::request<ReqBody>> req, std::function<void(const boost::beast::http::response<ResBody> &, boost::beast::error_code)> &handler)
+    void enqueue(utils::u_ptr<boost::beast::http::request<ReqBody>> req, const std::function<void(const boost::beast::http::response<ResBody> &, boost::beast::error_code)> &handler)
     {
       requests.push(new client_request_impl<Derived, ReqBody, ResBody>(derived(), std::move(req), handler));
 
@@ -133,7 +148,7 @@ namespace network
     }
 
     template <class Body>
-    void on_write(std::function<void(const boost::beast::http::response<Body> &, boost::beast::error_code)> &handler, boost::beast::error_code ec, std::size_t)
+    void on_write(const std::function<void(const boost::beast::http::response<Body> &, boost::beast::error_code)> &handler, boost::beast::error_code ec, std::size_t)
     {
       if (ec)
       {
@@ -152,7 +167,7 @@ namespace network
     }
 
     template <class Body>
-    void on_read(std::function<void(const boost::beast::http::response<Body> &, boost::beast::error_code)> &handler, const boost::beast::http::response<Body> *res, boost::beast::error_code ec, std::size_t)
+    void on_read(const std::function<void(const boost::beast::http::response<Body> &, boost::beast::error_code)> &handler, const boost::beast::http::response<Body> *res, boost::beast::error_code ec, std::size_t)
     {
       if (ec)
       {

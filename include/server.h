@@ -167,7 +167,7 @@ namespace network
 
   protected:
     template <class Session, class ReqBody, class ResBody>
-    void handle_request(Session &session, const boost::beast::http::request<ReqBody> &req, std::function<void(const boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> handler)
+    void handle_request(Session &session, const boost::beast::http::request<ReqBody> &req, const std::function<void(const boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> &handler)
     {
       auto res = new boost::beast::http::response<ResBody>(boost::beast::http::status::ok, req.version());
       res->set(boost::beast::http::field::server, "ratioNet");
@@ -198,13 +198,13 @@ namespace network
   class http_handler_impl : public http_handler
   {
   public:
-    http_handler_impl(std::function<void(const boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> &&handler) : handler(std::move(handler)) {}
+    http_handler_impl(const std::function<void(const boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> &handler) : handler(handler) {}
 
   private:
     void handle_request(const server_request &&req) override { http_handler::handle_request(static_cast<const server_request_impl<Session, ReqBody> &>(req).session, static_cast<const server_request_impl<Session, ReqBody> &>(req).req, handler); }
 
   private:
-    std::function<void(const boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> handler;
+    const std::function<void(const boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> &handler;
   };
 
   template <class Body>
@@ -421,22 +421,22 @@ namespace network
     friend class websocket_session<Session>;
 
   public:
-    ws_handler_impl<Session> &on_open(std::function<void(Session &)> handler) noexcept
+    ws_handler_impl<Session> &on_open(const std::function<void(Session &)> &handler) noexcept
     {
       on_open_handler = handler;
       return *this;
     }
-    ws_handler_impl<Session> &on_close(std::function<void(Session &)> handler) noexcept
+    ws_handler_impl<Session> &on_close(const std::function<void(Session &)> &handler) noexcept
     {
       on_close_handler = handler;
       return *this;
     }
-    ws_handler_impl<Session> &on_message(std::function<void(Session &, const std::string &)> handler) noexcept
+    ws_handler_impl<Session> &on_message(const std::function<void(Session &, const std::string &)> &handler) noexcept
     {
       on_message_handler = handler;
       return *this;
     }
-    ws_handler_impl<Session> &on_error(std::function<void(Session &, boost::beast::error_code)> handler) noexcept
+    ws_handler_impl<Session> &on_error(const std::function<void(Session &, boost::beast::error_code)> &handler) noexcept
     {
       on_error_handler = handler;
       return *this;
@@ -669,12 +669,12 @@ namespace network
     }
 
     template <class ReqBody, class ResBody>
-    void add_route(boost::beast::http::verb method, const std::string &path, std::function<void(const boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> handler, bool ssl = false) noexcept
+    void add_route(boost::beast::http::verb method, const std::string &path, const std::function<void(const boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> &handler, bool ssl = false) noexcept
     {
       if (ssl)
-        https_routes[method].push_back(std::make_pair(std::regex(path), new http_handler_impl<ssl_http_session, ReqBody, ResBody>(std::move(handler))));
+        https_routes[method].push_back(std::make_pair(std::regex(path), new http_handler_impl<ssl_http_session, ReqBody, ResBody>(handler)));
       else
-        http_routes[method].push_back(std::make_pair(std::regex(path), new http_handler_impl<plain_http_session, ReqBody, ResBody>(std::move(handler))));
+        http_routes[method].push_back(std::make_pair(std::regex(path), new http_handler_impl<plain_http_session, ReqBody, ResBody>(handler)));
     }
 
     ws_handler &add_ws_route(const std::string &path, bool ssl = false) noexcept
