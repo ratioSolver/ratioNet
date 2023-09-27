@@ -15,25 +15,21 @@ std::function<void(const boost::beast::http::response<boost::beast::http::string
 void test_plain_client()
 {
     network::plain_client client("www.boredapi.com", "80", [&client]()
-                                 {
-                                    std::cout << "Connected!" << std::endl;
-                                    client.get("/api/activity", handler); });
+                                 { std::cout << "Connected!" << std::endl; });
     std::this_thread::sleep_for(std::chrono::seconds(100));
 }
 
 void test_ssl_client()
 {
     network::ssl_client client("www.boredapi.com", "443", [&client]()
-                               {
-                                    std::cout << "Connected!" << std::endl;
-                                    client.get("/api/activity", handler); });
+                               { std::cout << "Connected!" << std::endl; });
     std::this_thread::sleep_for(std::chrono::seconds(100));
 }
 
 int main()
 {
     test_plain_client();
-    test_ssl_client();
+    // test_ssl_client();
 
     return 0;
 }
