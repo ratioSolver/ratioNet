@@ -80,12 +80,26 @@ namespace network
 
     virtual void close() = 0;
 
+    template <class Body>
+    void get(const std::string &target, std::function<void(const boost::beast::http::response<Body> &, boost::beast::error_code)> &handler) { get(target, {}, handler); }
+
+    template <class Body>
+    void get(const std::string &target, const std::unordered_map<boost::beast::http::field, std::string> &fields, std::function<void(const boost::beast::http::response<Body> &, boost::beast::error_code)> &handler)
+    {
+      auto req = new boost::beast::http::request<boost::beast::http::empty_body>{boost::beast::http::verb::get, target, 11};
+      req->set(boost::beast::http::field::host, host);
+      req->set(boost::beast::http::field::user_agent, "ratioNet");
+      for (auto &field : fields)
+        req->set(field.first, field.second);
+      send(utils::u_ptr<boost::beast::http::request<boost::beast::http::empty_body>>(req), handler);
+    }
+
     template <class ReqBody, class ResBody>
     void send(utils::u_ptr<boost::beast::http::request<ReqBody>> req, std::function<void(const boost::beast::http::response<ResBody> &, boost::beast::error_code)> &handler)
     {
       req->prepare_payload();
 
-      boost::asio::post(strand, [this, req = std::move(req), handler = std::move(handler)]() mutable
+      boost::asio::post(strand, [this, req = std::move(req), &handler]() mutable
                         { enqueue(std::move(req), handler); });
     }
 
