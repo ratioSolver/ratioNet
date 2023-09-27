@@ -44,7 +44,7 @@ namespace network
   class client_request_impl : public client_request
   {
   public:
-    client_request_impl(Session &session, utils::u_ptr<boost::beast::http::request<ReqBody>> req, std::function<void(const boost::beast::http::response<ResBody> &, boost::beast::error_code)> &&handler) : session(session), req(std::move(req)), handler(handler) {}
+    client_request_impl(Session &session, utils::u_ptr<boost::beast::http::request<ReqBody>> req, std::function<void(const boost::beast::http::response<ResBody> &, boost::beast::error_code)> &handler) : session(session), req(std::move(req)), handler(handler) {}
 
   private:
     void handle_request() override { client_request::handle_request(session, *req, handler); }
@@ -55,9 +55,12 @@ namespace network
     std::function<void(const boost::beast::http::response<ResBody> &, boost::beast::error_code)> &handler;
   };
 
-  std::function<void()> default_on_connect_handler = []() {};
-  std::function<void(boost::beast::error_code)> default_on_error_handler = [](boost::beast::error_code) {};
-  std::function<void()> default_on_close_handler = []() {};
+  std::function<void()> default_on_connect_handler = []()
+  { LOG("Connected!"); };
+  std::function<void(boost::beast::error_code)> default_on_error_handler = [](boost::beast::error_code ec)
+  { LOG_ERR("on_error: " << ec.message()); };
+  std::function<void()> default_on_close_handler = []()
+  { LOG("Closed!"); };
 
   template <class Derived>
   class client
@@ -74,8 +77,15 @@ namespace network
 #if defined(SIGQUIT)
       signals.add(SIGQUIT);
 #endif
-      signals.async_wait([this](boost::beast::error_code, int)
-                         { close(); });
+      signals.async_wait([this](boost::beast::error_code ec, int)
+                         {
+                            if (ec)
+                            {
+                              LOG_ERR("signals: " << ec.message());
+                              return;
+                            }
+  
+                            close(); });
     }
 
     virtual void close() = 0;
@@ -114,7 +124,7 @@ namespace network
     template <class ReqBody, class ResBody>
     void enqueue(utils::u_ptr<boost::beast::http::request<ReqBody>> req, std::function<void(const boost::beast::http::response<ResBody> &, boost::beast::error_code)> &handler)
     {
-      requests.push(new client_request_impl<Derived, ReqBody, ResBody>(derived(), std::move(req), std::move(handler)));
+      requests.push(new client_request_impl<Derived, ReqBody, ResBody>(derived(), std::move(req), handler));
 
       if (requests.size() > 1)
         return; // already sending
@@ -123,7 +133,7 @@ namespace network
     }
 
     template <class Body>
-    void on_write(std::function<void(const boost::beast::http::response<Body> &, boost::beast::error_code)> handler, boost::beast::error_code ec, std::size_t)
+    void on_write(std::function<void(const boost::beast::http::response<Body> &, boost::beast::error_code)> &handler, boost::beast::error_code ec, std::size_t)
     {
       if (ec)
       {
@@ -134,18 +144,15 @@ namespace network
 
       requests.pop();
 
-      if (!requests.empty()) // If we still have work to do, make this call again..
-        requests.front()->handle_request();
-
       auto res = new boost::beast::http::response<Body>();
 
       // Receive the HTTP response
-      boost::beast::http::async_read(derived().get_stream(), buffer, *res, [this, handler = std::move(handler), res](boost::beast::error_code ec, std::size_t bytes_transferred)
-                                     { on_read(handler, res, ec, bytes_transferred); });
+      boost::beast::http::async_read(derived().get_stream(), buffer, *res, [this, &handler, res](boost::beast::error_code ec, std::size_t bytes_transferred)
+                                     { on_read(handler, res, ec, bytes_transferred); delete res; });
     }
 
     template <class Body>
-    void on_read(std::function<void(const boost::beast::http::response<Body> &, boost::beast::error_code)> handler, const boost::beast::http::response<Body> *res, boost::beast::error_code ec, std::size_t)
+    void on_read(std::function<void(const boost::beast::http::response<Body> &, boost::beast::error_code)> &handler, const boost::beast::http::response<Body> *res, boost::beast::error_code ec, std::size_t)
     {
       if (ec)
       {
@@ -159,8 +166,8 @@ namespace network
       if (res->need_eof()) // This means we should close the connection, usually because the response indicated the "Connection: close" semantic.
         close();
 
-      // We're done with the response so delete it
-      delete res;
+      if (!requests.empty()) // If we still have work to do, make this call again..
+        requests.front()->handle_request();
     }
 
   private:

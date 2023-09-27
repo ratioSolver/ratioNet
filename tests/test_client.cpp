@@ -16,7 +16,6 @@ void test_plain_client()
 {
     network::plain_client client("www.boredapi.com", "80", [&client]()
                                  { std::cout << "Connected!" << std::endl;
-                                   client.get("/api/activity", handler);
                                    client.get("/api/activity", handler); });
     std::this_thread::sleep_for(std::chrono::seconds(5));
     client.get("/api/activity", handler);
@@ -26,7 +25,10 @@ void test_plain_client()
 void test_ssl_client()
 {
     network::ssl_client client("www.boredapi.com", "443", [&client]()
-                               { std::cout << "Connected!" << std::endl; });
+                               { std::cout << "Connected!" << std::endl;
+                                   client.get("/api/activity", handler); });
+    std::this_thread::sleep_for(std::chrono::seconds(5));
+    client.get("/api/activity", handler);
     std::this_thread::sleep_for(std::chrono::seconds(5));
 }
 
