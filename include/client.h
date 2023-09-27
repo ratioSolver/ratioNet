@@ -77,8 +77,9 @@ namespace network
 #if defined(SIGQUIT)
       signals.add(SIGQUIT);
 #endif
-      signals.async_wait([this](boost::beast::error_code ec, int)
+      signals.async_wait([this](boost::beast::error_code ec, int signo)
                          {
+                            LOG_DEBUG("Received signal " << signo);
                             if (ec)
                             {
                               LOG_ERR("signals: " << ec.message());
@@ -230,7 +231,7 @@ namespace network
     friend class client_request;
 
   public:
-    plain_client(const std::string &host, const std::string &port = "80", std::function<void()> on_connect_handler = default_on_connect_handler, std::function<void(boost::beast::error_code)> on_error_handler = default_on_error_handler, std::function<void()> on_close_handler = default_on_close_handler) : client(host, port, boost::asio::make_strand(boost::asio::system_executor()), on_connect_handler, on_error_handler, on_close_handler), stream(strand) { do_resolve(); }
+    plain_client(const std::string &host, const std::string &port = "80", const std::function<void()> &on_connect_handler = default_on_connect_handler, const std::function<void(boost::beast::error_code)> &on_error_handler = default_on_error_handler, const std::function<void()> &on_close_handler = default_on_close_handler) : client(host, port, boost::asio::make_strand(boost::asio::system_executor()), on_connect_handler, on_error_handler, on_close_handler), stream(strand) { do_resolve(); }
 
   private:
     boost::beast::tcp_stream &get_stream() { return stream; }
@@ -264,7 +265,7 @@ namespace network
     friend class client_request;
 
   public:
-    ssl_client(const std::string &host, const std::string &port = "443", std::function<void()> on_connect_handler = default_on_connect_handler, std::function<void(boost::beast::error_code)> on_error_handler = default_on_error_handler, std::function<void()> on_close_handler = default_on_close_handler) : client(host, port, boost::asio::make_strand(boost::asio::system_executor()), on_connect_handler, on_error_handler, on_close_handler), stream(strand, ctx)
+    ssl_client(const std::string &host, const std::string &port = "443", const std::function<void()> &on_connect_handler = default_on_connect_handler, const std::function<void(boost::beast::error_code)> &on_error_handler = default_on_error_handler, const std::function<void()> &on_close_handler = default_on_close_handler) : client(host, port, boost::asio::make_strand(boost::asio::system_executor()), on_connect_handler, on_error_handler, on_close_handler), stream(strand, ctx)
     {
       // Set SNI Hostname (many hosts need this to handshake successfully)
       if (!SSL_set_tlsext_host_name(stream.native_handle(), host.c_str()))

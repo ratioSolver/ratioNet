@@ -662,8 +662,16 @@ namespace network
       signals.add(SIGQUIT);
 #endif // defined(SIGQUIT)
 
-      signals.async_wait([this](boost::beast::error_code /*ec*/, int /*signo*/)
-                         { stop(); });
+      signals.async_wait([this](boost::beast::error_code ec, int signo)
+                         {
+                            LOG_DEBUG("Received signal " << signo);
+                            if (ec)
+                            {
+                              LOG_ERR("signals: " << ec.message());
+                              return;
+                            }
+                            
+                            stop(); });
 
       threads.reserve(concurrency_hint);
     }
