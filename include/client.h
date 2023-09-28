@@ -52,7 +52,7 @@ namespace network
   private:
     Session &session;
     utils::u_ptr<boost::beast::http::request<ReqBody>> req;
-    const std::function<void(const boost::beast::http::response<ResBody> &, boost::beast::error_code)> &handler;
+    const std::function<void(const boost::beast::http::response<ResBody> &, boost::beast::error_code)> handler;
   };
 
   inline std::function<void()> default_on_connect_handler = []()
@@ -169,7 +169,7 @@ namespace network
     {
       req->prepare_payload();
 
-      boost::asio::post(strand, [this, req = std::move(req), &handler]() mutable
+      boost::asio::post(strand, [this, req = std::move(req), handler]() mutable
                         { enqueue(std::move(req), handler); });
     }
 
