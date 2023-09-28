@@ -180,6 +180,12 @@ namespace network
                              { on_resolve(ec, results); });
     }
 
+    void next_request()
+    {
+      if (!requests.empty()) // If we still have work to do, make this call again..
+        requests.front()->handle_request();
+    }
+
   private:
     template <class ReqBody, class ResBody>
     void enqueue(utils::u_ptr<boost::beast::http::request<ReqBody>> req, const std::function<void(const boost::beast::http::response<ResBody> &, boost::beast::error_code)> &handler)
@@ -189,7 +195,7 @@ namespace network
       if (requests.size() > 1)
         return; // already sending
 
-      requests.front()->handle_request();
+      next_request();
     }
 
     template <class Body>
@@ -202,8 +208,6 @@ namespace network
         return;
       }
 
-      requests.pop();
-
       auto res = new boost::beast::http::response<Body>();
 
       // Receive the HTTP response
@@ -214,20 +218,26 @@ namespace network
     template <class Body>
     void on_read(const std::function<void(const boost::beast::http::response<Body> &, boost::beast::error_code)> &handler, const boost::beast::http::response<Body> *res, boost::beast::error_code ec, std::size_t)
     {
-      if (ec)
+      if (ec == boost::beast::http::error::end_of_stream)
+      {
+        do_resolve();
+        return;
+      }
+      else if (ec)
       {
         LOG_ERR("on_read: " << ec.message());
         on_error_handler(ec);
         return;
       }
 
+      requests.pop();
+
       handler(*res, ec);
 
       if (res->need_eof()) // This means we should close the connection, usually because the response indicated the "Connection: close" semantic.
         close();
 
-      if (!requests.empty()) // If we still have work to do, make this call again..
-        requests.front()->handle_request();
+      next_request();
     }
 
   private:
@@ -265,7 +275,6 @@ namespace network
     std::function<void(boost::beast::error_code)> on_error_handler;
     std::function<void()> on_close_handler;
 
-  private:
     std::queue<utils::u_ptr<client_request>> requests;
   };
 
@@ -290,6 +299,7 @@ namespace network
       }
 
       on_connect_handler();
+      next_request();
     }
 
     void close() override
@@ -353,6 +363,7 @@ namespace network
       }
 
       on_connect_handler();
+      next_request();
     }
 
     void close() override
