@@ -814,4 +814,19 @@ namespace network
         return *handler.second;
     return boost::none;
   }
+
+  inline std::map<std::string, std::string> parse_query(const std::string &query)
+  {
+    std::map<std::string, std::string> params;
+    std::istringstream iss(query);
+    std::string keyval, key, val;
+    while (std::getline(std::getline(iss, keyval, '&'), key, '='))
+    {
+      if (std::getline(iss, val))
+        params[key] = val;
+      else
+        params[key] = "";
+    }
+    return params;
+  }
 } // namespace network
