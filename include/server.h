@@ -818,15 +818,20 @@ namespace network
   inline std::map<std::string, std::string> parse_query(const std::string &query)
   {
     std::map<std::string, std::string> params;
-    std::istringstream iss(query);
-    std::string keyval, key, val;
-    while (std::getline(std::getline(iss, keyval, '&'), key, '='))
+
+    std::string::size_type pos = 0;
+    while (pos < query.size())
     {
-      if (std::getline(iss, val))
-        params[key] = val;
-      else
-        params[key] = "";
+      std::string::size_type next = query.find('&', pos);
+      std::string::size_type eq = query.find('=', pos);
+      if (eq == std::string::npos)
+        break;
+      if (next == std::string::npos)
+        next = query.size();
+      params.emplace(query.substr(pos, eq - pos), query.substr(eq + 1, next - eq - 1));
+      pos = next + 1;
     }
+
     return params;
   }
 } // namespace network
