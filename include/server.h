@@ -255,6 +255,7 @@ namespace network
       if (ec)
       {
         LOG_ERR(ec.message());
+        delete this; // Delete this session
         return;
       }
 
@@ -315,6 +316,7 @@ namespace network
       if (ec)
       {
         LOG_ERR(ec.message());
+        delete this; // Delete this session
         return;
       }
 
