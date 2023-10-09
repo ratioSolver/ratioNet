@@ -9,7 +9,6 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
-include(GenerateExportHeader)
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
@@ -28,7 +27,6 @@ if(RATIONET_INCLUDE_UTILS)
 endif()
 
 add_library(${PROJECT_NAME} INTERFACE)
-GENERATE_EXPORT_HEADER(${PROJECT_NAME})
 target_include_directories(${PROJECT_NAME} INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>)
 target_link_libraries(${PROJECT_NAME} INTERFACE utils Boost::system OpenSSL::SSL OpenSSL::Crypto)
 target_compile_definitions(${PROJECT_NAME} INTERFACE TLS_VERSION=${TLS_VERSION})
