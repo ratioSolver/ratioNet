@@ -27,9 +27,7 @@ if(RATIONET_INCLUDE_UTILS)
     add_subdirectory(extern/utils)
 endif()
 
-file(GLOB RATIONET_HEADERS include/*.h)
-
-add_library(${PROJECT_NAME} INTERFACE ${RATIONET_HEADERS})
+add_library(${PROJECT_NAME} INTERFACE)
 GENERATE_EXPORT_HEADER(${PROJECT_NAME})
 target_include_directories(${PROJECT_NAME} INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>)
 target_link_libraries(${PROJECT_NAME} INTERFACE utils Boost::system OpenSSL::SSL OpenSSL::Crypto)
