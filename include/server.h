@@ -664,7 +664,7 @@ namespace network
       signals.add(SIGQUIT);
 #endif // defined(SIGQUIT)
 
-      signals.async_wait([this](boost::beast::error_code ec, int signo)
+      signals.async_wait([this](boost::beast::error_code ec, [[maybe_unused]] int signo)
                          {
                             LOG_DEBUG("Received signal " << signo);
                             if (ec)

@@ -57,7 +57,7 @@ namespace network
 
   inline std::function<void()> default_on_connect_handler = []()
   { LOG("Connected!"); };
-  inline std::function<void(boost::beast::error_code)> default_on_error_handler = [](boost::beast::error_code ec)
+  inline std::function<void(boost::beast::error_code)> default_on_error_handler = []([[maybe_unused]] boost::beast::error_code ec)
   { LOG_ERR("on_error: " << ec.message()); };
   inline std::function<void()> default_on_close_handler = []()
   { LOG("Closed!"); };
@@ -77,7 +77,7 @@ namespace network
 #if defined(SIGQUIT)
       signals.add(SIGQUIT);
 #endif
-      signals.async_wait([this](boost::beast::error_code ec, int signo)
+      signals.async_wait([this](boost::beast::error_code ec, [[maybe_unused]] int signo)
                          {
                             LOG_DEBUG("Received signal " << signo);
                             if (ec)
