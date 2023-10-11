@@ -570,8 +570,8 @@ namespace network
     {
       if (ec)
         static_cast<ws_handler_impl<Derived> &>(handler).on_error_handler(derived(), ec);
-
-      static_cast<ws_handler_impl<Derived> &>(handler).on_close_handler(derived());
+      else
+        static_cast<ws_handler_impl<Derived> &>(handler).on_close_handler(derived());
       delete this;
     }
 
