@@ -518,6 +518,7 @@ namespace network
     {
       if (ec == boost::beast::websocket::error::closed)
       { // This indicates that the session was closed
+        static_cast<ws_handler_impl<Derived> &>(handler).on_close_handler(derived());
         delete this;
         return;
       }
