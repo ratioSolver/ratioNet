@@ -1,6 +1,5 @@
 #pragma once
 
-#include "memory.h"
 #include "logging.h"
 #include <boost/asio.hpp>
 #include <boost/asio/ssl.hpp>
@@ -150,8 +149,30 @@ namespace network
   public:
     server_request_impl(Session &session, boost::beast::http::request<Body> &&req) : session(session), req(std::move(req)) {}
 
+  public:
     Session &session;
     boost::beast::http::request<Body> req;
+  };
+
+  class server_response
+  {
+  public:
+    virtual ~server_response() = default;
+
+    virtual void do_write() = 0;
+  };
+
+  template <class Session, class Body>
+  class server_response_impl : public server_response
+  {
+  public:
+    server_response_impl(Session &session, boost::beast::http::response<Body> &&res) : session(session), res(std::move(res)) {}
+
+    void do_write() override { session.do_write(res); }
+
+  public:
+    Session &session;
+    boost::beast::http::response<Body> res;
   };
 
   class http_handler
@@ -169,27 +190,26 @@ namespace network
     template <class Session, class ReqBody, class ResBody>
     void handle_request(Session &session, const boost::beast::http::request<ReqBody> &req, const std::function<void(const boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> &handler)
     {
-      auto res = new boost::beast::http::response<ResBody>(boost::beast::http::status::ok, req.version());
-      res->set(boost::beast::http::field::server, "ratioNet");
-      res->set(boost::beast::http::field::content_type, "text/html");
-      res->keep_alive(req.keep_alive());
+      boost::beast::http::response<ResBody> res(boost::beast::http::status::ok, req.version());
+      res.set(boost::beast::http::field::server, "ratioNet");
+      res.set(boost::beast::http::field::content_type, "text/html");
+      res.keep_alive(req.keep_alive());
       try
       {
-        handler(req, *res);
-        res->prepare_payload();
-        session.do_write(res);
+        handler(req, res);
+        res.prepare_payload();
+        session.enqueue(std::move(res));
       }
       catch (const std::exception &e)
       {
-        delete res;
         LOG_WARN(e.what());
-        auto c_res = new boost::beast::http::response<boost::beast::http::string_body>(boost::beast::http::status::bad_request, req.version());
-        c_res->set(boost::beast::http::field::server, "ratioNet");
-        c_res->set(boost::beast::http::field::content_type, "text/html");
-        c_res->keep_alive(req.keep_alive());
-        c_res->body() = e.what();
-        c_res->prepare_payload();
-        session.do_write(c_res);
+        boost::beast::http::response<boost::beast::http::string_body> c_res(boost::beast::http::status::bad_request, req.version());
+        c_res.set(boost::beast::http::field::server, "ratioNet");
+        c_res.set(boost::beast::http::field::content_type, "text/html");
+        c_res.keep_alive(req.keep_alive());
+        c_res.body() = e.what();
+        c_res.prepare_payload();
+        session.enqueue(std::move(c_res));
       }
     }
   };
@@ -208,16 +228,16 @@ namespace network
   };
 
   template <class Body>
-  void make_websocket_session(server &srv, boost::beast::tcp_stream stream, boost::beast::http::request<Body> req, ws_handler &handler) { new plain_websocket_session(srv, std::move(stream), std::move(req), handler); }
+  void make_websocket_session(server &srv, boost::beast::tcp_stream stream, boost::beast::http::request<Body> req, ws_handler &handler) { std::make_shared<plain_websocket_session>(srv, std::move(stream), std::move(req), handler); }
 
   template <class Body>
-  void make_websocket_session(server &srv, boost::beast::ssl_stream<boost::beast::tcp_stream> stream, boost::beast::http::request<Body> req, ws_handler &handler) { new ssl_websocket_session(srv, std::move(stream), std::move(req), handler); }
+  void make_websocket_session(server &srv, boost::beast::ssl_stream<boost::beast::tcp_stream> stream, boost::beast::http::request<Body> req, ws_handler &handler) { std::make_shared<ssl_websocket_session>(srv, std::move(stream), std::move(req), handler); }
 
   boost::optional<http_handler &> get_http_handler(server &srv, boost::beast::http::verb method, const std::string &target, bool ssl);
   boost::optional<ws_handler &> get_ws_handler(server &srv, const std::string &target, bool ssl);
 
   template <class Derived>
-  class http_session
+  class http_session : public std::enable_shared_from_this<Derived>
   {
     Derived &derived() { return static_cast<Derived &>(*this); }
 
@@ -228,12 +248,18 @@ namespace network
     virtual bool is_ssl() const = 0;
 
     template <class Body>
-    void do_write(boost::beast::http::response<Body> *res)
+    void enqueue(boost::beast::http::response<Body> &&res)
     {
-      bool close = res->need_eof();
-      boost::beast::http::async_write(derived().get_stream(), *res, [this, close, res](boost::beast::error_code ec, std::size_t bytes_transferred)
-                                      { on_write(ec, bytes_transferred, close); delete res; });
+      response_queue.push(std::make_unique<server_response_impl<Derived, Body>>(derived(), std::move(res)));
+
+      if (response_queue.size() > 1)
+        return; // already sending
+
+      response_queue.front()->do_write();
     }
+
+    template <class Body>
+    void do_write(boost::beast::http::response<Body> &res) { boost::beast::http::async_write(derived().get_stream(), res, boost::beast::bind_front_handler(&http_session::on_write, this->shared_from_this(), res.keep_alive())); }
 
   protected:
     void do_read()
@@ -242,8 +268,7 @@ namespace network
       parser->body_limit(10000);                                                                      // Set the limit on the allowed size of a message
       boost::beast::get_lowest_layer(derived().get_stream()).expires_after(std::chrono::seconds(30)); // Set the timeout
 
-      boost::beast::http::async_read(derived().get_stream(), buffer, *parser, [this](boost::beast::error_code ec, std::size_t bytes_transferred)
-                                     { on_read(ec, bytes_transferred); }); // Read a request
+      boost::beast::http::async_read(derived().get_stream(), buffer, *parser, boost::beast::bind_front_handler(&http_session::on_read, this->shared_from_this())); // Read a request
     }
 
   private:
@@ -255,7 +280,6 @@ namespace network
       if (ec)
       {
         LOG_ERR(ec.message());
-        delete this; // Delete this session
         return;
       }
 
@@ -266,7 +290,6 @@ namespace network
         auto handler = get_ws_handler(srv, req.target().to_string(), is_ssl());
         if (handler)
           make_websocket_session(srv, derived().release_stream(), std::move(req), handler.get());
-        delete this; // Delete this session
         return;
       }
 
@@ -278,20 +301,20 @@ namespace network
     {
       if (req.target().empty() || req.target()[0] != '/' || req.target().find("..") != boost::beast::string_view::npos)
       {
-        auto res = new boost::beast::http::response<boost::beast::http::string_body>(boost::beast::http::status::bad_request, req.version());
-        res->set(boost::beast::http::field::server, "ratioNet");
-        res->set(boost::beast::http::field::content_type, "text/html");
-        res->keep_alive(req.keep_alive());
+        boost::beast::http::response<boost::beast::http::string_body> res(boost::beast::http::status::bad_request, req.version());
+        res.set(boost::beast::http::field::server, "ratioNet");
+        res.set(boost::beast::http::field::content_type, "text/html");
+        res.keep_alive(req.keep_alive());
         if (req.target().empty())
-          res->body() = "The path must not be empty";
+          res.body() = "The path must not be empty";
         else if (req.target()[0] != '/')
-          res->body() = "The path must begin with '/'";
+          res.body() = "The path must begin with '/'";
         else if (req.target().find("..") != boost::beast::string_view::npos)
-          res->body() = "The path must not contain '..'";
+          res.body() = "The path must not contain '..'";
         else
-          res->body() = "Bad request";
-        res->prepare_payload();
-        do_write(res);
+          res.body() = "Bad request";
+        res.prepare_payload();
+        enqueue(std::move(res));
         return;
       }
 
@@ -301,27 +324,28 @@ namespace network
       else
       {
         LOG_WARN("No handler found for " << req.method() << " " << target);
-        auto res = new boost::beast::http::response<boost::beast::http::string_body>(boost::beast::http::status::bad_request, req.version());
-        res->set(boost::beast::http::field::server, "ratioNet");
-        res->set(boost::beast::http::field::content_type, "text/html");
-        res->keep_alive(req.keep_alive());
-        res->body() = "Bad request";
-        res->prepare_payload();
-        do_write(res);
+        boost::beast::http::response<boost::beast::http::string_body> res(boost::beast::http::status::bad_request, req.version());
+        res.set(boost::beast::http::field::server, "ratioNet");
+        res.set(boost::beast::http::field::content_type, "text/html");
+        res.keep_alive(req.keep_alive());
+        res.body() = "Bad request";
+        res.prepare_payload();
+        enqueue(std::move(res));
       }
     }
 
-    void on_write(boost::beast::error_code ec, std::size_t, bool close)
+    void on_write(bool keep_alive, boost::beast::error_code ec, std::size_t)
     {
       if (ec)
       {
         LOG_ERR(ec.message());
-        delete this; // Delete this session
         return;
       }
 
-      if (close) // This means we should close the connection, usually because the response indicated the "Connection: close" semantic.
+      if (!keep_alive) // This means we should close the connection, usually because the response indicated the "Connection: close" semantic.
         return do_eof();
+
+      response_queue.pop();
 
       do_read();
     }
@@ -334,6 +358,7 @@ namespace network
 
   private:
     boost::optional<boost::beast::http::request_parser<boost::beast::http::string_body>> parser; // The parser for reading the request. The parser is stored in an optional container so we can construct it from scratch it at the beginning of each new message.
+    std::queue<std::unique_ptr<server_response>> response_queue;
   };
 
   class plain_http_session : public http_session<plain_http_session>
@@ -353,7 +378,6 @@ namespace network
     {
       boost::beast::error_code ec;
       stream.socket().shutdown(boost::asio::ip::tcp::socket::shutdown_send, ec);
-      delete this; // Delete this session
     }
 
   private:
@@ -367,9 +391,8 @@ namespace network
   public:
     ssl_http_session(server &srv, boost::beast::tcp_stream &&str, boost::asio::ssl::context &ctx, boost::beast::flat_buffer &&bfr) : http_session(srv, std::move(bfr)), stream(std::move(str), ctx)
     {
-      boost::beast::get_lowest_layer(stream).expires_after(std::chrono::seconds(30)); // Set the timeout
-      stream.async_handshake(boost::asio::ssl::stream_base::server, buffer.data(), [this](boost::beast::error_code ec, std::size_t bytes_used)
-                             { on_handshake(ec, bytes_used); }); // Perform the SSL handshake
+      boost::beast::get_lowest_layer(stream).expires_after(std::chrono::seconds(30));                                                                                            // Set the timeout
+      stream.async_handshake(boost::asio::ssl::stream_base::server, buffer.data(), boost::beast::bind_front_handler(&ssl_http_session::on_handshake, this->shared_from_this())); // Perform the SSL handshake
     }
 
     bool is_ssl() const override { return true; }
@@ -383,7 +406,6 @@ namespace network
       if (ec)
       {
         LOG_ERR(ec.message());
-        delete this;
       }
       else
       {
@@ -394,9 +416,8 @@ namespace network
 
     void do_eof() override
     {
-      boost::beast::get_lowest_layer(stream).expires_after(std::chrono::seconds(30)); // Set the timeout
-      stream.async_shutdown([this](boost::beast::error_code ec)
-                            { on_shutdown(ec); }); // Perform the SSL shutdown
+      boost::beast::get_lowest_layer(stream).expires_after(std::chrono::seconds(30));                                    // Set the timeout
+      stream.async_shutdown(boost::beast::bind_front_handler(&ssl_http_session::on_shutdown, this->shared_from_this())); // Perform the SSL shutdown
     }
     void on_shutdown(boost::beast::error_code ec)
     {
@@ -404,7 +425,6 @@ namespace network
       {
         LOG_ERR(ec.message());
       }
-      delete this; // Delete this session
     }
 
   private:
@@ -451,17 +471,8 @@ namespace network
     std::function<void(Session &, boost::beast::error_code)> on_error_handler = [](Session &, boost::beast::error_code) {};
   };
 
-  class message final : public utils::countable
-  {
-  public:
-    message(const std::string &msg) : msg(msg) {}
-    message(const std::string &&msg) : msg(std::move(msg)) {}
-
-    std::string msg;
-  };
-
   template <class Derived>
-  class websocket_session
+  class websocket_session : public std::enable_shared_from_this<Derived>
   {
     Derived &derived() { return static_cast<Derived &>(*this); }
 
@@ -469,20 +480,11 @@ namespace network
     websocket_session(server &srv, ws_handler &handler) : srv(srv), handler(handler) {}
     virtual ~websocket_session() = default;
 
-    void send(const std::string &&msg) { send(utils::c_ptr<message>(new message(std::move(msg)))); }
+    void send(const std::string &&msg) { send(std::make_shared<std::string>(msg)); }
 
-    void send(utils::c_ptr<message> msg)
-    {
-      // post to strand to avoid concurrent write..
-      boost::asio::post(derived().get_websocket().get_executor(), [this, msg]()
-                        { enqueue(std::move(msg)); });
-    }
+    void send(const std::shared_ptr<const std::string> &msg) { enqueue(msg); }
 
-    void close(boost::beast::websocket::close_code code = boost::beast::websocket::close_code::normal)
-    {
-      derived().get_websocket().async_close(code, [this](boost::beast::error_code ec)
-                                            { on_close(ec); });
-    }
+    void close(boost::beast::websocket::close_code code = boost::beast::websocket::close_code::normal) { derived().get_websocket().async_close(code, boost::beast::bind_front_handler(&websocket_session::on_close, this->shared_from_this())); }
 
   protected:
     template <class Body>
@@ -491,43 +493,27 @@ namespace network
       derived().get_websocket().set_option(boost::beast::websocket::stream_base::timeout::suggested(boost::beast::role_type::server));
       derived().get_websocket().set_option(boost::beast::websocket::stream_base::decorator([](boost::beast::websocket::response_type &res)
                                                                                            { res.set(boost::beast::http::field::server, "ratioNet"); }));
-      derived().get_websocket().async_accept(req, [this](boost::beast::error_code ec)
-                                             { on_accept(ec); });
+      derived().get_websocket().async_accept(req, boost::beast::bind_front_handler(&websocket_session::on_accept, this->shared_from_this()));
     }
 
   private:
     void on_accept(boost::beast::error_code ec)
     {
       if (ec)
-      {
-        static_cast<ws_handler_impl<Derived> &>(handler).on_error_handler(derived(), ec);
-        delete this;
-      }
+        return static_cast<ws_handler_impl<Derived> &>(handler).on_error_handler(derived(), ec);
 
       static_cast<ws_handler_impl<Derived> &>(handler).on_open_handler(derived());
 
       do_read();
     }
 
-    void do_read()
-    {
-      derived().get_websocket().async_read(buffer, [this](boost::beast::error_code ec, std::size_t bytes_transferred)
-                                           { on_read(ec, bytes_transferred); });
-    }
+    void do_read() { derived().get_websocket().async_read(buffer, boost::beast::bind_front_handler(&websocket_session::on_read, this->shared_from_this())); }
     void on_read(boost::beast::error_code ec, std::size_t)
     {
-      if (ec == boost::beast::websocket::error::closed)
-      { // This indicates that the session was closed
-        static_cast<ws_handler_impl<Derived> &>(handler).on_close_handler(derived());
-        delete this;
-        return;
-      }
+      if (ec == boost::beast::websocket::error::closed) // This indicates that the session was closed
+        return static_cast<ws_handler_impl<Derived> &>(handler).on_close_handler(derived());
       else if (ec)
-      {
-        static_cast<ws_handler_impl<Derived> &>(handler).on_error_handler(derived(), ec);
-        delete this;
-        return;
-      }
+        return static_cast<ws_handler_impl<Derived> &>(handler).on_error_handler(derived(), ec);
 
       static_cast<ws_handler_impl<Derived> &>(handler).on_message_handler(derived(), boost::beast::buffers_to_string(buffer.data()));
 
@@ -536,9 +522,12 @@ namespace network
       do_read(); // Read another message
     }
 
-    void enqueue(utils::c_ptr<message> msg)
+    void enqueue(const std::shared_ptr<const std::string> &msg)
     {
-      send_queue.push(std::move(msg));
+      if (!derived().get_websocket().get_executor().running_in_this_thread())
+        return boost::asio::post(derived().get_websocket().get_executor(), boost::beast::bind_front_handler(&websocket_session::enqueue, this->shared_from_this(), msg));
+
+      send_queue.push(msg);
 
       if (send_queue.size() > 1)
         return; // already sending
@@ -546,19 +535,11 @@ namespace network
       do_write();
     }
 
-    void do_write()
-    {
-      derived().get_websocket().async_write(boost::asio::buffer(send_queue.front()->msg), [this](boost::beast::error_code ec, std::size_t bytes_transferred)
-                                            { on_write(ec, bytes_transferred); });
-    }
+    void do_write() { derived().get_websocket().async_write(boost::asio::buffer(*send_queue.front()), boost::asio::bind_executor(derived().get_websocket().get_executor(), boost::beast::bind_front_handler(&websocket_session::on_write, this->shared_from_this()))); }
     void on_write(boost::beast::error_code ec, std::size_t)
     {
       if (ec)
-      {
-        static_cast<ws_handler_impl<Derived> &>(handler).on_error_handler(derived(), ec);
-        delete this;
-        return;
-      }
+        return static_cast<ws_handler_impl<Derived> &>(handler).on_error_handler(derived(), ec);
 
       send_queue.pop();
 
@@ -569,16 +550,15 @@ namespace network
     void on_close(boost::beast::error_code ec)
     {
       if (ec)
-        static_cast<ws_handler_impl<Derived> &>(handler).on_error_handler(derived(), ec);
-      else
-        static_cast<ws_handler_impl<Derived> &>(handler).on_close_handler(derived());
-      delete this;
+        return static_cast<ws_handler_impl<Derived> &>(handler).on_error_handler(derived(), ec);
+
+      static_cast<ws_handler_impl<Derived> &>(handler).on_close_handler(derived());
     }
 
   private:
     server &srv;
     boost::beast::flat_buffer buffer;
-    std::queue<utils::c_ptr<message>> send_queue;
+    std::queue<std::shared_ptr<const std::string>> send_queue;
     ws_handler &handler;
   };
 
@@ -614,21 +594,16 @@ namespace network
     boost::beast::websocket::stream<boost::beast::ssl_stream<boost::beast::tcp_stream>> websocket;
   };
 
-  class session_detector
+  class session_detector : public std::enable_shared_from_this<session_detector>
   {
   public:
-    session_detector(server &srv, boost::asio::ip::tcp::socket &&socket, boost::asio::ssl::context &ctx) : srv(srv), stream(std::move(socket)), ctx(ctx)
-    {
-      boost::asio::dispatch(stream.get_executor(), [this]
-                            { on_run(); });
-    }
+    session_detector(server &srv, boost::asio::ip::tcp::socket &&socket, boost::asio::ssl::context &ctx) : srv(srv), stream(std::move(socket)), ctx(ctx) { boost::asio::dispatch(stream.get_executor(), boost::beast::bind_front_handler(&session_detector::on_run, shared_from_this())); }
 
   private:
     void on_run()
     {
-      stream.expires_after(std::chrono::seconds(30)); // Set the timeout
-      boost::beast::async_detect_ssl(stream, buffer, [this](boost::beast::error_code ec, bool result)
-                                     { on_detect(ec, result); }); // Detect SSL
+      stream.expires_after(std::chrono::seconds(30));                                                                                     // Set the timeout
+      boost::beast::async_detect_ssl(stream, buffer, boost::beast::bind_front_handler(&session_detector::on_detect, shared_from_this())); // Detect SSL
     }
 
     void on_detect(boost::beast::error_code ec, bool result)
@@ -638,10 +613,9 @@ namespace network
         LOG_ERR(ec.message());
       }
       else if (result)
-        new ssl_http_session(srv, std::move(stream), ctx, std::move(buffer));
+        std::make_shared<ssl_http_session>(srv, std::move(stream), ctx, std::move(buffer));
       else
-        new plain_http_session(srv, std::move(stream), std::move(buffer));
-      delete this;
+        std::make_shared<plain_http_session>(srv, std::move(stream), std::move(buffer));
     }
 
   private:
@@ -683,21 +657,21 @@ namespace network
     void add_route(boost::beast::http::verb method, const std::string &path, const std::function<void(const boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> &handler, bool ssl = false) noexcept
     {
       if (ssl)
-        https_routes[method].push_back(std::make_pair(std::regex(path), new http_handler_impl<ssl_http_session, ReqBody, ResBody>(handler)));
+        https_routes[method].push_back(std::make_pair(std::regex(path), std::make_unique<http_handler_impl<ssl_http_session, ReqBody, ResBody>>(handler)));
       else
-        http_routes[method].push_back(std::make_pair(std::regex(path), new http_handler_impl<plain_http_session, ReqBody, ResBody>(handler)));
+        http_routes[method].push_back(std::make_pair(std::regex(path), std::make_unique<http_handler_impl<plain_http_session, ReqBody, ResBody>>(handler)));
     }
 
     ws_handler &add_ws_route(const std::string &path, bool ssl = false) noexcept
     {
       if (ssl)
       {
-        wss_routes.push_back(std::make_pair(std::regex(path), new ws_handler_impl<ssl_websocket_session>()));
+        wss_routes.push_back(std::make_pair(std::regex(path), std::make_unique<ws_handler_impl<ssl_websocket_session>>()));
         return *wss_routes.back().second;
       }
       else
       {
-        ws_routes.push_back(std::make_pair(std::regex(path), new ws_handler_impl<plain_websocket_session>()));
+        ws_routes.push_back(std::make_pair(std::regex(path), std::make_unique<ws_handler_impl<plain_websocket_session>>()));
         return *ws_routes.back().second;
       }
     }
@@ -798,8 +772,8 @@ namespace network
     boost::asio::ip::tcp::endpoint endpoint;                               // The endpoint for the server
     boost::asio::ssl::context ctx{boost::asio::ssl::context::TLS_VERSION}; // The SSL context is required, and holds certificates
     boost::asio::ip::tcp::acceptor acceptor;                               // The acceptor receives incoming connections
-    std::unordered_map<boost::beast::http::verb, std::vector<std::pair<std::regex, utils::u_ptr<http_handler>>>> http_routes, https_routes;
-    std::vector<std::pair<std::regex, utils::u_ptr<ws_handler>>> ws_routes, wss_routes;
+    std::unordered_map<boost::beast::http::verb, std::vector<std::pair<std::regex, std::unique_ptr<http_handler>>>> http_routes, https_routes;
+    std::vector<std::pair<std::regex, std::unique_ptr<ws_handler>>> ws_routes, wss_routes;
   };
 
   inline boost::optional<http_handler &> get_http_handler(server &srv, boost::beast::http::verb method, const std::string &target, bool ssl = false)
