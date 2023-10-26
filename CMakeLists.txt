@@ -12,6 +12,9 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
+include(CTest)
+enable_testing()
+
 find_package(Boost REQUIRED COMPONENTS system)
 find_package(OpenSSL REQUIRED)
 
@@ -19,7 +22,10 @@ set(TLS_VERSIONS tlsv11 tlsv12 tlsv13)
 set(TLS_VERSION tlsv12 CACHE STRING "Specify the desired TLS version")
 set_property(CACHE TLS_VERSION PROPERTY STRINGS ${TLS_VERSIONS})
 
+option(ADD_COVERAGE "Add coverage" OFF)
+
 message(STATUS "TLS version:            ${TLS_VERSION}")
+message(STATUS "Add coverage:           ${ADD_COVERAGE}")
 
 option(RATIONET_INCLUDE_UTILS "Include utils library" ON)
 if(RATIONET_INCLUDE_UTILS)
@@ -39,6 +45,12 @@ if(MSVC)
     target_compile_options(${PROJECT_NAME} INTERFACE /W4)
 else()
     target_compile_options(${PROJECT_NAME} INTERFACE -Wall -Wextra -pedantic)
+    if (ADD_COVERAGE)
+        if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+            target_compile_options(${PROJECT_NAME} PRIVATE --coverage)
+            target_link_libraries(${PROJECT_NAME} PUBLIC gcov)
+        endif()
+    endif()
 endif()
 
 install(
