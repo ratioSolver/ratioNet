@@ -802,6 +802,16 @@ namespace network
     std::vector<std::pair<std::regex, utils::u_ptr<ws_handler>>> ws_routes, wss_routes;
   };
 
+  /**
+   * @brief Get the http handler object.
+   *
+   * Returns the http handler for the given method and target.
+   *
+   * @param srv The server.
+   * @param method The http method.
+   * @param target The target.
+   * @param ssl Whether the connection is ssl or not.
+   */
   inline boost::optional<http_handler &> get_http_handler(server &srv, boost::beast::http::verb method, const std::string &target, bool ssl = false)
   {
     for (auto &handler : ssl ? srv.https_routes[method] : srv.http_routes[method])
@@ -810,6 +820,15 @@ namespace network
     return boost::none;
   }
 
+  /**
+   * @brief Get the websocket handler object.
+   *
+   * Returns the websocket handler for the given target.
+   *
+   * @param srv The server.
+   * @param target The target.
+   * @param ssl Whether the connection is ssl or not.
+   */
   inline boost::optional<ws_handler &> get_ws_handler(server &srv, const std::string &target, bool ssl = false)
   {
     for (auto &handler : ssl ? srv.wss_routes : srv.ws_routes)
