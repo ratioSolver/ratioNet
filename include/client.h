@@ -1,6 +1,5 @@
 #pragma once
 
-#include "memory.h"
 #include "logging.h"
 #include <boost/beast.hpp>
 #include <boost/beast/ssl.hpp>
@@ -35,8 +34,8 @@ namespace network
       boost::beast::get_lowest_layer(session.get_stream()).expires_after(std::chrono::seconds(30));
 
       // Send the HTTP request to the remote host
-      boost::beast::http::async_write(session.get_stream(), req, [&session, &handler](boost::beast::error_code ec, std::size_t bytes_transferred)
-                                      { session.on_write(handler, ec, bytes_transferred); });
+      boost::beast::http::async_write(session.get_stream(), req, boost::asio::bind_executor(session.strand, [&session, &handler](boost::beast::error_code ec, std::size_t bytes_transferred)
+                                                                                            { session.on_write(handler, ec, bytes_transferred); }));
     }
   };
 
@@ -44,14 +43,14 @@ namespace network
   class client_request_impl : public client_request
   {
   public:
-    client_request_impl(Session &session, utils::u_ptr<boost::beast::http::request<ReqBody>> req, const std::function<void(const boost::beast::http::response<ResBody> &, boost::beast::error_code)> &handler) : session(session), req(std::move(req)), handler(handler) {}
+    client_request_impl(Session &session, std::unique_ptr<boost::beast::http::request<ReqBody>> req, const std::function<void(const boost::beast::http::response<ResBody> &, boost::beast::error_code)> &handler) : session(session), req(std::move(req)), handler(handler) {}
 
   private:
     void handle_request() override { client_request::handle_request(session, *req, handler); }
 
   private:
     Session &session;
-    utils::u_ptr<boost::beast::http::request<ReqBody>> req;
+    std::unique_ptr<boost::beast::http::request<ReqBody>> req;
     const std::function<void(const boost::beast::http::response<ResBody> &, boost::beast::error_code)> handler;
   };
 
@@ -97,12 +96,12 @@ namespace network
     template <class Body>
     void get(const std::string &target, const std::unordered_map<boost::beast::http::field, std::string> &fields, const std::function<void(const boost::beast::http::response<Body> &, boost::beast::error_code)> &handler)
     {
-      auto req = new boost::beast::http::request<boost::beast::http::empty_body>{boost::beast::http::verb::get, target, 11};
+      auto req = std::make_unique<boost::beast::http::request<boost::beast::http::empty_body>>(boost::beast::http::verb::get, target, 11);
       req->set(boost::beast::http::field::host, host);
       req->set(boost::beast::http::field::user_agent, "ratioNet");
       for (auto &field : fields)
         req->set(field.first, field.second);
-      send(utils::u_ptr<boost::beast::http::request<boost::beast::http::empty_body>>(req), handler);
+      send(std::move(req), handler);
     }
 
     template <class Body>
@@ -111,13 +110,13 @@ namespace network
     template <class Body>
     void post(const std::string &target, const std::string &body, const std::unordered_map<boost::beast::http::field, std::string> &fields, const std::function<void(const boost::beast::http::response<Body> &, boost::beast::error_code)> &handler)
     {
-      auto req = new boost::beast::http::request<boost::beast::http::string_body>{boost::beast::http::verb::post, target, 11};
+      auto req = std::make_unique<boost::beast::http::request<boost::beast::http::string_body>>(boost::beast::http::verb::get, target, 11);
       req->set(boost::beast::http::field::host, host);
       req->set(boost::beast::http::field::user_agent, "ratioNet");
       for (auto &field : fields)
         req->set(field.first, field.second);
       req->body() = body;
-      send(utils::u_ptr<boost::beast::http::request<boost::beast::http::string_body>>(req), handler);
+      send(std::move(req), handler);
     }
 
     template <class Body>
@@ -126,13 +125,13 @@ namespace network
     template <class Body>
     void put(const std::string &target, const std::string &body, const std::unordered_map<boost::beast::http::field, std::string> &fields, const std::function<void(const boost::beast::http::response<Body> &, boost::beast::error_code)> &handler)
     {
-      auto req = new boost::beast::http::request<boost::beast::http::string_body>{boost::beast::http::verb::put, target, 11};
+      auto req = std::make_unique<boost::beast::http::request<boost::beast::http::string_body>>(boost::beast::http::verb::put, target, 11);
       req->set(boost::beast::http::field::host, host);
       req->set(boost::beast::http::field::user_agent, "ratioNet");
       for (auto &field : fields)
         req->set(field.first, field.second);
       req->body() = body;
-      send(utils::u_ptr<boost::beast::http::request<boost::beast::http::string_body>>(req), handler);
+      send(std::move(req), handler);
     }
 
     template <class Body>
@@ -141,13 +140,13 @@ namespace network
     template <class Body>
     void patch(const std::string &target, const std::string &body, const std::unordered_map<boost::beast::http::field, std::string> &fields, const std::function<void(const boost::beast::http::response<Body> &, boost::beast::error_code)> &handler)
     {
-      auto req = new boost::beast::http::request<boost::beast::http::string_body>{boost::beast::http::verb::patch, target, 11};
+      auto req = std::make_unique<boost::beast::http::request<boost::beast::http::string_body>>(boost::beast::http::verb::put, target, 11);
       req->set(boost::beast::http::field::host, host);
       req->set(boost::beast::http::field::user_agent, "ratioNet");
       for (auto &field : fields)
         req->set(field.first, field.second);
       req->body() = body;
-      send(utils::u_ptr<boost::beast::http::request<boost::beast::http::string_body>>(req), handler);
+      send(std::move(req), handler);
     }
 
     template <class Body>
@@ -156,16 +155,16 @@ namespace network
     template <class Body>
     void del(const std::string &target, const std::unordered_map<boost::beast::http::field, std::string> &fields, const std::function<void(const boost::beast::http::response<Body> &, boost::beast::error_code)> &handler)
     {
-      auto req = new boost::beast::http::request<boost::beast::http::empty_body>{boost::beast::http::verb::delete_, target, 11};
+      auto req = std::make_unique<boost::beast::http::request<boost::beast::http::empty_body>>(boost::beast::http::verb::get, target, 11);
       req->set(boost::beast::http::field::host, host);
       req->set(boost::beast::http::field::user_agent, "ratioNet");
       for (auto &field : fields)
         req->set(field.first, field.second);
-      send(utils::u_ptr<boost::beast::http::request<boost::beast::http::empty_body>>(req), handler);
+      send(std::move(req), handler);
     }
 
     template <class ReqBody, class ResBody>
-    void send(utils::u_ptr<boost::beast::http::request<ReqBody>> req, const std::function<void(const boost::beast::http::response<ResBody> &, boost::beast::error_code)> &handler)
+    void send(std::unique_ptr<boost::beast::http::request<ReqBody>> req, const std::function<void(const boost::beast::http::response<ResBody> &, boost::beast::error_code)> &handler)
     {
       req->prepare_payload();
 
@@ -188,9 +187,9 @@ namespace network
 
   private:
     template <class ReqBody, class ResBody>
-    void enqueue(utils::u_ptr<boost::beast::http::request<ReqBody>> req, const std::function<void(const boost::beast::http::response<ResBody> &, boost::beast::error_code)> &handler)
+    void enqueue(std::unique_ptr<boost::beast::http::request<ReqBody>> req, const std::function<void(const boost::beast::http::response<ResBody> &, boost::beast::error_code)> &handler)
     {
-      requests.push(new client_request_impl<Derived, ReqBody, ResBody>(derived(), std::move(req), handler));
+      requests.push(std::make_unique<client_request_impl<Derived, ReqBody, ResBody>>(derived(), std::move(req), handler));
 
       if (requests.size() > 1)
         return; // already sending
@@ -207,6 +206,8 @@ namespace network
         on_error_handler(ec);
         return;
       }
+
+      requests.pop();
 
       auto res = new boost::beast::http::response<Body>();
 
@@ -229,8 +230,6 @@ namespace network
         on_error_handler(ec);
         return;
       }
-
-      requests.pop();
 
       handler(*res, ec);
 
@@ -275,7 +274,7 @@ namespace network
     std::function<void(boost::beast::error_code)> on_error_handler;
     std::function<void()> on_close_handler;
 
-    std::queue<utils::u_ptr<client_request>> requests;
+    std::queue<std::unique_ptr<client_request>> requests;
   };
 
   class plain_client : public client<plain_client>
