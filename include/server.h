@@ -744,11 +744,7 @@ namespace network
     }
 
   private:
-    void do_accept()
-    {
-      acceptor.async_accept(boost::asio::make_strand(io_ctx), [this](boost::beast::error_code ec, boost::asio::ip::tcp::socket socket)
-                            { on_accept(ec, std::move(socket)); });
-    }
+    void do_accept() { acceptor.async_accept(boost::asio::make_strand(io_ctx), boost::beast::bind_front_handler(&server::on_accept, this)); }
 
     void on_accept(boost::beast::error_code ec, boost::asio::ip::tcp::socket socket)
     {

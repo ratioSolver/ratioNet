@@ -16,6 +16,7 @@ namespace network
   class ssl_client;
 
   class client_request
+
   {
     friend class client<plain_client>;
     friend class plain_client;
@@ -27,69 +28,6 @@ namespace network
 
   private:
     virtual void handle_request() = 0;
-
-  protected:
-    void handle_request_impl() { handle_request(); }
-  };
-
-  template <class Session, class ReqBody, class ResBody>
-  class client_request_impl : public client_request
-  {
-  public:
-    client_request_impl(Session &session, std::unique_ptr<boost::beast::http::request<ReqBody>> req, const std::function<void(const boost::beast::http::response<ResBody> &, boost::beast::error_code)> &handler) : session(session), req(std::move(req)), handler(handler) {}
-
-  private:
-    void handle_request() override
-    {
-      // Set a timeout on the operation
-      boost::beast::get_lowest_layer(session.get_stream()).expires_after(std::chrono::seconds(30));
-
-      // Send the HTTP request to the remote host
-      boost::beast::http::async_write(session.get_stream(), req, boost::beast::bind_front_handler(&client_request_impl::on_write, this));
-    }
-
-    void on_write(boost::beast::error_code ec, std::size_t)
-    {
-      if (ec)
-      {
-        LOG_ERR("on_write: " << ec.message());
-        handler(res, ec);
-        return;
-      }
-
-      // Receive the HTTP response
-      boost::beast::http::async_read(session.get_stream(), session.buffer, *res, boost::asio::bind_executor(session.strand, boost::beast::bind_front_handler(&client_request_impl::on_read, this)));
-    }
-
-    void on_read(boost::beast::error_code ec, std::size_t)
-    {
-      if (ec == boost::beast::http::error::end_of_stream)
-      {
-        session.do_resolve();
-        return;
-      }
-      else if (ec)
-      {
-        LOG_ERR("on_read: " << ec.message());
-        handler(res, ec);
-        return;
-      }
-
-      handler(res, ec);
-
-      session.requests.pop();
-      if (!session.requests.empty()) // If we still have work to do, make this call again..
-        session.requests.front()->handle_request();
-
-      if (res.need_eof()) // This means we should close the connection, usually because the response indicated the "Connection: close" semantic.
-        session.close();
-    }
-
-  private:
-    Session &session;
-    std::unique_ptr<boost::beast::http::request<ReqBody>> req;
-    boost::beast::http::response<ResBody> res;
-    const std::function<void(const boost::beast::http::response<ResBody> &, boost::beast::error_code)> handler;
   };
 
   inline std::function<void()> default_on_connect_handler = []()
@@ -241,6 +179,66 @@ namespace network
 
     virtual void on_connect(boost::beast::error_code ec, boost::asio::ip::tcp::resolver::results_type::endpoint_type) = 0;
 
+    template <class Session, class ReqBody, class ResBody>
+    class client_request_impl : public client_request, public std::enable_shared_from_this<client_request_impl<Session, ReqBody, ResBody>>
+    {
+    public:
+      client_request_impl(Session &session, std::unique_ptr<boost::beast::http::request<ReqBody>> req, const std::function<void(const boost::beast::http::response<ResBody> &, boost::beast::error_code)> &handler) : session(session), req(std::move(req)), handler(handler) {}
+
+    private:
+      void handle_request() override
+      {
+        // Set a timeout on the operation
+        boost::beast::get_lowest_layer(session.get_stream()).expires_after(std::chrono::seconds(30));
+
+        // Send the HTTP request to the remote host
+        boost::beast::http::async_write(session.get_stream(), *req, boost::beast::bind_front_handler(&client_request_impl::on_write, this->shared_from_this()));
+      }
+
+      void on_write(boost::beast::error_code ec, std::size_t)
+      {
+        if (ec)
+        {
+          LOG_ERR("on_write: " << ec.message());
+          handler(res, ec);
+          return;
+        }
+
+        // Receive the HTTP response
+        boost::beast::http::async_read(session.get_stream(), session.buffer, res, boost::asio::bind_executor(session.strand, boost::beast::bind_front_handler(&client_request_impl::on_read, this->shared_from_this())));
+      }
+
+      void on_read(boost::beast::error_code ec, std::size_t)
+      {
+        if (ec == boost::beast::http::error::end_of_stream)
+        {
+          session.do_resolve();
+          return;
+        }
+        else if (ec)
+        {
+          LOG_ERR("on_read: " << ec.message());
+          handler(res, ec);
+          return;
+        }
+
+        handler(res, ec);
+
+        session.requests.pop();
+        if (!session.requests.empty()) // If we still have work to do, make this call again..
+          session.requests.front()->handle_request();
+
+        if (res.need_eof()) // This means we should close the connection, usually because the response indicated the "Connection: close" semantic.
+          session.close();
+      }
+
+    private:
+      Session &session;
+      std::unique_ptr<boost::beast::http::request<ReqBody>> req;
+      boost::beast::http::response<ResBody> res;
+      const std::function<void(const boost::beast::http::response<ResBody> &, boost::beast::error_code)> handler;
+    };
+
   private:
     const std::string host, port;
 
@@ -263,7 +261,6 @@ namespace network
   class plain_client : public client<plain_client>
   {
     friend class client<plain_client>;
-    friend class client_request;
 
   public:
     plain_client(const std::string &host, const std::string &port = "80", const std::function<void()> &on_connect_handler = default_on_connect_handler, const std::function<void(boost::beast::error_code)> &on_error_handler = default_on_error_handler, const std::function<void()> &on_close_handler = default_on_close_handler) : client(host, port, boost::asio::make_strand(boost::asio::system_executor()), on_connect_handler, on_error_handler, on_close_handler), stream(strand) { do_resolve(); }
@@ -299,7 +296,6 @@ namespace network
   class ssl_client : public client<ssl_client>
   {
     friend class client<ssl_client>;
-    friend class client_request;
 
   public:
     ssl_client(const std::string &host, const std::string &port = "443", const std::function<void()> &on_connect_handler = default_on_connect_handler, const std::function<void(boost::beast::error_code)> &on_error_handler = default_on_error_handler, const std::function<void()> &on_close_handler = default_on_close_handler) : client(host, port, boost::asio::make_strand(boost::asio::system_executor()), on_connect_handler, on_error_handler, on_close_handler), stream(strand, ctx)
