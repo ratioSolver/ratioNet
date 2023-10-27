@@ -18,7 +18,9 @@ namespace network
   class client_request
   {
     friend class client<plain_client>;
+    friend class plain_client;
     friend class client<ssl_client>;
+    friend class ssl_client;
 
   public:
     virtual ~client_request() = default;
@@ -27,16 +29,7 @@ namespace network
     virtual void handle_request() = 0;
 
   protected:
-    template <class Session, class ReqBody, class ResBody>
-    void handle_request(Session &session, boost::beast::http::request<ReqBody> &req, const std::function<void(const boost::beast::http::response<ResBody> &, boost::beast::error_code)> &handler)
-    {
-      // Set a timeout on the operation
-      boost::beast::get_lowest_layer(session.get_stream()).expires_after(std::chrono::seconds(30));
-
-      // Send the HTTP request to the remote host
-      boost::beast::http::async_write(session.get_stream(), req, boost::asio::bind_executor(session.strand, [&session, &handler](boost::beast::error_code ec, std::size_t bytes_transferred)
-                                                                                            { session.on_write(handler, ec, bytes_transferred); }));
-    }
+    void handle_request_impl() { handle_request(); }
   };
 
   template <class Session, class ReqBody, class ResBody>
@@ -46,11 +39,56 @@ namespace network
     client_request_impl(Session &session, std::unique_ptr<boost::beast::http::request<ReqBody>> req, const std::function<void(const boost::beast::http::response<ResBody> &, boost::beast::error_code)> &handler) : session(session), req(std::move(req)), handler(handler) {}
 
   private:
-    void handle_request() override { client_request::handle_request(session, *req, handler); }
+    void handle_request() override
+    {
+      // Set a timeout on the operation
+      boost::beast::get_lowest_layer(session.get_stream()).expires_after(std::chrono::seconds(30));
+
+      // Send the HTTP request to the remote host
+      boost::beast::http::async_write(session.get_stream(), req, boost::beast::bind_front_handler(&client_request_impl::on_write, this));
+    }
+
+    void on_write(boost::beast::error_code ec, std::size_t)
+    {
+      if (ec)
+      {
+        LOG_ERR("on_write: " << ec.message());
+        handler(res, ec);
+        return;
+      }
+
+      // Receive the HTTP response
+      boost::beast::http::async_read(session.get_stream(), session.buffer, *res, boost::asio::bind_executor(session.strand, boost::beast::bind_front_handler(&client_request_impl::on_read, this)));
+    }
+
+    void on_read(boost::beast::error_code ec, std::size_t)
+    {
+      if (ec == boost::beast::http::error::end_of_stream)
+      {
+        session.do_resolve();
+        return;
+      }
+      else if (ec)
+      {
+        LOG_ERR("on_read: " << ec.message());
+        handler(res, ec);
+        return;
+      }
+
+      handler(res, ec);
+
+      session.requests.pop();
+      if (!session.requests.empty()) // If we still have work to do, make this call again..
+        session.requests.front()->handle_request();
+
+      if (res.need_eof()) // This means we should close the connection, usually because the response indicated the "Connection: close" semantic.
+        session.close();
+    }
 
   private:
     Session &session;
     std::unique_ptr<boost::beast::http::request<ReqBody>> req;
+    boost::beast::http::response<ResBody> res;
     const std::function<void(const boost::beast::http::response<ResBody> &, boost::beast::error_code)> handler;
   };
 
@@ -173,70 +211,16 @@ namespace network
     }
 
   protected:
-    void do_resolve()
-    {
-      resolver.async_resolve(host, port, [this](boost::beast::error_code ec, boost::asio::ip::tcp::resolver::results_type results)
-                             { on_resolve(ec, results); });
-    }
-
-    void next_request()
-    {
-      if (!requests.empty()) // If we still have work to do, make this call again..
-        requests.front()->handle_request();
-    }
+    void do_resolve() { resolver.async_resolve(host, port, boost::beast::bind_front_handler(&client::on_resolve, this)); }
 
   private:
     template <class ReqBody, class ResBody>
     void enqueue(std::unique_ptr<boost::beast::http::request<ReqBody>> req, const std::function<void(const boost::beast::http::response<ResBody> &, boost::beast::error_code)> &handler)
     {
-      requests.push(std::make_unique<client_request_impl<Derived, ReqBody, ResBody>>(derived(), std::move(req), handler));
+      requests.push(std::make_shared<client_request_impl<Derived, ReqBody, ResBody>>(derived(), std::move(req), handler));
 
-      if (requests.size() > 1)
-        return; // already sending
-
-      next_request();
-    }
-
-    template <class Body>
-    void on_write(const std::function<void(const boost::beast::http::response<Body> &, boost::beast::error_code)> &handler, boost::beast::error_code ec, std::size_t)
-    {
-      if (ec)
-      {
-        LOG_ERR("on_write: " << ec.message());
-        on_error_handler(ec);
-        return;
-      }
-
-      requests.pop();
-
-      auto res = new boost::beast::http::response<Body>();
-
-      // Receive the HTTP response
-      boost::beast::http::async_read(derived().get_stream(), buffer, *res, [this, &handler, res](boost::beast::error_code ec, std::size_t bytes_transferred)
-                                     { on_read(handler, res, ec, bytes_transferred); delete res; });
-    }
-
-    template <class Body>
-    void on_read(const std::function<void(const boost::beast::http::response<Body> &, boost::beast::error_code)> &handler, const boost::beast::http::response<Body> *res, boost::beast::error_code ec, std::size_t)
-    {
-      if (ec == boost::beast::http::error::end_of_stream)
-      {
-        do_resolve();
-        return;
-      }
-      else if (ec)
-      {
-        LOG_ERR("on_read: " << ec.message());
-        on_error_handler(ec);
-        return;
-      }
-
-      handler(*res, ec);
-
-      if (res->need_eof()) // This means we should close the connection, usually because the response indicated the "Connection: close" semantic.
-        close();
-
-      next_request();
+      if (requests.size() == 1) // If we have no work, make this call again..
+        requests.front()->handle_request();
     }
 
   private:
@@ -252,8 +236,7 @@ namespace network
       boost::beast::get_lowest_layer(derived().get_stream()).expires_after(std::chrono::seconds(30));
 
       // Make the connection on the IP address we get from a lookup
-      boost::beast::get_lowest_layer(derived().get_stream()).async_connect(results, [this](boost::beast::error_code ec, boost::asio::ip::tcp::resolver::results_type::endpoint_type ep)
-                                                                           { on_connect(ec, ep); });
+      boost::beast::get_lowest_layer(derived().get_stream()).async_connect(results, boost::beast::bind_front_handler(&client::on_connect, this));
     }
 
     virtual void on_connect(boost::beast::error_code ec, boost::asio::ip::tcp::resolver::results_type::endpoint_type) = 0;
@@ -274,7 +257,7 @@ namespace network
     std::function<void(boost::beast::error_code)> on_error_handler;
     std::function<void()> on_close_handler;
 
-    std::queue<std::unique_ptr<client_request>> requests;
+    std::queue<std::shared_ptr<client_request>> requests;
   };
 
   class plain_client : public client<plain_client>
@@ -298,7 +281,8 @@ namespace network
       }
 
       on_connect_handler();
-      next_request();
+      if (requests.size() == 1) // If we have no work, make this call again..
+        requests.front()->handle_request();
     }
 
     void close() override
@@ -362,7 +346,8 @@ namespace network
       }
 
       on_connect_handler();
-      next_request();
+      if (requests.size() == 1) // If we have no work, make this call again..
+        requests.front()->handle_request();
     }
 
     void close() override
