@@ -2,7 +2,9 @@
 #include <thread>
 #include <iostream>
 
-std::function<void(const boost::beast::http::response<boost::beast::http::string_body> &, boost::beast::error_code)> handler = [](const boost::beast::http::response<boost::beast::http::string_body> &res, boost::beast::error_code ec)
+using string_res = boost::beast::http::response<boost::beast::http::string_body>;
+
+std::function<void(const string_res &, boost::beast::error_code)> handler = [](const string_res &res, boost::beast::error_code ec)
 {
     if (ec)
     {
