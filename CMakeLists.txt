@@ -27,14 +27,9 @@ option(ADD_COVERAGE "Add coverage" OFF)
 message(STATUS "TLS version:            ${TLS_VERSION}")
 message(STATUS "Add coverage:           ${ADD_COVERAGE}")
 
-option(RATIONET_INCLUDE_UTILS "Include utils library" ON)
-if(RATIONET_INCLUDE_UTILS)
-    add_subdirectory(extern/utils)
-endif()
-
 add_library(${PROJECT_NAME} INTERFACE)
-target_include_directories(${PROJECT_NAME} INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>)
-target_link_libraries(${PROJECT_NAME} INTERFACE utils Boost::system OpenSSL::SSL OpenSSL::Crypto)
+target_include_directories(${PROJECT_NAME} INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include)
+target_link_libraries(${PROJECT_NAME} INTERFACE Boost::system OpenSSL::SSL OpenSSL::Crypto)
 target_compile_definitions(${PROJECT_NAME} INTERFACE TLS_VERSION=${TLS_VERSION})
 
 if(BUILD_TESTING)
@@ -59,7 +54,7 @@ install(
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 install(
-    FILES ${RATIONET_HEADERS} ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}_export.h
+    FILES ${RATIONET_HEADERS}
     INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}
 )
 
