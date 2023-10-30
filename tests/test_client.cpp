@@ -1,57 +1,41 @@
-#include "server.h"
-#include "websocket_client.h"
-#include "logging.h"
+#include "client.h"
 #include <thread>
+#include <iostream>
 
-void test_websocket()
+std::function<void(const boost::beast::http::response<boost::beast::http::string_body> &, boost::beast::error_code)> handler = [](const boost::beast::http::response<boost::beast::http::string_body> &res, boost::beast::error_code ec)
 {
-    LOG("Test WebSocket");
+    if (ec)
+    {
+        std::cout << "Error: " << ec.message() << std::endl;
+        return;
+    }
+    std::cout << res.body() << std::endl;
+};
 
-    network::server server;
-    server.add_ws_route("/ws")
-        .on_open([](network::websocket_session &ws)
-                 { LOG("Server: WebSocket opened"); })
-        .on_message([](network::websocket_session &ws, const std::string &msg)
-                    {
-                        LOG("Server: Received: " << msg);
-                        ws.send("World"); })
-        .on_error([](network::websocket_session &ws, const boost::system::error_code &ec)
-                  { LOG("Server: " << ec.message()); })
-        .on_close([](network::websocket_session &ws)
-                  { LOG("Server: WebSocket closed"); });
+void test_plain_client()
+{
+    network::plain_client client("www.boredapi.com", "80", [&client]()
+                                 { std::cout << "Connected!" << std::endl;
+                                   client.get("/api/activity", handler); });
+    std::this_thread::sleep_for(std::chrono::seconds(5));
+    client.get("/api/activity", handler);
+    std::this_thread::sleep_for(std::chrono::seconds(5));
+}
 
-    auto srv_future = std::async(std::launch::async, [&server]()
-                                 { server.start(); });
-
-    std::this_thread::sleep_for(std::chrono::seconds(1));
-
-    network::websocket_client client("localhost", "8080", "/ws");
-    client.on_open([]()
-                   { LOG("Client: WebSocket opened"); })
-        .on_message([](const std::string &msg)
-                    { LOG("Client: Received: " << msg); })
-        .on_error([](const boost::system::error_code &ec)
-                  { LOG("Client: " << ec.message()); })
-        .on_close([]()
-                  { LOG("Client: WebSocket closed"); });
-
-    std::this_thread::sleep_for(std::chrono::seconds(1));
-    auto cl_future = std::async(std::launch::async, [&client]()
-                                { client.start(); });
-
-    std::this_thread::sleep_for(std::chrono::seconds(1));
-    client.send("Hello");
-
-    std::this_thread::sleep_for(std::chrono::seconds(1));
-    client.close();
-
-    std::this_thread::sleep_for(std::chrono::seconds(1));
-    server.stop();
+void test_ssl_client()
+{
+    network::ssl_client client("www.boredapi.com", "443", [&client]()
+                               { std::cout << "Connected!" << std::endl;
+                                   client.get("/api/activity", handler); });
+    std::this_thread::sleep_for(std::chrono::seconds(5));
+    client.get("/api/activity", handler);
+    std::this_thread::sleep_for(std::chrono::seconds(5));
 }
 
 int main()
 {
-    test_websocket();
+    test_plain_client();
+    test_ssl_client();
 
     return 0;
 }
