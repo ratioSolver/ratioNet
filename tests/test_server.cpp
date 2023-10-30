@@ -1,10 +1,13 @@
 #include "server.h"
 
+using string_req = boost::beast::http::request<boost::beast::http::string_body>;
+using string_res = boost::beast::http::response<boost::beast::http::string_body>;
+
 void test_plain()
 {
   network::server server;
 
-  server.add_route(boost::beast::http::verb::get, "/", std::function{[](const boost::beast::http::request<boost::beast::http::string_body> &, boost::beast::http::response<boost::beast::http::string_body> &res)
+  server.add_route(boost::beast::http::verb::get, "/", std::function{[](const string_req &, string_res &res)
                                                                      {
                                                                        res.set(boost::beast::http::field::content_type, "html");
                                                                        res.body() = R"(<html><body><h1>Hello, world!</h1></body></html>)";
@@ -24,7 +27,7 @@ void test_ssl()
 
   server.set_ssl_context("cert.pem", "key.pem", "dh.pem");
 
-  server.add_route(boost::beast::http::verb::get, "/", std::function{[](const boost::beast::http::request<boost::beast::http::string_body> &, boost::beast::http::response<boost::beast::http::string_body> &res)
+  server.add_route(boost::beast::http::verb::get, "/", std::function{[](const string_req &, string_res &res)
                                                                      {
                                                                        res.set(boost::beast::http::field::content_type, "html");
                                                                        res.body() = R"(<html><body><h1>Hello, world!</h1></body></html>)";
@@ -43,7 +46,7 @@ void test_websocket()
 {
   network::server server;
 
-  server.add_route(boost::beast::http::verb::get, "/", std::function{[](const boost::beast::http::request<boost::beast::http::string_body> &, boost::beast::http::response<boost::beast::http::string_body> &res)
+  server.add_route(boost::beast::http::verb::get, "/", std::function{[](const string_req &, string_res &res)
                                                                      {
                                                                        res.set(boost::beast::http::field::content_type, "html");
                                                                        res.body() = R"(
@@ -60,8 +63,8 @@ void test_websocket()
                                                                         </html>)";
                                                                      }});
 
-  static_cast<network::ws_handler_impl<network::plain_websocket_session> &>(server.add_ws_route("/ws")).on_open([](network::plain_websocket_session &session)
-                                                                                                                { session.send("Hello, world!"); });
+  server.add_ws_route("/ws").on_open([](network::websocket_session &session)
+                                     { session.send("Hello, world!"); });
 
   std::thread t{[&server]
                 { server.start(); }};

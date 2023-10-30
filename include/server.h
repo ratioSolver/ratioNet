@@ -19,9 +19,8 @@ namespace network
   class http_session;
   class plain_http_session;
   class ssl_http_session;
-  class ws_handler;
   template <class Session>
-  class websocket_session;
+  class websocket_session_impl;
   class plain_websocket_session;
   class ssl_websocket_session;
 
@@ -137,60 +136,84 @@ namespace network
       {"wmv", "video/x-ms-wmv"},
       {"avi", "video/x-msvideo"}};
 
-  class ws_handler
+  class websocket_session
   {
   public:
-    virtual ~ws_handler() = default;
+    virtual ~websocket_session() = default;
+
+    /**
+     * @brief Send a message to the client.
+     *
+     * @param msg The message to send.
+     */
+    virtual void send(const std::string &&msg) = 0;
+    /**
+     * @brief Send a message to the client.
+     *
+     * @param msg The message to send.
+     */
+    virtual void send(const std::shared_ptr<const std::string> &msg) = 0;
+    /**
+     * @brief Close the connection.
+     *
+     * @param code The close code.
+     */
+    virtual void close(boost::beast::websocket::close_code code = boost::beast::websocket::close_code::normal) = 0;
   };
 
-  template <class Session>
-  class ws_handler_impl : public ws_handler
+  class ws_handler
   {
-    friend class websocket_session<Session>;
+    friend class websocket_session_impl<plain_websocket_session>;
+    friend class websocket_session_impl<ssl_websocket_session>;
 
   public:
-    ws_handler_impl<Session> &on_open(const std::function<void(Session &)> &handler) noexcept
+    /**
+     * @brief Called when the connection is opened.
+     *
+     * @param handler The handler to call.
+     */
+    ws_handler &on_open(const std::function<void(websocket_session &)> &handler) noexcept
     {
       on_open_handler = handler;
       return *this;
     }
-    ws_handler_impl<Session> &on_close(const std::function<void(Session &)> &handler) noexcept
+    ws_handler &on_close(const std::function<void(websocket_session &)> &handler) noexcept
     {
       on_close_handler = handler;
       return *this;
     }
-    ws_handler_impl<Session> &on_message(const std::function<void(Session &, const std::string &)> &handler) noexcept
+    ws_handler &on_message(const std::function<void(websocket_session &, const std::string &)> &handler) noexcept
     {
       on_message_handler = handler;
       return *this;
     }
-    ws_handler_impl<Session> &on_error(const std::function<void(Session &, boost::beast::error_code)> &handler) noexcept
+    ws_handler &on_error(const std::function<void(websocket_session &, boost::beast::error_code)> &handler) noexcept
     {
       on_error_handler = handler;
       return *this;
     }
 
   private:
-    std::function<void(Session &)> on_open_handler = [](Session &) {};
-    std::function<void(Session &)> on_close_handler = [](Session &) {};
-    std::function<void(Session &, const std::string &)> on_message_handler = [](Session &, const std::string &) {};
-    std::function<void(Session &, boost::beast::error_code)> on_error_handler = [](Session &, boost::beast::error_code) {};
+    std::function<void(websocket_session &)> on_open_handler = [](websocket_session &) {};
+    std::function<void(websocket_session &)> on_close_handler = [](websocket_session &) {};
+    std::function<void(websocket_session &, const std::string &)> on_message_handler = [](websocket_session &, const std::string &) {};
+    std::function<void(websocket_session &, boost::beast::error_code)> on_error_handler = [](websocket_session &, boost::beast::error_code) {};
   };
 
   template <class Derived>
-  class websocket_session : public std::enable_shared_from_this<Derived>
+  class websocket_session_impl : public websocket_session, public std::enable_shared_from_this<Derived>
   {
     Derived &derived() { return static_cast<Derived &>(*this); }
 
   public:
-    websocket_session(server &srv, ws_handler &handler) : srv(srv), handler(handler) {}
-    virtual ~websocket_session() = default;
+    websocket_session_impl(server &srv, ws_handler &handler) : srv(srv), handler(handler) {}
+    virtual ~websocket_session_impl() = default;
 
     void send(const std::string &&msg) { send(std::make_shared<std::string>(msg)); }
 
-    void send(const std::shared_ptr<const std::string> &msg) { boost::asio::post(derived().get_websocket().get_executor(), boost::beast::bind_front_handler(&websocket_session::enqueue, this->shared_from_this(), msg)); }
+    void send(const std::shared_ptr<const std::string> &msg) { boost::asio::post(derived().get_websocket().get_executor(), boost::beast::bind_front_handler(&websocket_session_impl::enqueue, this->shared_from_this(), msg)); }
 
-    void close(boost::beast::websocket::close_code code = boost::beast::websocket::close_code::normal) { derived().get_websocket().async_close(code, boost::beast::bind_front_handler(&websocket_session::on_close, this->shared_from_this())); }
+    void close(boost::beast::websocket::close_code code = boost::beast::websocket::close_code::normal) { derived().get_websocket().async_close(code, boost::beast::bind_front_handler(&websocket_session_impl::on_close, this->shared_from_this())); }
 
     template <class Body>
     void do_accept(boost::beast::http::request<Body> req)
@@ -198,29 +221,29 @@ namespace network
       derived().get_websocket().set_option(boost::beast::websocket::stream_base::timeout::suggested(boost::beast::role_type::server));
       derived().get_websocket().set_option(boost::beast::websocket::stream_base::decorator([](boost::beast::websocket::response_type &res)
                                                                                            { res.set(boost::beast::http::field::server, "ratioNet"); }));
-      derived().get_websocket().async_accept(req, boost::beast::bind_front_handler(&websocket_session::on_accept, this->shared_from_this()));
+      derived().get_websocket().async_accept(req, boost::beast::bind_front_handler(&websocket_session_impl::on_accept, this->shared_from_this()));
     }
 
   private:
     void on_accept(boost::beast::error_code ec)
     {
       if (ec)
-        return static_cast<ws_handler_impl<Derived> &>(handler).on_error_handler(derived(), ec);
+        return handler.on_error_handler(derived(), ec);
 
-      static_cast<ws_handler_impl<Derived> &>(handler).on_open_handler(derived());
+      handler.on_open_handler(derived());
 
       do_read();
     }
 
-    void do_read() { derived().get_websocket().async_read(buffer, boost::beast::bind_front_handler(&websocket_session::on_read, this->shared_from_this())); }
+    void do_read() { derived().get_websocket().async_read(buffer, boost::beast::bind_front_handler(&websocket_session_impl::on_read, this->shared_from_this())); }
     void on_read(boost::beast::error_code ec, std::size_t)
     {
       if (ec == boost::beast::websocket::error::closed) // This indicates that the session was closed
-        return static_cast<ws_handler_impl<Derived> &>(handler).on_close_handler(derived());
+        return handler.on_close_handler(derived());
       else if (ec)
-        return static_cast<ws_handler_impl<Derived> &>(handler).on_error_handler(derived(), ec);
+        return handler.on_error_handler(derived(), ec);
 
-      static_cast<ws_handler_impl<Derived> &>(handler).on_message_handler(derived(), boost::beast::buffers_to_string(buffer.data()));
+      handler.on_message_handler(derived(), boost::beast::buffers_to_string(buffer.data()));
 
       buffer.consume(buffer.size()); // Clear the buffer
 
@@ -237,11 +260,11 @@ namespace network
       do_write();
     }
 
-    void do_write() { derived().get_websocket().async_write(boost::asio::buffer(*send_queue.front()), boost::asio::bind_executor(derived().get_websocket().get_executor(), boost::beast::bind_front_handler(&websocket_session::on_write, this->shared_from_this()))); }
+    void do_write() { derived().get_websocket().async_write(boost::asio::buffer(*send_queue.front()), boost::asio::bind_executor(derived().get_websocket().get_executor(), boost::beast::bind_front_handler(&websocket_session_impl::on_write, this->shared_from_this()))); }
     void on_write(boost::beast::error_code ec, std::size_t)
     {
       if (ec)
-        return static_cast<ws_handler_impl<Derived> &>(handler).on_error_handler(derived(), ec);
+        return handler.on_error_handler(derived(), ec);
 
       send_queue.pop();
 
@@ -252,9 +275,9 @@ namespace network
     void on_close(boost::beast::error_code ec)
     {
       if (ec)
-        return static_cast<ws_handler_impl<Derived> &>(handler).on_error_handler(derived(), ec);
+        return handler.on_error_handler(derived(), ec);
 
-      static_cast<ws_handler_impl<Derived> &>(handler).on_close_handler(derived());
+      handler.on_close_handler(derived());
     }
 
   private:
@@ -264,12 +287,12 @@ namespace network
     ws_handler &handler;
   };
 
-  class plain_websocket_session : public websocket_session<plain_websocket_session>
+  class plain_websocket_session : public websocket_session_impl<plain_websocket_session>
   {
-    friend class websocket_session<plain_websocket_session>;
+    friend class websocket_session_impl<plain_websocket_session>;
 
   public:
-    plain_websocket_session(server &srv, boost::beast::tcp_stream &&stream, ws_handler &handler) : websocket_session(srv, handler), websocket(std::move(stream)) {}
+    plain_websocket_session(server &srv, boost::beast::tcp_stream &&stream, ws_handler &handler) : websocket_session_impl(srv, handler), websocket(std::move(stream)) {}
     ~plain_websocket_session() {}
 
   private:
@@ -279,12 +302,12 @@ namespace network
     boost::beast::websocket::stream<boost::beast::tcp_stream> websocket;
   };
 
-  class ssl_websocket_session : public websocket_session<ssl_websocket_session>
+  class ssl_websocket_session : public websocket_session_impl<ssl_websocket_session>
   {
-    friend class websocket_session<ssl_websocket_session>;
+    friend class websocket_session_impl<ssl_websocket_session>;
 
   public:
-    ssl_websocket_session(server &srv, boost::beast::ssl_stream<boost::beast::tcp_stream> &&stream, ws_handler &handler) : websocket_session(srv, handler), websocket(std::move(stream)) {}
+    ssl_websocket_session(server &srv, boost::beast::ssl_stream<boost::beast::tcp_stream> &&stream, ws_handler &handler) : websocket_session_impl(srv, handler), websocket(std::move(stream)) {}
     ~ssl_websocket_session() {}
 
   private:
@@ -669,12 +692,12 @@ namespace network
     {
       if (ssl)
       {
-        wss_routes.push_back(std::make_pair(std::regex(path), std::make_unique<ws_handler_impl<ssl_websocket_session>>()));
+        wss_routes.push_back(std::make_pair(std::regex(path), std::make_unique<ws_handler>()));
         return *wss_routes.back().second;
       }
       else
       {
-        ws_routes.push_back(std::make_pair(std::regex(path), std::make_unique<ws_handler_impl<plain_websocket_session>>()));
+        ws_routes.push_back(std::make_pair(std::regex(path), std::make_unique<ws_handler>()));
         return *ws_routes.back().second;
       }
     }
