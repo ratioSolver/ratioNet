@@ -47,8 +47,56 @@ int main()
         res.body() = R"(<html><body><h1>Hello, world!</h1></body></html>)";
     }});
 
+    // Add a WebSocket route to the server
+    server.add_ws_route("/ws").on_open([](network::websocket_session &session)
+    { session.send("Hello, world!"); });
+
     // Start the server
     server.start();
+
+    return 0;
+}
+```
+
+Creating a REST client is just as easy:
+
+```cpp
+#include <client.h>
+
+using string_res = boost::beast::http::response<boost::beast::http::string_body>;
+
+int main()
+{
+    // Create the client instance
+    network::plain_client client("localhost", "8080", []() { std::cout << "Connected!" << std::endl; });
+
+    // Send a GET request to the server
+    auto res = client.get("/", std::function{[](const string_res &res, boost::beast::error_code ec)
+    {
+        if (ec)
+            std::cout << "Error: " << ec.message() << std::endl;
+        else
+            std::cout << res.body() << std::endl;
+    }});
+
+    return 0;
+}
+```
+
+Finally, here's an example of how to create a WebSocket client:
+
+```cpp
+#include <ws_client.h>
+
+int main()
+{
+    // Create the client instance
+    network::plain_ws_client client("localhost", "8080", "/ws",
+        []() { std::cout << "Connected!" << std::endl; },
+        [](const std::string &msg) { std::cout << "Received: " << msg << std::endl; });
+
+    // Send a message to the server
+    client.send("Hello, world!");
 
     return 0;
 }
