@@ -66,7 +66,7 @@ namespace network
   inline std::function<void()> default_on_connect_handler = []()
   { LOG("Connected!"); };
   inline std::function<void(boost::beast::error_code)> default_on_error_handler = []([[maybe_unused]] boost::beast::error_code ec)
-  { LOG_ERR("on_error: " << ec.message()); };
+  { LOG_ERR("Error: " << ec.message()); };
   inline std::function<void()> default_on_close_handler = []()
   { LOG("Closed!"); };
 
@@ -361,8 +361,7 @@ namespace network
       boost::beast::get_lowest_layer(stream).expires_after(std::chrono::seconds(30));
 
       // Perform the SSL handshake
-      stream.async_handshake(boost::asio::ssl::stream_base::client, [this](boost::beast::error_code ec)
-                             { on_handshake(ec); });
+      stream.async_handshake(boost::asio::ssl::stream_base::client, boost::beast::bind_front_handler(&ssl_client::on_handshake, this));
     }
 
     void on_handshake(boost::beast::error_code ec)
@@ -385,8 +384,7 @@ namespace network
       boost::beast::get_lowest_layer(stream).expires_after(std::chrono::seconds(30));
 
       // Perform the SSL shutdown
-      stream.async_shutdown([this](boost::beast::error_code ec)
-                            { on_shutdown(ec); });
+      stream.async_shutdown(boost::beast::bind_front_handler(&ssl_client::on_shutdown, this));
     }
 
     void on_shutdown(boost::beast::error_code ec)
