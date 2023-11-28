@@ -85,6 +85,7 @@ namespace network
       {"ico", "image/x-icon"},
       {"jng", "image/x-jng"},
       {"bmp", "image/x-ms-bmp"},
+      {"ttf", "font/ttf"},
       {"woff", "font/woff"},
       {"woff2", "font/woff2"},
       {"ear", "application/java-archive"},
