@@ -1,0 +1,3 @@
+[submodule "extern/utils"]
+	path = extern/utils
+	url = https://github.com/ratioSolver/Utils
