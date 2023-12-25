@@ -15,6 +15,8 @@ include(CMakePackageConfigHelpers)
 include(CTest)
 enable_testing()
 
+file(GLOB RATIONET_HEADERS include/*.hpp)
+
 find_package(Boost REQUIRED COMPONENTS system)
 find_package(OpenSSL REQUIRED)
 
