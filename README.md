@@ -30,7 +30,7 @@ git clone https://github.com/ratioSolver/ratioNet.git
 Here's a simple example of how to use `ratioNet` to create an HTTP server:
 
 ```cpp
-#include <server.h>
+#include <server.hpp>
 
 using string_req = boost::beast::http::request<boost::beast::http::string_body>;
 using string_res = boost::beast::http::response<boost::beast::http::string_body>;
@@ -61,7 +61,7 @@ int main()
 Creating a REST client is just as easy:
 
 ```cpp
-#include <client.h>
+#include <client.hpp>
 
 using string_res = boost::beast::http::response<boost::beast::http::string_body>;
 
@@ -86,7 +86,7 @@ int main()
 Finally, here's an example of how to create a WebSocket client:
 
 ```cpp
-#include <ws_client.h>
+#include <ws_client.hpp>
 
 int main()
 {
