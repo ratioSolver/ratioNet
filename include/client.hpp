@@ -119,7 +119,7 @@ namespace network
     template <class Body>
     void post(const std::string &target, const std::string &body, const std::unordered_map<boost::beast::http::field, std::string> &fields, const std::function<void(const boost::beast::http::response<Body> &, boost::beast::error_code)> &handler)
     {
-      auto req = std::make_unique<boost::beast::http::request<boost::beast::http::string_body>>(boost::beast::http::verb::get, target, 11);
+      auto req = std::make_unique<boost::beast::http::request<boost::beast::http::string_body>>(boost::beast::http::verb::post, target, 11);
       req->set(boost::beast::http::field::host, host);
       req->set(boost::beast::http::field::user_agent, "ratioNet");
       for (auto &field : fields)
