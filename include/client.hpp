@@ -99,9 +99,22 @@ namespace network
 
     virtual void close() = 0;
 
+    /**
+     * @brief Send a GET request.
+     *
+     * @param target The target of the request.
+     * @param handler The handler to call when the request completes.
+     */
     template <class Body>
     void get(const std::string &target, const std::function<void(const boost::beast::http::response<Body> &, boost::beast::error_code)> &handler) { get(target, {}, handler); }
 
+    /**
+     * @brief Send a GET request.
+     *
+     * @param target The target of the request.
+     * @param fields The fields to send with the request.
+     * @param handler The handler to call when the request completes.
+     */
     template <class Body>
     void get(const std::string &target, const std::unordered_map<boost::beast::http::field, std::string> &fields, const std::function<void(const boost::beast::http::response<Body> &, boost::beast::error_code)> &handler)
     {
@@ -113,9 +126,24 @@ namespace network
       send(std::move(req), handler);
     }
 
+    /**
+     * @brief Send a POST request.
+     *
+     * @param target The target of the request.
+     * @param body The body of the request.
+     * @param handler The handler to call when the request completes.
+     */
     template <class Body>
     void post(const std::string &target, const std::string &body, const std::function<void(const boost::beast::http::response<Body> &, boost::beast::error_code)> &handler) { post(target, body, {}, handler); }
 
+    /**
+     * @brief Send a POST request.
+     *
+     * @param target The target of the request.
+     * @param body The body of the request.
+     * @param fields The fields to send with the request.
+     * @param handler The handler to call when the request completes.
+     */
     template <class Body>
     void post(const std::string &target, const std::string &body, const std::unordered_map<boost::beast::http::field, std::string> &fields, const std::function<void(const boost::beast::http::response<Body> &, boost::beast::error_code)> &handler)
     {
@@ -128,9 +156,24 @@ namespace network
       send(std::move(req), handler);
     }
 
+    /**
+     * @brief Send a PUT request.
+     *
+     * @param target The target of the request.
+     * @param body The body of the request.
+     * @param handler The handler to call when the request completes.
+     */
     template <class Body>
     void put(const std::string &target, const std::string &body, const std::function<void(const boost::beast::http::response<Body> &, boost::beast::error_code)> &handler) { put(target, body, {}, handler); }
 
+    /**
+     * @brief Send a PUT request.
+     *
+     * @param target The target of the request.
+     * @param body The body of the request.
+     * @param fields The fields to send with the request.
+     * @param handler The handler to call when the request completes.
+     */
     template <class Body>
     void put(const std::string &target, const std::string &body, const std::unordered_map<boost::beast::http::field, std::string> &fields, const std::function<void(const boost::beast::http::response<Body> &, boost::beast::error_code)> &handler)
     {
@@ -143,9 +186,24 @@ namespace network
       send(std::move(req), handler);
     }
 
+    /**
+     * @brief Send a PATCH request.
+     *
+     * @param target The target of the request.
+     * @param body The body of the request.
+     * @param handler The handler to call when the request completes.
+     */
     template <class Body>
     void patch(const std::string &target, const std::string &body, const std::function<void(const boost::beast::http::response<Body> &, boost::beast::error_code)> &handler) { patch(target, body, {}, handler); }
 
+    /**
+     * @brief Send a PATCH request.
+     *
+     * @param target The target of the request.
+     * @param body The body of the request.
+     * @param fields The fields to send with the request.
+     * @param handler The handler to call when the request completes.
+     */
     template <class Body>
     void patch(const std::string &target, const std::string &body, const std::unordered_map<boost::beast::http::field, std::string> &fields, const std::function<void(const boost::beast::http::response<Body> &, boost::beast::error_code)> &handler)
     {
@@ -158,9 +216,22 @@ namespace network
       send(std::move(req), handler);
     }
 
+    /**
+     * @brief Send a DELETE request.
+     *
+     * @param target The target of the request.
+     * @param handler The handler to call when the request completes.
+     */
     template <class Body>
     void del(const std::string &target, const std::function<void(const boost::beast::http::response<Body> &, boost::beast::error_code)> &handler) { del(target, {}, handler); }
 
+    /**
+     * @brief Send a DELETE request.
+     *
+     * @param target The target of the request.
+     * @param fields The fields to send with the request.
+     * @param handler The handler to call when the request completes.
+     */
     template <class Body>
     void del(const std::string &target, const std::unordered_map<boost::beast::http::field, std::string> &fields, const std::function<void(const boost::beast::http::response<Body> &, boost::beast::error_code)> &handler)
     {
@@ -172,6 +243,12 @@ namespace network
       send(std::move(req), handler);
     }
 
+    /**
+     * @brief Send a generic request.
+     *
+     * @param req The request to send.
+     * @param handler The handler to call when the request completes.
+     */
     template <class ReqBody, class ResBody>
     void send(std::unique_ptr<boost::beast::http::request<ReqBody>> req, const std::function<void(const boost::beast::http::response<ResBody> &, boost::beast::error_code)> &handler)
     {
@@ -181,8 +258,12 @@ namespace network
                         { enqueue(std::move(req), handler); });
     }
 
-  protected:
-    void do_resolve() { resolver.async_resolve(host, port, boost::beast::bind_front_handler(&client::on_resolve, this)); }
+    /**
+     * @brief Reset the client.
+     *
+     * This will close the connection and reset the client to its initial state.
+     */
+    void reset() { resolver.async_resolve(host, port, boost::beast::bind_front_handler(&client::on_resolve, this)); }
 
   private:
     template <class ReqBody, class ResBody>
@@ -245,7 +326,7 @@ namespace network
       {
         if (ec == boost::beast::http::error::end_of_stream)
         {
-          session.do_resolve();
+          session.reset();
           return;
         }
         else if (ec)
@@ -296,7 +377,7 @@ namespace network
     friend class client<plain_client>;
 
   public:
-    plain_client(const std::string &host, const std::string &port = "80", const std::function<void()> &on_connect_handler = default_on_connect_handler, const std::function<void(boost::beast::error_code)> &on_error_handler = default_on_error_handler, const std::function<void()> &on_close_handler = default_on_close_handler) : client(host, port, boost::asio::make_strand(boost::asio::system_executor()), on_connect_handler, on_error_handler, on_close_handler), stream(strand) { do_resolve(); }
+    plain_client(const std::string &host, const std::string &port = "80", const std::function<void()> &on_connect_handler = default_on_connect_handler, const std::function<void(boost::beast::error_code)> &on_error_handler = default_on_error_handler, const std::function<void()> &on_close_handler = default_on_close_handler) : client(host, port, boost::asio::make_strand(boost::asio::system_executor()), on_connect_handler, on_error_handler, on_close_handler), stream(strand) { reset(); }
 
   private:
     boost::beast::tcp_stream &get_stream() { return stream; }
@@ -342,7 +423,7 @@ namespace network
         return;
       }
 
-      do_resolve();
+      reset();
     }
 
   private:
