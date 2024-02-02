@@ -41,4 +41,11 @@ namespace network
 
         io_ctx.run();
     }
+
+    void server::stop()
+    {
+        io_ctx.stop();
+        for (auto &thread : threads)
+            thread.join();
+    }
 } // namespace network

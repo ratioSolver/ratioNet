@@ -12,6 +12,8 @@ namespace network
 
     void start();
 
+    void stop();
+
   private:
     virtual void do_accept() = 0;
 
