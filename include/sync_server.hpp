@@ -10,6 +10,9 @@ namespace network::sync
     session_detector(server &srv, boost::asio::ip::tcp::socket &&socket) : network::session_detector(srv, std::move(socket)) {}
 
     void run() override;
+
+  private:
+    void on_run();
   };
 
   class server : public network::server

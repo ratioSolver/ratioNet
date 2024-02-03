@@ -3,7 +3,18 @@
 
 namespace network::async
 {
-    void session_detector::run() {}
+    void session_detector::run() { boost::asio::dispatch(stream.get_executor(), boost::beast::bind_front_handler(&session_detector::on_run, shared_from_this())); }
+    void session_detector::on_run()
+    {
+        stream.expires_after(std::chrono::seconds(30));                                                                                     // Set the timeout
+        boost::beast::async_detect_ssl(stream, buffer, boost::beast::bind_front_handler(&session_detector::on_detect, shared_from_this())); // Detect SSL
+    }
+    void session_detector::on_detect(boost::beast::error_code ec, bool result)
+    {
+        if (ec)
+            throw std::runtime_error(ec.message());
+        // TODO: Handle session detection
+    }
 
     server::server(const std::string &address, unsigned short port, std::size_t concurrency_hint) : network::server(address, port, concurrency_hint) {}
 
