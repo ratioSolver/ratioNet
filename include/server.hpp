@@ -1,10 +1,26 @@
 #pragma once
 
 #include <boost/asio.hpp>
+#include <boost/beast.hpp>
 #include <thread>
 
 namespace network
 {
+  class server;
+
+  class session_detector
+  {
+  public:
+    session_detector(server &srv, boost::asio::ip::tcp::socket &&socket) : srv(srv), stream(std::move(socket)) {}
+
+    virtual void run() = 0;
+
+  protected:
+    server &srv;
+    boost::beast::tcp_stream stream;
+    boost::beast::flat_buffer buffer;
+  };
+
   class server
   {
   public:
@@ -16,6 +32,9 @@ namespace network
 
   private:
     virtual void do_accept() = 0;
+
+  protected:
+    static std::map<std::string, std::string> parse_query(const std::string &query);
 
   protected:
     boost::asio::io_context io_ctx;          // The io_context is required for all I/O

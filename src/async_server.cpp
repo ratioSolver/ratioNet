@@ -1,0 +1,20 @@
+#include <boost/beast.hpp>
+#include "async_server.hpp"
+
+namespace network::async
+{
+    void session_detector::run() {}
+
+    server::server(const std::string &address, unsigned short port, std::size_t concurrency_hint) : network::server(address, port, concurrency_hint) {}
+
+    void server::do_accept() { acceptor.async_accept(boost::asio::make_strand(io_ctx), boost::beast::bind_front_handler(&server::on_accept, this)); }
+
+    void server::on_accept(boost::beast::error_code ec, boost::asio::ip::tcp::socket socket)
+    {
+        if (ec)
+            throw std::runtime_error(ec.message());
+        else
+            std::make_shared<session_detector>(*this, std::move(socket))->run();
+        do_accept(); // Accept another connection
+    }
+} // namespace network

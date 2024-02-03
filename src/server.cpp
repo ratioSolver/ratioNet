@@ -48,4 +48,24 @@ namespace network
         for (auto &thread : threads)
             thread.join();
     }
+
+    std::map<std::string, std::string> server::parse_query(const std::string &query)
+    {
+        std::map<std::string, std::string> params;
+
+        std::string::size_type pos = 0;
+        while (pos < query.size())
+        {
+            std::string::size_type next = query.find('&', pos);
+            std::string::size_type eq = query.find('=', pos);
+            if (eq == std::string::npos)
+                break;
+            if (next == std::string::npos)
+                next = query.size();
+            params.emplace(query.substr(pos, eq - pos), query.substr(eq + 1, next - eq - 1));
+            pos = next + 1;
+        }
+
+        return params;
+    }
 } // namespace network
