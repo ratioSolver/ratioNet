@@ -6,10 +6,13 @@ namespace network::sync
     {
         boost::beast::error_code ec;
         stream.expires_after(std::chrono::seconds(30));
-        if (boost::beast::detect_ssl(stream, buffer, ec))
-        {
-            // TODO: Handle session detection
-        }
+        bool result = boost::beast::detect_ssl(stream, buffer, ec);
+        if (ec)
+            throw std::runtime_error(ec.message());
+        else if (result)
+            std::make_shared<ssl_session>(srv, std::move(buffer))->run();
+        else
+            std::make_shared<plain_session>(srv, std::move(buffer))->run();
     }
 
     server::server(const std::string &address, unsigned short port, std::size_t concurrency_hint) : network::server(address, port, concurrency_hint) {}

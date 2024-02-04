@@ -8,6 +8,21 @@ namespace network
 {
   class server;
 
+  class http_session
+  {
+  public:
+    http_session(server &srv, boost::beast::flat_buffer &&buffer) : srv(srv), buffer(std::move(buffer)) {}
+
+    virtual void run() = 0;
+
+  private:
+    virtual void do_read() = 0;
+
+  protected:
+    server &srv;
+    boost::beast::flat_buffer buffer;
+  };
+
   class session_detector
   {
   public:
