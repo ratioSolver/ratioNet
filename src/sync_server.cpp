@@ -36,4 +36,29 @@ namespace network::sync
             static_cast<server &>(srv).sessions.emplace(std::make_unique<plain_session>(srv, std::move(stream), std::move(buffer))).first->get()->run();
     }
 #endif
+
+    void plain_session::run()
+    {
+    }
+    void plain_session::do_eof()
+    {
+        boost::beast::error_code ec;
+        stream.socket().shutdown(boost::asio::ip::tcp::socket::shutdown_send, ec);
+    }
+
+#ifdef USE_SSL
+    void ssl_session::run()
+    {
+        boost::beast::error_code ec;
+        boost::beast::get_lowest_layer(stream).expires_after(std::chrono::seconds(30));
+        stream.handshake(boost::asio::ssl::stream_base::server, ec);
+        if (ec)
+            throw std::runtime_error(ec.message());
+    }
+    void ssl_session::do_eof()
+    {
+        boost::beast::error_code ec;
+        stream.shutdown(ec);
+    }
+#endif
 } // namespace network

@@ -40,9 +40,7 @@ namespace network::sync
     plain_session(network::server &srv, boost::beast::tcp_stream &&str, boost::beast::flat_buffer &&buffer) : network::plain_session(srv, std::move(str), std::move(buffer)) {}
 
     void run() override;
-
-  private:
-    void do_read() override;
+    void do_eof() override;
   };
 
 #ifdef USE_SSL
@@ -52,9 +50,7 @@ namespace network::sync
     ssl_session(network::server &srv, boost::beast::tcp_stream &&str, boost::asio::ssl::context &ctx, boost::beast::flat_buffer &&buffer) : network::ssl_session(srv, std::move(str), ctx, std::move(buffer)) {}
 
     void run() override;
-
-  private:
-    void do_read() override;
+    void do_eof() override;
   };
 #endif
 } // namespace network

@@ -41,4 +41,62 @@ namespace network::async
             std::make_shared<plain_session>(srv, std::move(stream), std::move(buffer))->run();
     }
 #endif
+
+    void plain_session::run()
+    { // Start reading
+        do_read();
+    }
+    void plain_session::do_eof()
+    {
+        boost::beast::error_code ec;
+        stream.socket().shutdown(boost::asio::ip::tcp::socket::shutdown_send, ec);
+    }
+
+    void plain_session::do_read()
+    {
+        parser.emplace();                                                               // Construct a new parser for each message
+        parser->body_limit(10000);                                                      // Set the limit on the allowed size of a message
+        boost::beast::get_lowest_layer(stream).expires_after(std::chrono::seconds(30)); // Set the timeout
+
+        boost::beast::http::async_read(stream, buffer, *parser, boost::beast::bind_front_handler(&plain_session::on_read, this->shared_from_this())); // Read a request
+    }
+
+#ifdef USE_SSL
+    void ssl_session::run()
+    {
+        boost::beast::get_lowest_layer(stream).expires_after(std::chrono::seconds(30));
+        stream.async_handshake(boost::asio::ssl::stream_base::server, buffer.data(), boost::beast::bind_front_handler(&ssl_session::on_handshake, this->shared_from_this()));
+    }
+    void ssl_session::do_eof()
+    {
+        boost::beast::get_lowest_layer(stream).expires_after(std::chrono::seconds(30));
+        stream.async_shutdown(boost::beast::bind_front_handler(&ssl_session::on_shutdown, this->shared_from_this()));
+    }
+
+    void ssl_session::on_handshake(boost::beast::error_code ec, std::size_t bytes_used)
+    {
+        if (ec)
+            throw std::runtime_error(ec.message());
+        else
+        {
+            buffer.consume(bytes_used); // Consume the handshake buffer
+            do_read();
+        }
+    }
+
+    void ssl_session::on_shutdown(boost::beast::error_code ec)
+    {
+        if (ec)
+            throw std::runtime_error(ec.message());
+    }
+
+    void ssl_session::do_read()
+    {
+        parser.emplace();                                                               // Construct a new parser for each message
+        parser->body_limit(10000);                                                      // Set the limit on the allowed size of a message
+        boost::beast::get_lowest_layer(stream).expires_after(std::chrono::seconds(30)); // Set the timeout
+
+        boost::beast::http::async_read(stream, buffer, *parser, boost::beast::bind_front_handler(&ssl_session::on_read, this->shared_from_this())); // Read a request
+    }
+#endif
 } // namespace network

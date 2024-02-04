@@ -18,9 +18,7 @@ namespace network
     http_session(server &srv, boost::beast::flat_buffer &&buffer) : srv(srv), buffer(std::move(buffer)) {}
 
     virtual void run() = 0;
-
-  private:
-    virtual void do_read() = 0;
+    virtual void do_eof() = 0;
 
   protected:
     server &srv;
@@ -33,8 +31,6 @@ namespace network
   public:
     plain_session(server &srv, boost::beast::tcp_stream &&str, boost::beast::flat_buffer &&buffer) : http_session(srv, std::move(buffer)), stream(std::move(str)) {}
 
-    void run() override;
-
   protected:
     boost::beast::tcp_stream stream;
   };
@@ -44,8 +40,6 @@ namespace network
   {
   public:
     ssl_session(server &srv, boost::beast::tcp_stream &&str, boost::asio::ssl::context &ctx, boost::beast::flat_buffer &&buffer) : http_session(srv, std::move(buffer)), stream(std::move(str), ctx) {}
-
-    void run() override;
 
   protected:
     boost::beast::ssl_stream<boost::beast::tcp_stream> stream;
