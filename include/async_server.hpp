@@ -14,11 +14,11 @@ namespace network::async
     void on_accept(boost::beast::error_code ec, boost::asio::ip::tcp::socket socket);
   };
 
-#ifdef SSL
+#ifdef USE_SSL
   class session_detector : public network::session_detector, public std::enable_shared_from_this<session_detector>
   {
   public:
-    session_detector(network::server &srv, boost::asio::ip::tcp::socket &&socket) : network::session_detector(srv, std::move(socket)) {}
+    session_detector(network::server &srv, boost::asio::ip::tcp::socket &&socket, boost::asio::ssl::context &ctx) : network::session_detector(srv, std::move(socket), ctx) {}
 
     void run() override;
 
@@ -39,7 +39,7 @@ namespace network::async
     void do_read() override;
   };
 
-#ifdef SSL
+#ifdef USE_SSL
   class ssl_session : public network::ssl_session
   {
   public:

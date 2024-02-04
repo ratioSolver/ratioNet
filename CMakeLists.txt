@@ -6,10 +6,10 @@ enable_testing()
 
 find_package(Boost REQUIRED COMPONENTS system)
 
-option(SSL "Use Secure Sockets Layer (SSL) for secure communication" ON)
-message(STATUS "SSL:                    ${SSL}")
+option(USE_SSL "Use Secure Sockets Layer (SSL) for secure communication" ON)
+message(STATUS "SSL:                    ${USE_SSL}")
 
-if(SSL)
+if(USE_SSL)
     find_package(OpenSSL REQUIRED)
 
     set(TLS_VERSIONS tlsv11 tlsv12 tlsv13)
@@ -26,9 +26,9 @@ target_compile_features(ratioNet PUBLIC cxx_std_17)
 target_include_directories(ratioNet PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include)
 target_link_libraries(ratioNet PUBLIC Boost::system)
 
-if (SSL)
+if (USE_SSL)
     target_link_libraries(ratioNet PUBLIC OpenSSL::SSL OpenSSL::Crypto)
-    target_compile_definitions(ratioNet PUBLIC TLS_VERSION=${TLS_VERSION})
+    target_compile_definitions(ratioNet PUBLIC USE_SSL TLS_VERSION=${TLS_VERSION})
 endif()
 
 if(BUILD_TESTING)

@@ -21,11 +21,11 @@ namespace network::sync
     std::unordered_set<std::unique_ptr<network::http_session>> sessions;
   };
 
-#ifdef SSL
+#ifdef USE_SSL
   class session_detector : public network::session_detector
   {
   public:
-    session_detector(network::server &srv, boost::asio::ip::tcp::socket &&socket) : network::session_detector(srv, std::move(socket)) {}
+    session_detector(network::server &srv, boost::asio::ip::tcp::socket &&socket, boost::asio::ssl::context &ctx) : network::session_detector(srv, std::move(socket), ctx) {}
 
     void run() override;
 
@@ -45,7 +45,7 @@ namespace network::sync
     void do_read() override;
   };
 
-#ifdef SSL
+#ifdef USE_SSL
   class ssl_session : public network::ssl_session
   {
   public:

@@ -12,8 +12,8 @@ namespace network::async
         if (ec)
             throw std::runtime_error(ec.message());
         else
-#ifdef SSL
-            std::make_shared<session_detector>(*this, std::move(socket))->run();
+#ifdef USE_SSL
+            std::make_shared<session_detector>(*this, std::move(socket), ctx)->run();
 #else
         {
             boost::beast::tcp_stream stream(std::move(socket));
@@ -24,7 +24,7 @@ namespace network::async
         do_accept(); // Accept another connection
     }
 
-#ifdef SSL
+#ifdef USE_SSL
     void session_detector::run() { boost::asio::dispatch(stream.get_executor(), boost::beast::bind_front_handler(&session_detector::on_run, shared_from_this())); }
     void session_detector::on_run()
     {
@@ -36,9 +36,9 @@ namespace network::async
         if (ec)
             throw std::runtime_error(ec.message());
         else if (result)
-            std::make_shared<ssl_session>(srv, std::move(buffer))->run();
+            std::make_shared<ssl_session>(srv, std::move(stream), ctx, std::move(buffer))->run();
         else
-            std::make_shared<plain_session>(srv, std::move(buffer))->run();
+            std::make_shared<plain_session>(srv, std::move(stream), std::move(buffer))->run();
     }
 #endif
 } // namespace network

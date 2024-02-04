@@ -2,7 +2,7 @@
 
 #include <boost/asio.hpp>
 #include <boost/beast.hpp>
-#ifdef SSL
+#ifdef USE_SSL
 #include <boost/asio/ssl.hpp>
 #include <boost/beast/ssl.hpp>
 #endif
@@ -39,7 +39,7 @@ namespace network
     boost::beast::tcp_stream stream;
   };
 
-#ifdef SSL
+#ifdef USE_SSL
   class ssl_session : public http_session
   {
   public:
@@ -87,7 +87,7 @@ namespace network
     boost::asio::signal_set signals;         // The signal_set is used to register for process termination notifications
     boost::asio::ip::tcp::endpoint endpoint; // The endpoint for the server
     boost::asio::ip::tcp::acceptor acceptor; // The acceptor receives incoming connections
-#ifdef SSL
+#ifdef USE_SSL
     boost::asio::ssl::context ctx{boost::asio::ssl::context::TLS_VERSION}; // The SSL context is required, and holds certificates
 #endif
   };
