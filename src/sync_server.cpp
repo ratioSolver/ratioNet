@@ -2,6 +2,18 @@
 
 namespace network::sync
 {
+    server::server(const std::string &address, unsigned short port, std::size_t concurrency_hint) : network::server(address, port, concurrency_hint) {}
+
+    void server::do_accept()
+    {
+        while (true)
+        { // Accept a new connection
+            boost::asio::ip::tcp::socket socket(io_ctx);
+            acceptor.accept(socket);
+            session_detector(*this, std::move(socket)).run();
+        }
+    }
+
     void session_detector::run()
     {
         boost::beast::error_code ec;
@@ -10,20 +22,8 @@ namespace network::sync
         if (ec)
             throw std::runtime_error(ec.message());
         else if (result)
-            std::make_shared<ssl_session>(srv, std::move(buffer))->run();
+            static_cast<server &>(srv).sessions.emplace(std::make_unique<ssl_session>(srv, std::move(buffer))).first->get()->run();
         else
-            std::make_shared<plain_session>(srv, std::move(buffer))->run();
-    }
-
-    server::server(const std::string &address, unsigned short port, std::size_t concurrency_hint) : network::server(address, port, concurrency_hint) {}
-
-    void server::do_accept()
-    {
-        while (true)
-        {
-            boost::asio::ip::tcp::socket socket(io_ctx);
-            acceptor.accept(socket);
-            std::make_shared<session_detector>(*this, std::move(socket))->run();
-        }
+            static_cast<server &>(srv).sessions.emplace(std::make_unique<plain_session>(srv, std::move(buffer))).first->get()->run();
     }
 } // namespace network
