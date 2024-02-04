@@ -10,10 +10,19 @@ namespace network::sync
         { // Accept a new connection
             boost::asio::ip::tcp::socket socket(io_ctx);
             acceptor.accept(socket);
+#ifdef SSL
             session_detector(*this, std::move(socket)).run();
+#else
+            {
+                boost::beast::tcp_stream stream(std::move(socket));
+                boost::beast::flat_buffer buffer;
+                sessions.emplace(std::make_unique<plain_session>(*this, std::move(stream), std::move(buffer))).first->get()->run();
+            }
+#endif
         }
     }
 
+#ifdef SSL
     void session_detector::run()
     {
         boost::beast::error_code ec;
@@ -26,4 +35,5 @@ namespace network::sync
         else
             static_cast<server &>(srv).sessions.emplace(std::make_unique<plain_session>(srv, std::move(buffer))).first->get()->run();
     }
+#endif
 } // namespace network

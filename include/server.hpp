@@ -2,6 +2,10 @@
 
 #include <boost/asio.hpp>
 #include <boost/beast.hpp>
+#ifdef SSL
+#include <boost/asio/ssl.hpp>
+#include <boost/beast/ssl.hpp>
+#endif
 #include <thread>
 
 namespace network
@@ -21,20 +25,46 @@ namespace network
   protected:
     server &srv;
     boost::beast::flat_buffer buffer;
+    boost::optional<boost::beast::http::request_parser<boost::beast::http::string_body>> parser;
+  };
+
+  class plain_session : public http_session
+  {
+  public:
+    plain_session(server &srv, boost::beast::tcp_stream &&str, boost::beast::flat_buffer &&buffer) : http_session(srv, std::move(buffer)), stream(std::move(str)) {}
+
+    void run() override;
+
+  protected:
+    boost::beast::tcp_stream stream;
+  };
+
+#ifdef SSL
+  class ssl_session : public http_session
+  {
+  public:
+    ssl_session(server &srv, boost::beast::tcp_stream &&str, boost::asio::ssl::context &ctx, boost::beast::flat_buffer &&buffer) : http_session(srv, std::move(buffer)), stream(std::move(str), ctx) {}
+
+    void run() override;
+
+  protected:
+    boost::beast::ssl_stream<boost::beast::tcp_stream> stream;
   };
 
   class session_detector
   {
   public:
-    session_detector(server &srv, boost::asio::ip::tcp::socket &&socket) : srv(srv), stream(std::move(socket)) {}
+    session_detector(server &srv, boost::asio::ip::tcp::socket &&socket, boost::asio::ssl::context &ctx) : srv(srv), stream(std::move(socket)), ctx(ctx) {}
 
     virtual void run() = 0;
 
   protected:
     server &srv;
     boost::beast::tcp_stream stream;
+    boost::asio::ssl::context &ctx;
     boost::beast::flat_buffer buffer;
   };
+#endif
 
   class server
   {
@@ -57,5 +87,8 @@ namespace network
     boost::asio::signal_set signals;         // The signal_set is used to register for process termination notifications
     boost::asio::ip::tcp::endpoint endpoint; // The endpoint for the server
     boost::asio::ip::tcp::acceptor acceptor; // The acceptor receives incoming connections
+#ifdef SSL
+    boost::asio::ssl::context ctx{boost::asio::ssl::context::TLS_VERSION}; // The SSL context is required, and holds certificates
+#endif
   };
 } // namespace network

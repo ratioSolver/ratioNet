@@ -21,6 +21,7 @@ namespace network::sync
     std::unordered_set<std::unique_ptr<network::http_session>> sessions;
   };
 
+#ifdef SSL
   class session_detector : public network::session_detector
   {
   public:
@@ -31,11 +32,12 @@ namespace network::sync
   private:
     void on_run();
   };
+#endif
 
-  class plain_session : public network::http_session
+  class plain_session : public network::plain_session
   {
   public:
-    plain_session(network::server &srv, boost::beast::flat_buffer &&buffer) : network::http_session(srv, std::move(buffer)) {}
+    plain_session(network::server &srv, boost::beast::tcp_stream &&str, boost::beast::flat_buffer &&buffer) : network::plain_session(srv, std::move(str), std::move(buffer)) {}
 
     void run() override;
 
@@ -43,14 +45,16 @@ namespace network::sync
     void do_read() override;
   };
 
-  class ssl_session : public network::http_session
+#ifdef SSL
+  class ssl_session : public network::ssl_session
   {
   public:
-    ssl_session(network::server &srv, boost::beast::flat_buffer &&buffer) : network::http_session(srv, std::move(buffer)) {}
+    ssl_session(network::server &srv, boost::beast::tcp_stream &&str, boost::asio::ssl::context &ctx, boost::beast::flat_buffer &&buffer) : network::ssl_session(srv, std::move(str), ctx, std::move(buffer)) {}
 
     void run() override;
 
   private:
     void do_read() override;
   };
+#endif
 } // namespace network

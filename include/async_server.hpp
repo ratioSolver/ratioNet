@@ -14,6 +14,7 @@ namespace network::async
     void on_accept(boost::beast::error_code ec, boost::asio::ip::tcp::socket socket);
   };
 
+#ifdef SSL
   class session_detector : public network::session_detector, public std::enable_shared_from_this<session_detector>
   {
   public:
@@ -25,11 +26,12 @@ namespace network::async
     void on_run();
     void on_detect(boost::beast::error_code ec, bool result);
   };
+#endif
 
-  class plain_session : public network::http_session
+  class plain_session : public network::plain_session
   {
   public:
-    plain_session(network::server &srv, boost::beast::flat_buffer &&buffer) : network::http_session(srv, std::move(buffer)) {}
+    plain_session(network::server &srv, boost::beast::tcp_stream &&str, boost::beast::flat_buffer &&buffer) : network::plain_session(srv, std::move(str), std::move(buffer)) {}
 
     void run() override;
 
@@ -37,14 +39,16 @@ namespace network::async
     void do_read() override;
   };
 
-  class ssl_session : public network::http_session
+#ifdef SSL
+  class ssl_session : public network::ssl_session
   {
   public:
-    ssl_session(network::server &srv, boost::beast::flat_buffer &&buffer) : network::http_session(srv, std::move(buffer)) {}
+    ssl_session(network::server &srv, boost::beast::tcp_stream &&str, boost::asio::ssl::context &ctx, boost::beast::flat_buffer &&buffer) : network::ssl_session(srv, std::move(str), ctx, std::move(buffer)) {}
 
     void run() override;
 
   private:
     void do_read() override;
   };
+#endif
 } // namespace network

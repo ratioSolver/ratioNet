@@ -6,7 +6,7 @@ enable_testing()
 
 find_package(Boost REQUIRED COMPONENTS system)
 
-option(SSL "Use Secure Sockets Layer (SSL) for secure communication" OFF)
+option(SSL "Use Secure Sockets Layer (SSL) for secure communication" ON)
 message(STATUS "SSL:                    ${SSL}")
 
 if(SSL)
