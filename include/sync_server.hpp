@@ -43,6 +43,15 @@ namespace network::sync
     void do_eof() override;
   };
 
+  class plain_websocket_session : public network::websocket_session
+  {
+  public:
+    plain_websocket_session(network::server &srv, boost::beast::tcp_stream &&str, websocket_handler &handler) : network::websocket_session(srv, handler), websocket(std::move(str)) {}
+
+  private:
+    boost::beast::websocket::stream<boost::beast::tcp_stream> websocket;
+  };
+
 #ifdef USE_SSL
   class ssl_session : public network::ssl_session
   {
@@ -52,5 +61,14 @@ namespace network::sync
     void run() override;
     void do_eof() override;
   };
+
+  class ssl_websocket_session : public network::websocket_session
+  {
+  public:
+    ssl_websocket_session(network::server &srv, boost::beast::ssl_stream<boost::beast::tcp_stream> &&str, websocket_handler &handler) : network::websocket_session(srv, handler), websocket(std::move(str)) {}
+
+  private:
+    boost::beast::websocket::stream<boost::beast::ssl_stream<boost::beast::tcp_stream>> websocket;
+  };
 #endif
-} // namespace network
+} // namespace network::sync

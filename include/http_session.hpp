@@ -10,6 +10,8 @@
 namespace network
 {
   class server;
+  class http_handler;
+  class websocket_handler;
 
   class http_session
   {
@@ -18,6 +20,14 @@ namespace network
 
     virtual void run() = 0;
     virtual void do_eof() = 0;
+
+  protected:
+    boost::optional<http_handler &> get_http_handler(boost::beast::http::verb method, const std::string &target);
+    boost::optional<websocket_handler &> get_ws_handler(const std::string &target);
+#ifdef USE_SSL
+    boost::optional<http_handler &> get_https_handler(boost::beast::http::verb method, const std::string &target);
+    boost::optional<websocket_handler &> get_wss_handler(const std::string &target);
+#endif
 
   protected:
     server &srv;

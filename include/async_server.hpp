@@ -41,6 +41,15 @@ namespace network::async
     void on_read(boost::beast::error_code ec, std::size_t bytes_transferred);
   };
 
+  class plain_websocket_session : public network::websocket_session
+  {
+  public:
+    plain_websocket_session(network::server &srv, boost::beast::tcp_stream &&str, websocket_handler &handler) : network::websocket_session(srv, handler), websocket(std::move(str)) {}
+
+  private:
+    boost::beast::websocket::stream<boost::beast::tcp_stream> websocket;
+  };
+
 #ifdef USE_SSL
   class ssl_session : public network::ssl_session, public std::enable_shared_from_this<ssl_session>
   {
@@ -56,6 +65,15 @@ namespace network::async
 
     void do_read();
     void on_read(boost::beast::error_code ec, std::size_t bytes_transferred);
+  };
+
+  class ssl_websocket_session : public network::websocket_session
+  {
+  public:
+    ssl_websocket_session(network::server &srv, boost::beast::ssl_stream<boost::beast::tcp_stream> &&str, websocket_handler &handler) : network::websocket_session(srv, handler), websocket(std::move(str)) {}
+
+  private:
+    boost::beast::websocket::stream<boost::beast::ssl_stream<boost::beast::tcp_stream>> websocket;
   };
 #endif
 } // namespace network

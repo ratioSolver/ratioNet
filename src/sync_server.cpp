@@ -54,6 +54,9 @@ namespace network::sync
 
             if (boost::beast::websocket::is_upgrade(parser->get()))
             {
+                boost::beast::get_lowest_layer(stream).expires_never();
+                auto req = parser->release();
+                auto handler = get_ws_handler(req.target().to_string());
                 // TODO: Create a websocket session
             }
 

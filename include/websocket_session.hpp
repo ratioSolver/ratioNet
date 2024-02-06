@@ -6,9 +6,13 @@
 
 namespace network
 {
+  class server;
+  class websocket_handler;
+
   class websocket_session
   {
   public:
+    websocket_session(server &srv, websocket_handler &handler) : srv(srv), handler(handler) {}
     virtual ~websocket_session() = default;
 
     /**
@@ -29,5 +33,9 @@ namespace network
      * @param cr The reason for closing the connection.
      */
     virtual void close(boost::beast::websocket::close_reason const &cr = boost::beast::websocket::close_code::normal) = 0;
+
+  protected:
+    server &srv;
+    websocket_handler &handler;
   };
 } // namespace network

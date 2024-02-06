@@ -9,6 +9,8 @@ namespace network
 {
   class server
   {
+    friend class http_session;
+
   public:
     server(const std::string &address = "0.0.0.0", unsigned short port = 8080, std::size_t concurrency_hint = std::thread::hardware_concurrency());
 
