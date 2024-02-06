@@ -51,6 +51,12 @@ namespace network::sync
                 break;
             if (ec)
                 throw std::runtime_error(ec.message());
+
+            if (boost::beast::websocket::is_upgrade(parser->get()))
+            {
+                // TODO: Create a websocket session
+            }
+
             // TODO: Handle the request
         }
     }
@@ -75,6 +81,12 @@ namespace network::sync
                 return do_eof();
             else if (ec)
                 throw std::runtime_error(ec.message());
+
+            if (boost::beast::websocket::is_upgrade(parser->get()))
+            {
+                // TODO: Create a websocket session
+            }
+
             // TODO: Handle the request
         }
     }
