@@ -49,6 +49,24 @@ namespace network
             thread.join();
     }
 
+    boost::optional<http_handler &> server::get_http_handler(boost::beast::http::verb method, const std::string &target)
+    {
+        for (auto &handler : http_routes[method])
+            if (std::regex_match(target, handler.first))
+                return *handler.second;
+        return boost::none;
+    }
+
+#ifdef USE_SSL
+    boost::optional<http_handler &> server::get_https_handler(boost::beast::http::verb method, const std::string &target)
+    {
+        for (auto &handler : https_routes[method])
+            if (std::regex_match(target, handler.first))
+                return *handler.second;
+        return boost::none;
+    }
+#endif
+
     std::map<std::string, std::string> server::parse_query(const std::string &query)
     {
         std::map<std::string, std::string> params;
