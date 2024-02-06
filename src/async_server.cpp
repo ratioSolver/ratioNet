@@ -61,6 +61,21 @@ namespace network::async
         boost::beast::http::async_read(stream, buffer, *parser, boost::beast::bind_front_handler(&plain_session::on_read, this->shared_from_this())); // Read a request
     }
 
+    void plain_session::on_read(boost::beast::error_code ec, std::size_t)
+    {
+        if (ec == boost::beast::http::error::end_of_stream)
+            return do_eof();
+        else if (ec)
+            throw std::runtime_error(ec.message());
+
+        if (boost::beast::websocket::is_upgrade(parser->get()))
+        {
+            // TODO: Create a websocket session
+        }
+
+        // TODO: Handle the request
+    }
+
 #ifdef USE_SSL
     void ssl_session::run()
     {
@@ -97,6 +112,21 @@ namespace network::async
         boost::beast::get_lowest_layer(stream).expires_after(std::chrono::seconds(30)); // Set the timeout
 
         boost::beast::http::async_read(stream, buffer, *parser, boost::beast::bind_front_handler(&ssl_session::on_read, this->shared_from_this())); // Read a request
+    }
+
+    void ssl_session::on_read(boost::beast::error_code ec, std::size_t)
+    {
+        if (ec == boost::beast::http::error::end_of_stream)
+            return do_eof();
+        else if (ec)
+            throw std::runtime_error(ec.message());
+
+        if (boost::beast::websocket::is_upgrade(parser->get()))
+        {
+            // TODO: Create a websocket session
+        }
+
+        // TODO: Handle the request
     }
 #endif
 } // namespace network

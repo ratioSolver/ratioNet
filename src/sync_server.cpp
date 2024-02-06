@@ -39,6 +39,20 @@ namespace network::sync
 
     void plain_session::run()
     {
+        parser.emplace();                                                               // Construct a new parser for each message
+        parser->body_limit(10000);                                                      // Set the limit on the allowed size of a message
+        boost::beast::get_lowest_layer(stream).expires_after(std::chrono::seconds(30)); // Set the timeout
+
+        boost::beast::error_code ec;
+        while (true)
+        { // Read a message
+            boost::beast::http::read(stream, buffer, *parser, ec);
+            if (ec == boost::beast::http::error::end_of_stream)
+                break;
+            if (ec)
+                throw std::runtime_error(ec.message());
+            // TODO: Handle the request
+        }
     }
     void plain_session::do_eof()
     {
@@ -54,6 +68,15 @@ namespace network::sync
         stream.handshake(boost::asio::ssl::stream_base::server, ec);
         if (ec)
             throw std::runtime_error(ec.message());
+        while (true)
+        { // Read a message
+            boost::beast::http::read(stream, buffer, *parser, ec);
+            if (ec == boost::beast::http::error::end_of_stream)
+                return do_eof();
+            else if (ec)
+                throw std::runtime_error(ec.message());
+            // TODO: Handle the request
+        }
     }
     void ssl_session::do_eof()
     {
