@@ -39,6 +39,17 @@ namespace network::async
   private:
     void do_read();
     void on_read(boost::beast::error_code ec, std::size_t bytes_transferred);
+
+    template <class Body>
+    void handle_request(boost::beast::http::request<Body> &&req)
+    {
+      if (auto c_res = check_request(req); c_res)
+        return enqueue(std::move(c_res.value()));
+      if (auto handler = srv.get_https_handler(req.method(), req.target()); handler)
+        return handler.value().handle_request(std::move(req), *this);
+      else
+        enqueue(no_handler(req));
+    }
   };
 
   class plain_websocket_session : public network::plain_websocket_session
@@ -62,6 +73,17 @@ namespace network::async
 
     void do_read();
     void on_read(boost::beast::error_code ec, std::size_t bytes_transferred);
+
+    template <class Body>
+    void handle_request(boost::beast::http::request<Body> &&req)
+    {
+      if (auto c_res = check_request(req); c_res)
+        return enqueue(std::move(c_res.value()));
+      if (auto handler = srv.get_https_handler(req.method(), req.target()); handler)
+        return handler.value().handle_request(std::move(req), *this);
+      else
+        enqueue(no_handler(req));
+    }
   };
 
   class ssl_websocket_session : public network::ssl_websocket_session

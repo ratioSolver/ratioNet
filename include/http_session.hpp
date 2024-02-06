@@ -29,6 +29,40 @@ namespace network
     boost::optional<websocket_handler &> get_wss_handler(const std::string &target);
 #endif
 
+    template <class Body>
+    boost::optional<boost::beast::http::response<boost::beast::http::string_body>> check_request(const boost::beast::http::request<Body> &req)
+    {
+      if (req.target().empty() || req.target()[0] != '/' || req.target().find("..") != boost::beast::string_view::npos)
+      {
+        boost::beast::http::response<boost::beast::http::string_body> res(boost::beast::http::status::bad_request, req.version());
+        res.set(boost::beast::http::field::server, "ratioNet");
+        res.set(boost::beast::http::field::content_type, "text/html");
+        res.keep_alive(req.keep_alive());
+        if (req.target().empty())
+          res.body() = "The path must not be empty";
+        else if (req.target()[0] != '/')
+          res.body() = "The path must begin with '/'";
+        else if (req.target().find("..") != boost::beast::string_view::npos)
+          res.body() = "The path must not contain '..'";
+        else
+          res.body() = "Bad request";
+        return res;
+      }
+      else
+        return boost::none;
+    }
+
+    template <class Body>
+    boost::beast::http::response<boost::beast::http::string_body> no_handler(const boost::beast::http::request<Body> &req)
+    {
+      boost::beast::http::response<boost::beast::http::string_body> res(boost::beast::http::status::not_found, req.version());
+      res.set(boost::beast::http::field::server, "ratioNet");
+      res.set(boost::beast::http::field::content_type, "text/html");
+      res.keep_alive(req.keep_alive());
+      res.body() = "The resource '" + std::string(req.target()) + "' was not found";
+      return res;
+    }
+
   protected:
     server &srv;
     boost::beast::flat_buffer buffer;
