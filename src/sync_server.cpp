@@ -60,7 +60,7 @@ namespace network::sync
                 // TODO: Create a websocket session
             }
 
-            // TODO: Handle the request
+            handle_request(parser->release()); // Handle the HTTP request
         }
     }
     void plain_session::do_eof()
@@ -93,7 +93,7 @@ namespace network::sync
                 // TODO: Create a websocket session
             }
 
-            // TODO: Handle the request
+            handle_request(parser->release()); // Handle the HTTP request
         }
     }
     void ssl_session::do_eof()

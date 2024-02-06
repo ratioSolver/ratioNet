@@ -76,7 +76,7 @@ namespace network::async
             // TODO: Create a websocket session
         }
 
-        // TODO: Handle the request
+        handle_request(parser->release()); // Handle the HTTP request
     }
 
 #ifdef USE_SSL
@@ -132,7 +132,7 @@ namespace network::async
             // TODO: Create a websocket session
         }
 
-        // TODO: Handle the request
+        handle_request(parser->release()); // Handle the HTTP request
     }
 #endif
 } // namespace network

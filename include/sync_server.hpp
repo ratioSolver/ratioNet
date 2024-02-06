@@ -42,15 +42,25 @@ namespace network::sync
     void run() override;
     void do_eof() override;
 
+  private:
     template <class Body>
     void handle_request(boost::beast::http::request<Body> &&req)
     {
       if (auto c_res = check_request(req); c_res)
         return write(std::move(c_res.value()));
-      if (auto handler = srv.get_http_handler(req.method(), req.target()); handler)
-        return handler.value().handle_request(std::move(req), *this);
+      if (auto handler = get_http_handler(req.method(), req.target().to_string()); handler)
+        return handler.value().handle_request(std::move(req));
       else
         write(no_handler(req));
+    }
+
+    template <class Body>
+    void write(boost::beast::http::response<Body> &&res)
+    {
+      boost::beast::error_code ec;
+      boost::beast::http::write(stream, res, ec);
+      if (ec)
+        throw std::runtime_error(ec.message());
     }
   };
 
@@ -69,15 +79,25 @@ namespace network::sync
     void run() override;
     void do_eof() override;
 
+  private:
     template <class Body>
     void handle_request(boost::beast::http::request<Body> &&req)
     {
       if (auto c_res = check_request(req); c_res)
         return write(std::move(c_res.value()));
-      if (auto handler = srv.get_https_handler(req.method(), req.target()); handler)
-        return handler.value().handle_request(std::move(req), *this);
+      if (auto handler = get_https_handler(req.method(), req.target().to_string()); handler)
+        return handler.value().handle_request(std::move(req));
       else
         write(no_handler(req));
+    }
+
+    template <class Body>
+    void write(boost::beast::http::response<Body> &&res)
+    {
+      boost::beast::error_code ec;
+      boost::beast::http::write(stream, res, ec);
+      if (ec)
+        throw std::runtime_error(ec.message());
     }
   };
 
