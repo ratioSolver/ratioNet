@@ -49,9 +49,38 @@ namespace network
             thread.join();
     }
 
+    websocket_handler &server::ws(const std::string &target)
+    {
+        ws_routes.emplace_back(std::regex(target), std::make_unique<websocket_handler>());
+        return *ws_routes.back().second;
+    }
+
+#ifdef USE_SSL
+    void server::set_ssl_context(const std::string &cert_chain_file, const std::string &private_key_file, const std::string &tmp_dh_file)
+    {
+        ctx.set_options(boost::asio::ssl::context::default_workarounds | boost::asio::ssl::context::no_sslv2 | boost::asio::ssl::context::no_sslv3 | boost::asio::ssl::context::single_dh_use);
+        ctx.use_certificate_chain_file(cert_chain_file);
+        ctx.use_private_key_file(private_key_file, boost::asio::ssl::context::pem);
+        ctx.use_tmp_dh_file(tmp_dh_file);
+    }
+
+    websocket_handler &server::wss(const std::string &target)
+    {
+        wss_routes.emplace_back(std::regex(target), std::make_unique<websocket_handler>());
+        return *wss_routes.back().second;
+    }
+#endif
+
     boost::optional<http_handler &> server::get_http_handler(boost::beast::http::verb method, const std::string &target)
     {
         for (auto &handler : http_routes[method])
+            if (std::regex_match(target, handler.first))
+                return *handler.second;
+        return boost::none;
+    }
+    boost::optional<websocket_handler &> server::get_ws_handler(const std::string &target)
+    {
+        for (auto &handler : ws_routes)
             if (std::regex_match(target, handler.first))
                 return *handler.second;
         return boost::none;
@@ -61,6 +90,13 @@ namespace network
     boost::optional<http_handler &> server::get_https_handler(boost::beast::http::verb method, const std::string &target)
     {
         for (auto &handler : https_routes[method])
+            if (std::regex_match(target, handler.first))
+                return *handler.second;
+        return boost::none;
+    }
+    boost::optional<websocket_handler &> server::get_wss_handler(const std::string &target)
+    {
+        for (auto &handler : wss_routes)
             if (std::regex_match(target, handler.first))
                 return *handler.second;
         return boost::none;
