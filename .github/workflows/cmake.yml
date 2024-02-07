@@ -18,6 +18,19 @@ jobs:
       USE_SSL: ${{ matrix.use_ssl }}
 
     steps:
+      - name: Install Boost
+        run: |
+          if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
+            sudo apt-get update
+            sudo apt-get install libboost-all-dev
+          fi
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            choco install boost
+          fi
+          if [ "${{ matrix.os }}" = "macos-latest" ]; then
+            brew install boost
+          fi
+      
       - uses: actions/checkout@v3
         with:
           submodules: recursive
