@@ -115,7 +115,7 @@ namespace network::async
     plain_websocket_session(network::server &srv, boost::beast::tcp_stream &&str, websocket_handler &handler) : network::plain_websocket_session(srv, std::move(str), handler) {}
 
     template <class Body>
-    void do_accept(boost::beast::http::request<Body> req)
+    void do_accept(boost::beast::http::request<Body> &&req)
     {
       websocket.set_option(boost::beast::websocket::stream_base::timeout::suggested(boost::beast::role_type::server));
       websocket.set_option(boost::beast::websocket::stream_base::decorator([](boost::beast::websocket::response_type &res)
@@ -199,7 +199,7 @@ namespace network::async
     ssl_websocket_session(network::server &srv, boost::beast::ssl_stream<boost::beast::tcp_stream> &&str, websocket_handler &handler) : network::ssl_websocket_session(srv, std::move(str), handler) {}
 
     template <class Body>
-    void do_accept(boost::beast::http::request<Body> req)
+    void do_accept(boost::beast::http::request<Body> &&req)
     {
       websocket.set_option(boost::beast::websocket::stream_base::timeout::suggested(boost::beast::role_type::server));
       websocket.set_option(boost::beast::websocket::stream_base::decorator([](boost::beast::websocket::response_type &res)

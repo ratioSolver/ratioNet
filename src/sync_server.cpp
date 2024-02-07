@@ -57,7 +57,9 @@ namespace network::sync
                 boost::beast::get_lowest_layer(stream).expires_never();
                 auto req = parser->release();
                 auto handler = get_ws_handler(req.target().to_string());
-                static_cast<server &>(srv).ws_sessions.emplace(std::make_unique<plain_websocket_session>(srv, std::move(stream), handler.value()));
+                auto ws_session = std::make_unique<plain_websocket_session>(srv, std::move(stream), handler.value());
+                ws_session->do_accept(std::move(req));
+                static_cast<server &>(srv).ws_sessions.emplace(std::move(ws_session));
                 static_cast<server &>(srv).sessions.erase(std::find_if(static_cast<server &>(srv).sessions.begin(), static_cast<server &>(srv).sessions.end(), [&](auto &session)
                                                                        { return session.get() == this; }));
             }
@@ -69,6 +71,22 @@ namespace network::sync
     {
         boost::beast::error_code ec;
         stream.socket().shutdown(boost::asio::ip::tcp::socket::shutdown_send, ec);
+    }
+
+    void plain_websocket_session::send(const std::shared_ptr<const std::string> &msg)
+    {
+        boost::beast::error_code ec;
+        websocket.write(boost::asio::buffer(*msg), ec);
+        if (ec)
+            throw std::runtime_error(ec.message());
+    }
+
+    void plain_websocket_session::close(boost::beast::websocket::close_reason const &cr)
+    {
+        boost::beast::error_code ec;
+        websocket.close(cr, ec);
+        if (ec)
+            throw std::runtime_error(ec.message());
     }
 
 #ifdef USE_SSL
@@ -92,7 +110,9 @@ namespace network::sync
                 boost::beast::get_lowest_layer(stream).expires_never();
                 auto req = parser->release();
                 auto handler = get_wss_handler(req.target().to_string());
-                static_cast<server &>(srv).ws_sessions.emplace(std::make_unique<ssl_websocket_session>(srv, std::move(stream), handler.value()));
+                auto ws_session = std::make_unique<ssl_websocket_session>(srv, std::move(stream), handler.value());
+                ws_session->do_accept(std::move(req));
+                static_cast<server &>(srv).ws_sessions.emplace(std::move(ws_session));
                 static_cast<server &>(srv).sessions.erase(std::find_if(static_cast<server &>(srv).sessions.begin(), static_cast<server &>(srv).sessions.end(), [&](auto &session)
                                                                        { return session.get() == this; }));
             }
@@ -104,6 +124,22 @@ namespace network::sync
     {
         boost::beast::error_code ec;
         stream.shutdown(ec);
+    }
+
+    void ssl_websocket_session::send(const std::shared_ptr<const std::string> &msg)
+    {
+        boost::beast::error_code ec;
+        websocket.write(boost::asio::buffer(*msg), ec);
+        if (ec)
+            throw std::runtime_error(ec.message());
+    }
+
+    void ssl_websocket_session::close(boost::beast::websocket::close_reason const &cr)
+    {
+        boost::beast::error_code ec;
+        websocket.close(cr, ec);
+        if (ec)
+            throw std::runtime_error(ec.message());
     }
 #endif
 } // namespace network
