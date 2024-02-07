@@ -5,11 +5,17 @@
 
 namespace network::sync
 {
+#ifdef USE_SSL
   class session_detector;
+#endif
 
   class server : public network::server
   {
+#ifdef USE_SSL
     friend class session_detector;
+    friend class ssl_session;
+#endif
+    friend class plain_session;
 
   public:
     server(const std::string &address = "0.0.0.0", unsigned short port = 8080, std::size_t concurrency_hint = std::thread::hardware_concurrency());
@@ -19,6 +25,7 @@ namespace network::sync
 
   private:
     std::unordered_set<std::unique_ptr<network::http_session>> sessions;
+    std::unordered_set<std::unique_ptr<network::websocket_session>> ws_sessions;
   };
 
 #ifdef USE_SSL
@@ -33,6 +40,19 @@ namespace network::sync
     void on_run();
   };
 #endif
+
+  template <class Body>
+  class server_request : public network::server_request
+  {
+  public:
+    server_request(boost::beast::http::request<Body> &&req) : req(std::move(req)) {}
+    virtual ~server_request() = default;
+
+    boost::beast::http::request<Body> &get() { return req; }
+
+  private:
+    boost::beast::http::request<Body> req;
+  };
 
   class plain_session : public network::plain_session
   {
@@ -49,7 +69,7 @@ namespace network::sync
       if (auto c_res = check_request(req); c_res)
         return write(std::move(c_res.value()));
       if (auto handler = get_http_handler(req.method(), req.target().to_string()); handler)
-        return handler.value().handle_request(std::move(req));
+        return handler.value().handle_request(server_request<Body>(std::move(req)));
       else
         write(no_handler(req));
     }
@@ -68,6 +88,9 @@ namespace network::sync
   {
   public:
     plain_websocket_session(network::server &srv, boost::beast::tcp_stream &&str, websocket_handler &handler) : network::plain_websocket_session(srv, std::move(str), handler) {}
+
+    void send(const std::shared_ptr<const std::string> &msg) override;
+    void close(boost::beast::websocket::close_reason const &cr = boost::beast::websocket::close_code::normal) override;
   };
 
 #ifdef USE_SSL
@@ -86,7 +109,7 @@ namespace network::sync
       if (auto c_res = check_request(req); c_res)
         return write(std::move(c_res.value()));
       if (auto handler = get_https_handler(req.method(), req.target().to_string()); handler)
-        return handler.value().handle_request(std::move(req));
+        return handler.value().handle_request(server_request<Body>(std::move(req)));
       else
         write(no_handler(req));
     }
@@ -105,6 +128,9 @@ namespace network::sync
   {
   public:
     ssl_websocket_session(network::server &srv, boost::beast::ssl_stream<boost::beast::tcp_stream> &&str, websocket_handler &handler) : network::ssl_websocket_session(srv, std::move(str), handler) {}
+
+    void send(const std::shared_ptr<const std::string> &msg) override;
+    void close(boost::beast::websocket::close_reason const &cr = boost::beast::websocket::close_code::normal) override;
   };
 #endif
 } // namespace network::sync

@@ -57,7 +57,9 @@ namespace network::sync
                 boost::beast::get_lowest_layer(stream).expires_never();
                 auto req = parser->release();
                 auto handler = get_ws_handler(req.target().to_string());
-                // TODO: Create a websocket session
+                static_cast<server &>(srv).ws_sessions.emplace(std::make_unique<plain_websocket_session>(srv, std::move(stream), handler.value()));
+                static_cast<server &>(srv).sessions.erase(std::find_if(static_cast<server &>(srv).sessions.begin(), static_cast<server &>(srv).sessions.end(), [&](auto &session)
+                                                                       { return session.get() == this; }));
             }
 
             handle_request(parser->release()); // Handle the HTTP request
@@ -90,7 +92,9 @@ namespace network::sync
                 boost::beast::get_lowest_layer(stream).expires_never();
                 auto req = parser->release();
                 auto handler = get_wss_handler(req.target().to_string());
-                // TODO: Create a websocket session
+                static_cast<server &>(srv).ws_sessions.emplace(std::make_unique<ssl_websocket_session>(srv, std::move(stream), handler.value()));
+                static_cast<server &>(srv).sessions.erase(std::find_if(static_cast<server &>(srv).sessions.begin(), static_cast<server &>(srv).sessions.end(), [&](auto &session)
+                                                                       { return session.get() == this; }));
             }
 
             handle_request(parser->release()); // Handle the HTTP request

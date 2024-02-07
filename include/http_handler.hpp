@@ -4,12 +4,17 @@
 
 namespace network
 {
+  class server_request
+  {
+  public:
+    virtual ~server_request() = default;
+  };
+
   class http_handler
   {
   public:
     virtual ~http_handler() = default;
 
-    template <class Body>
-    void handle_request(boost::beast::http::request<Body> &&req) {}
+    virtual void handle_request(server_request &&req) = 0;
   };
 } // namespace network

@@ -4,6 +4,12 @@
 
 namespace network
 {
+  class server_response
+  {
+  public:
+    virtual ~server_response() = default;
+  };
+
   class websocket_handler
   {
     friend class websocket_session;

@@ -50,6 +50,19 @@ namespace network::async
   };
 #endif
 
+  template <class Body>
+  class server_request : public network::server_request
+  {
+  public:
+    server_request(boost::beast::http::request<Body> &&req) : req(std::move(req)) {}
+    virtual ~server_request() = default;
+
+    boost::beast::http::request<Body> &get() { return req; }
+
+  private:
+    boost::beast::http::request<Body> req;
+  };
+
   class plain_session : public network::plain_session, public std::enable_shared_from_this<plain_session>
   {
   public:
@@ -71,7 +84,7 @@ namespace network::async
       if (auto c_res = check_request(req); c_res)
         return enqueue(std::move(c_res.value()));
       if (auto handler = get_http_handler(req.method(), req.target().to_string()); handler)
-        return handler.value().handle_request(std::move(req));
+        return handler.value().handle_request(server_request<Body>(std::move(req)));
       else
         enqueue(no_handler(req));
     }
@@ -155,7 +168,7 @@ namespace network::async
       if (auto c_res = check_request(req); c_res)
         return enqueue(std::move(c_res.value()));
       if (auto handler = get_https_handler(req.method(), req.target().to_string()); handler)
-        return handler.value().handle_request(std::move(req));
+        return handler.value().handle_request(server_request<Body>(std::move(req)));
       else
         enqueue(no_handler(req));
     }
