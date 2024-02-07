@@ -5,6 +5,13 @@
 
 namespace network::async
 {
+  template <class ReqBody, class ResBody>
+  class plain_handler;
+#ifdef USE_SSL
+  template <class ReqBody, class ResBody>
+  class ssl_handler;
+#endif
+
   class server_response
   {
   public:
@@ -30,6 +37,26 @@ namespace network::async
   {
   public:
     server(const std::string &address = "0.0.0.0", unsigned short port = 8080, std::size_t concurrency_hint = std::thread::hardware_concurrency());
+
+    template <class ReqBody, class ResBody>
+    void get(const std::string &path, const std::function<void(const boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> &handler) { add_route(boost::beast::http::verb::get, path, handler); }
+
+    template <class ReqBody, class ResBody>
+    void post(const std::string &path, const std::function<void(const boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> &handler) { add_route(boost::beast::http::verb::post, path, handler); }
+
+    template <class ReqBody, class ResBody>
+    void put(const std::string &path, const std::function<void(const boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> &handler) { add_route(boost::beast::http::verb::put, path, handler); }
+
+    template <class ReqBody, class ResBody>
+    void del(const std::string &path, const std::function<void(const boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> &handler) { add_route(boost::beast::http::verb::delete_, path, handler); }
+
+    template <class ReqBody, class ResBody>
+    void add_route(boost::beast::http::verb method, const std::string &path, const std::function<void(const boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> &handler) { http_routes[method].emplace_back(std::regex(path), std::make_unique<plain_handler<ReqBody, ResBody>>(handler)); }
+
+#ifdef USE_SSL
+    template <class ReqBody, class ResBody>
+    void add_ssl_route(boost::beast::http::verb method, const std::string &path, const std::function<void(const boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> &handler) { https_routes[method].emplace_back(std::regex(path), std::make_unique<ssl_handler<ReqBody, ResBody>>(handler)); }
+#endif
 
   private:
     void do_accept() override;
@@ -113,21 +140,20 @@ namespace network::async
   class plain_handler : public http_handler
   {
   public:
-    plain_handler(plain_session &session, const std::function<void(const boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> &handler) : handler(handler) {}
+    plain_handler(const std::function<void(const boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> &handler) : handler(handler) {}
 
     void handle_request(network::server_request &&req) override
     {
-      auto &req_impl = static_cast<server_request_impl<ReqBody> &>(req);
-      boost::beast::http::response<ResBody> res{boost::beast::http::status::ok, req_impl.get().version()};
+      auto &req_impl = static_cast<server_request_impl<plain_session, ReqBody> &>(req);
+      boost::beast::http::response<ResBody> res{boost::beast::http::status::ok, req_impl.get_request().version()};
       res.set(boost::beast::http::field::server, "ratioNet");
       res.set(boost::beast::http::field::content_type, "text/html");
-      res.keep_alive(req_impl.get().keep_alive());
-      handler(req_impl.get(), res);
-      session.enqueue(std::move(res));
+      res.keep_alive(req_impl.get_request().keep_alive());
+      handler(req_impl.get_request(), res);
+      req_impl.get_session().enqueue(std::move(res));
     }
 
   private:
-    plain_session &session;
     const std::function<void(const boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> handler;
   };
 
@@ -219,21 +245,20 @@ namespace network::async
   class ssl_handler : public http_handler
   {
   public:
-    ssl_handler(ssl_session &session, const std::function<void(const boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> &handler) : handler(handler) {}
+    ssl_handler(const std::function<void(const boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> &handler) : handler(handler) {}
 
     void handle_request(network::server_request &&req) override
     {
-      auto &req_impl = static_cast<server_request_impl<ReqBody> &>(req);
-      boost::beast::http::response<ResBody> res{boost::beast::http::status::ok, req_impl.get().version()};
+      auto &req_impl = static_cast<server_request_impl<ssl_session, ReqBody> &>(req);
+      boost::beast::http::response<ResBody> res{boost::beast::http::status::ok, req_impl.get_request().version()};
       res.set(boost::beast::http::field::server, "ratioNet");
       res.set(boost::beast::http::field::content_type, "text/html");
-      res.keep_alive(req_impl.get().keep_alive());
-      handler(req_impl.get(), res);
-      session.enqueue(std::move(res));
+      res.keep_alive(req_impl.get_request().keep_alive());
+      handler(req_impl.get_request(), res);
+      req_impl.get_session().enqueue(std::move(res));
     }
 
   private:
-    ssl_session &session;
     const std::function<void(const boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> handler;
   };
 
