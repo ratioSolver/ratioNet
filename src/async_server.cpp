@@ -73,10 +73,85 @@ namespace network::async
             boost::beast::get_lowest_layer(stream).expires_never();
             auto req = parser->release();
             auto handler = get_ws_handler(req.target().to_string());
-            // TODO: Create a websocket session
+            if (handler)
+                std::make_shared<plain_websocket_session>(srv, std::move(stream), handler.value())->do_accept(std::move(req));
         }
 
         handle_request(parser->release()); // Handle the HTTP request
+    }
+
+    void plain_session::on_write(bool keep_alive, boost::beast::error_code ec, std::size_t)
+    {
+        if (ec)
+            throw std::runtime_error(ec.message());
+
+        if (!keep_alive) // This means we should close the connection, usually because the response indicated the "Connection: close" semantic.
+            return do_eof();
+
+        response_queue.pop();
+
+        do_read();
+    }
+
+    void plain_websocket_session::send(const std::shared_ptr<const std::string> &msg) { boost::asio::post(websocket.get_executor(), boost::beast::bind_front_handler(&plain_websocket_session::enqueue, this->shared_from_this(), msg)); }
+
+    void plain_websocket_session::close(boost::beast::websocket::close_reason const &cr) { websocket.async_close(cr, boost::beast::bind_front_handler(&plain_websocket_session::on_close, this->shared_from_this())); }
+
+    void plain_websocket_session::on_accept(boost::beast::error_code ec)
+    {
+        if (ec)
+            throw std::runtime_error(ec.message());
+
+        fire_on_open();
+
+        do_read();
+    }
+
+    void plain_websocket_session::do_read() { websocket.async_read(buffer, boost::beast::bind_front_handler(&plain_websocket_session::on_read, this->shared_from_this())); }
+
+    void plain_websocket_session::on_read(boost::beast::error_code ec, std::size_t)
+    {
+        if (ec == boost::beast::websocket::error::closed) // This indicates that the session was closed
+            return fire_on_close(websocket.reason());
+        else if (ec)
+            throw std::runtime_error(ec.message());
+
+        fire_on_message(std::make_shared<const std::string>(boost::beast::buffers_to_string(buffer.data())));
+
+        buffer.consume(buffer.size());
+
+        do_read();
+    }
+
+    void plain_websocket_session::enqueue(const std::shared_ptr<const std::string> &msg)
+    {
+        send_queue.push(msg);
+
+        if (send_queue.size() > 1)
+            return; // already sending
+
+        do_write();
+    }
+
+    void plain_websocket_session::do_write() { websocket.async_write(boost::asio::buffer(*send_queue.front()), boost::asio::bind_executor(websocket.get_executor(), boost::beast::bind_front_handler(&plain_websocket_session::on_write, this->shared_from_this()))); }
+
+    void plain_websocket_session::on_write(boost::beast::error_code ec, std::size_t)
+    {
+        if (ec)
+            throw std::runtime_error(ec.message());
+
+        send_queue.pop();
+
+        if (!send_queue.empty())
+            do_write();
+    }
+
+    void plain_websocket_session::on_close(boost::beast::error_code ec)
+    {
+        if (ec)
+            throw std::runtime_error(ec.message());
+
+        fire_on_close(websocket.reason());
     }
 
 #ifdef USE_SSL
@@ -129,10 +204,85 @@ namespace network::async
             boost::beast::get_lowest_layer(stream).expires_never();
             auto req = parser->release();
             auto handler = get_wss_handler(req.target().to_string());
-            // TODO: Create a websocket session
+            if (handler)
+                std::make_shared<ssl_websocket_session>(srv, std::move(stream), handler.value())->do_accept(std::move(req));
         }
 
         handle_request(parser->release()); // Handle the HTTP request
+    }
+
+    void ssl_session::on_write(bool keep_alive, boost::beast::error_code ec, std::size_t)
+    {
+        if (ec)
+            throw std::runtime_error(ec.message());
+
+        if (!keep_alive) // This means we should close the connection, usually because the response indicated the "Connection: close" semantic.
+            return do_eof();
+
+        response_queue.pop();
+
+        do_read();
+    }
+
+    void ssl_websocket_session::send(const std::shared_ptr<const std::string> &msg) { boost::asio::post(websocket.get_executor(), boost::beast::bind_front_handler(&ssl_websocket_session::enqueue, this->shared_from_this(), msg)); }
+
+    void ssl_websocket_session::close(boost::beast::websocket::close_reason const &cr) { websocket.async_close(cr, boost::beast::bind_front_handler(&ssl_websocket_session::on_close, this->shared_from_this())); }
+
+    void ssl_websocket_session::on_accept(boost::beast::error_code ec)
+    {
+        if (ec)
+            throw std::runtime_error(ec.message());
+
+        fire_on_open();
+
+        do_read();
+    }
+
+    void ssl_websocket_session::do_read() { websocket.async_read(buffer, boost::beast::bind_front_handler(&ssl_websocket_session::on_read, this->shared_from_this())); }
+
+    void ssl_websocket_session::on_read(boost::beast::error_code ec, std::size_t)
+    {
+        if (ec == boost::beast::websocket::error::closed) // This indicates that the session was closed
+            return fire_on_close(websocket.reason());
+        else if (ec)
+            throw std::runtime_error(ec.message());
+
+        fire_on_message(std::make_shared<const std::string>(boost::beast::buffers_to_string(buffer.data())));
+
+        buffer.consume(buffer.size());
+
+        do_read();
+    }
+
+    void ssl_websocket_session::enqueue(const std::shared_ptr<const std::string> &msg)
+    {
+        send_queue.push(msg);
+
+        if (send_queue.size() > 1)
+            return; // already sending
+
+        do_write();
+    }
+
+    void ssl_websocket_session::do_write() { websocket.async_write(boost::asio::buffer(*send_queue.front()), boost::asio::bind_executor(websocket.get_executor(), boost::beast::bind_front_handler(&ssl_websocket_session::on_write, this->shared_from_this()))); }
+
+    void ssl_websocket_session::on_write(boost::beast::error_code ec, std::size_t)
+    {
+        if (ec)
+            throw std::runtime_error(ec.message());
+
+        send_queue.pop();
+
+        if (!send_queue.empty())
+            do_write();
+    }
+
+    void ssl_websocket_session::on_close(boost::beast::error_code ec)
+    {
+        if (ec)
+            throw std::runtime_error(ec.message());
+
+        fire_on_close(websocket.reason());
     }
 #endif
 } // namespace network

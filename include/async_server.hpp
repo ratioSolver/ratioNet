@@ -90,27 +90,44 @@ namespace network::async
       response_queue.front()->do_write();
     }
 
-    void on_write(bool keep_alive, boost::beast::error_code ec, std::size_t)
-    {
-      if (ec)
-        throw std::runtime_error(ec.message());
-
-      if (!keep_alive) // This means we should close the connection, usually because the response indicated the "Connection: close" semantic.
-        return do_eof();
-
-      response_queue.pop();
-
-      do_read();
-    }
+    void on_write(bool keep_alive, boost::beast::error_code ec, std::size_t bytes_transferred);
 
   private:
     std::queue<std::unique_ptr<server_response>> response_queue;
   };
 
-  class plain_websocket_session : public network::plain_websocket_session
+  class plain_websocket_session : public network::plain_websocket_session, public std::enable_shared_from_this<plain_websocket_session>
   {
   public:
     plain_websocket_session(network::server &srv, boost::beast::tcp_stream &&str, websocket_handler &handler) : network::plain_websocket_session(srv, std::move(str), handler) {}
+
+    template <class Body>
+    void do_accept(boost::beast::http::request<Body> req)
+    {
+      websocket.set_option(boost::beast::websocket::stream_base::timeout::suggested(boost::beast::role_type::server));
+      websocket.set_option(boost::beast::websocket::stream_base::decorator([](boost::beast::websocket::response_type &res)
+                                                                           { res.set(boost::beast::http::field::server, "ratioNet"); }));
+      websocket.async_accept(req, boost::beast::bind_front_handler(&plain_websocket_session::on_accept, this->shared_from_this()));
+    }
+
+    void send(const std::shared_ptr<const std::string> &msg) override;
+    void close(boost::beast::websocket::close_reason const &cr = boost::beast::websocket::close_code::normal) override;
+
+  private:
+    void on_accept(boost::beast::error_code ec);
+
+    void do_read();
+    void on_read(boost::beast::error_code ec, std::size_t bytes_transferred);
+
+    void enqueue(const std::shared_ptr<const std::string> &msg);
+
+    void do_write();
+    void on_write(boost::beast::error_code ec, std::size_t bytes_transferred);
+
+    void on_close(boost::beast::error_code ec);
+
+  private:
+    std::queue<std::shared_ptr<const std::string>> send_queue;
   };
 
 #ifdef USE_SSL
@@ -157,27 +174,44 @@ namespace network::async
       response_queue.front()->do_write();
     }
 
-    void on_write(bool keep_alive, boost::beast::error_code ec, std::size_t)
-    {
-      if (ec)
-        throw std::runtime_error(ec.message());
-
-      if (!keep_alive) // This means we should close the connection, usually because the response indicated the "Connection: close" semantic.
-        return do_eof();
-
-      response_queue.pop();
-
-      do_read();
-    }
+    void on_write(bool keep_alive, boost::beast::error_code ec, std::size_t bytes_transferred);
 
   private:
     std::queue<std::unique_ptr<server_response>> response_queue;
   };
 
-  class ssl_websocket_session : public network::ssl_websocket_session
+  class ssl_websocket_session : public network::ssl_websocket_session, public std::enable_shared_from_this<ssl_websocket_session>
   {
   public:
     ssl_websocket_session(network::server &srv, boost::beast::ssl_stream<boost::beast::tcp_stream> &&str, websocket_handler &handler) : network::ssl_websocket_session(srv, std::move(str), handler) {}
+
+    template <class Body>
+    void do_accept(boost::beast::http::request<Body> req)
+    {
+      websocket.set_option(boost::beast::websocket::stream_base::timeout::suggested(boost::beast::role_type::server));
+      websocket.set_option(boost::beast::websocket::stream_base::decorator([](boost::beast::websocket::response_type &res)
+                                                                           { res.set(boost::beast::http::field::server, "ratioNet"); }));
+      websocket.async_accept(req, boost::beast::bind_front_handler(&ssl_websocket_session::on_accept, this->shared_from_this()));
+    }
+
+    void send(const std::shared_ptr<const std::string> &msg) override;
+    void close(boost::beast::websocket::close_reason const &cr = boost::beast::websocket::close_code::normal) override;
+
+  private:
+    void on_accept(boost::beast::error_code ec);
+
+    void do_read();
+    void on_read(boost::beast::error_code ec, std::size_t bytes_transferred);
+
+    void enqueue(const std::shared_ptr<const std::string> &msg);
+
+    void do_write();
+    void on_write(boost::beast::error_code ec, std::size_t bytes_transferred);
+
+    void on_close(boost::beast::error_code ec);
+
+  private:
+    std::queue<std::shared_ptr<const std::string>> send_queue;
   };
 #endif
 } // namespace network

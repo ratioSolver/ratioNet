@@ -2,6 +2,10 @@
 
 #include <string>
 #include <memory>
+#include <boost/beast.hpp>
+#ifdef USE_SSL
+#include <boost/beast/ssl.hpp>
+#endif
 #include <boost/beast/websocket.hpp>
 
 namespace network
@@ -26,7 +30,7 @@ namespace network
      *
      * @param message The message to send.
      */
-    virtual void send(std::string &&message) { send(std::make_shared<std::string>(message)); }
+    void send(std::string &&message) { send(std::make_shared<std::string>(message)); }
     /**
      * @brief Close the connection to the client.
      *
@@ -35,8 +39,15 @@ namespace network
     virtual void close(boost::beast::websocket::close_reason const &cr = boost::beast::websocket::close_code::normal) = 0;
 
   protected:
+    void fire_on_open();
+    void fire_on_message(const std::shared_ptr<const std::string> &msg);
+    void fire_on_close(boost::beast::websocket::close_reason const &cr);
+    void fire_on_error(boost::beast::error_code const &ec);
+
+  protected:
     server &srv;
     websocket_handler &handler;
+    boost::beast::flat_buffer buffer;
   };
 
   class plain_websocket_session : public websocket_session
