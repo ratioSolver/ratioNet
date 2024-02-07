@@ -26,6 +26,9 @@ namespace network::async
   public:
     server_response_impl(Session &session, boost::beast::http::response<Body> &&res) : session(session), res(std::move(res)) {}
 
+    Session &get_session() { return session; }
+    boost::beast::http::response<Body> &get_response() { return res; }
+
     void do_write() override { session.do_write(res); }
 
   public:
@@ -54,6 +57,18 @@ namespace network::async
     void add_route(boost::beast::http::verb method, const std::string &path, const std::function<void(const boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> &handler) { http_routes[method].emplace_back(std::regex(path), std::make_unique<plain_handler<ReqBody, ResBody>>(handler)); }
 
 #ifdef USE_SSL
+    template <class ReqBody, class ResBody>
+    void ssl_get(const std::string &path, const std::function<void(const boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> &handler) { add_ssl_route(boost::beast::http::verb::get, path, handler); }
+
+    template <class ReqBody, class ResBody>
+    void ssl_post(const std::string &path, const std::function<void(const boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> &handler) { add_ssl_route(boost::beast::http::verb::post, path, handler); }
+
+    template <class ReqBody, class ResBody>
+    void ssl_put(const std::string &path, const std::function<void(const boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> &handler) { add_ssl_route(boost::beast::http::verb::put, path, handler); }
+
+    template <class ReqBody, class ResBody>
+    void ssl_del(const std::string &path, const std::function<void(const boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> &handler) { add_ssl_route(boost::beast::http::verb::delete_, path, handler); }
+
     template <class ReqBody, class ResBody>
     void add_ssl_route(boost::beast::http::verb method, const std::string &path, const std::function<void(const boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> &handler) { https_routes[method].emplace_back(std::regex(path), std::make_unique<ssl_handler<ReqBody, ResBody>>(handler)); }
 #endif
