@@ -1,4 +1,3 @@
-#include <boost/beast.hpp>
 #include "async_server.hpp"
 
 namespace network::async
@@ -24,28 +23,7 @@ namespace network::async
         do_accept(); // Accept another connection
     }
 
-#ifdef USE_SSL
-    void session_detector::run() { boost::asio::dispatch(stream.get_executor(), boost::beast::bind_front_handler(&session_detector::on_run, shared_from_this())); }
-    void session_detector::on_run()
-    {
-        stream.expires_after(std::chrono::seconds(30));                                                                                     // Set the timeout
-        boost::beast::async_detect_ssl(stream, buffer, boost::beast::bind_front_handler(&session_detector::on_detect, shared_from_this())); // Detect SSL
-    }
-    void session_detector::on_detect(boost::beast::error_code ec, bool result)
-    {
-        if (ec)
-            throw std::runtime_error(ec.message());
-        else if (result)
-            std::make_shared<ssl_session>(srv, std::move(stream), ctx, std::move(buffer))->run();
-        else
-            std::make_shared<plain_session>(srv, std::move(stream), std::move(buffer))->run();
-    }
-#endif
-
-    void plain_session::run()
-    { // Start reading
-        do_read();
-    }
+    void plain_session::run() { do_read(); }
     void plain_session::do_eof()
     {
         boost::beast::error_code ec;
@@ -155,6 +133,22 @@ namespace network::async
     }
 
 #ifdef USE_SSL
+    void session_detector::run() { boost::asio::dispatch(stream.get_executor(), boost::beast::bind_front_handler(&session_detector::on_run, shared_from_this())); }
+    void session_detector::on_run()
+    {
+        stream.expires_after(std::chrono::seconds(30));                                                                                     // Set the timeout
+        boost::beast::async_detect_ssl(stream, buffer, boost::beast::bind_front_handler(&session_detector::on_detect, shared_from_this())); // Detect SSL
+    }
+    void session_detector::on_detect(boost::beast::error_code ec, bool result)
+    {
+        if (ec)
+            throw std::runtime_error(ec.message());
+        else if (result)
+            std::make_shared<ssl_session>(srv, std::move(stream), ctx, std::move(buffer))->run();
+        else
+            std::make_shared<plain_session>(srv, std::move(stream), std::move(buffer))->run();
+    }
+
     void ssl_session::run()
     {
         boost::beast::get_lowest_layer(stream).expires_after(std::chrono::seconds(30));
@@ -175,12 +169,6 @@ namespace network::async
             buffer.consume(bytes_used); // Consume the handshake buffer
             do_read();
         }
-    }
-
-    void ssl_session::on_shutdown(boost::beast::error_code ec)
-    {
-        if (ec)
-            throw std::runtime_error(ec.message());
     }
 
     void ssl_session::do_read()
@@ -222,6 +210,12 @@ namespace network::async
         response_queue.pop();
 
         do_read();
+    }
+
+    void ssl_session::on_shutdown(boost::beast::error_code ec)
+    {
+        if (ec)
+            throw std::runtime_error(ec.message());
     }
 
     void ssl_websocket_session::send(const std::shared_ptr<const std::string> &msg) { boost::asio::post(websocket.get_executor(), boost::beast::bind_front_handler(&ssl_websocket_session::enqueue, this->shared_from_this(), msg)); }
@@ -285,4 +279,4 @@ namespace network::async
         fire_on_close(websocket.reason());
     }
 #endif
-} // namespace network
+} // namespace network::async

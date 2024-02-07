@@ -4,17 +4,17 @@
 
 namespace network
 {
-  class server_request
+  class request
   {
   public:
-    virtual ~server_request() = default;
+    virtual ~request() = default;
   };
 
   template <class Session, class Body>
-  class server_request_impl : public server_request
+  class request_impl : public request
   {
   public:
-    server_request_impl(Session &session, boost::beast::http::request<Body> &&req) : req(std::move(req)) {}
+    request_impl(Session &session, boost::beast::http::request<Body> &&req) : session(session), req(std::move(req)) {}
 
     Session &get_session() { return session; }
     boost::beast::http::request<Body> &get_request() { return req; }
@@ -29,6 +29,6 @@ namespace network
   public:
     virtual ~http_handler() = default;
 
-    virtual void handle_request(server_request &&req) = 0;
+    virtual void handle_request(request &&req) = 0;
   };
 } // namespace network

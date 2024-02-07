@@ -6,18 +6,18 @@ using string_res = boost::beast::http::response<boost::beast::http::string_body>
 
 void test_plain_async_server()
 {
-    network::async::server s;
+    network::async::server server;
+    server.add_route(boost::beast::http::verb::get, "/", std::function{[](const string_req &, string_res &res)
+                                                                       {
+                                                                           res.set(boost::beast::http::field::content_type, "html");
+                                                                           res.body() = R"(<html><body><h1>Hello, world!</h1></body></html>)";
+                                                                       }});
 
-    s.get("/", std::function{[](const string_req &req, string_res &res)
-                             {
-                                res.set(boost::beast::http::field::content_type, "html");
-                                res.body() = R"(<html><body><h1>Hello, world!</h1></body></html>)"; }});
-
-    std::thread t{[&s]
-                  { s.start(); }};
+    std::thread t{[&server]
+                  { server.start(); }};
 
     std::this_thread::sleep_for(std::chrono::seconds(10));
-    s.stop();
+    server.stop();
     t.join();
 }
 
