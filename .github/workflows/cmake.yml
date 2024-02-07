@@ -24,7 +24,7 @@ jobs:
             sudo apt-get update
             sudo apt-get install libboost-all-dev
           elif [ "$RUNNER_OS" == "Windows" ]; then
-            choco install boost
+            choco install boost-msvc-1.75.0
           elif [ "$RUNNER_OS" == "macOS" ]; then
             brew install boost
           fi
