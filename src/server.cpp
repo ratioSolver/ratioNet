@@ -19,19 +19,19 @@ namespace network
         boost::beast::error_code ec;
         acceptor.open(endpoint.protocol(), ec);
         if (ec)
-            return;
+            throw std::runtime_error(ec.message());
 
         acceptor.set_option(boost::asio::socket_base::reuse_address(true), ec);
         if (ec)
-            return;
+            throw std::runtime_error(ec.message());
 
         acceptor.bind(endpoint, ec);
         if (ec)
-            return;
+            throw std::runtime_error(ec.message());
 
         acceptor.listen(boost::asio::socket_base::max_listen_connections, ec);
         if (ec)
-            return;
+            throw std::runtime_error(ec.message());
 
         do_accept();
 

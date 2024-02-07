@@ -225,7 +225,7 @@ namespace network::async
     void ssl_websocket_session::on_accept(boost::beast::error_code ec)
     {
         if (ec)
-            throw std::runtime_error(ec.message());
+            return fire_on_error(ec);
 
         fire_on_open();
 

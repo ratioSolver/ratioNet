@@ -2,6 +2,7 @@
 
 #include <thread>
 #include <regex>
+#include <map>
 #include "http_handler.hpp"
 #include "websocket_handler.hpp"
 
