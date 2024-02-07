@@ -72,6 +72,9 @@ namespace network::async
     void do_eof() override;
 
     template <class Body>
+    void enqueue(boost::beast::http::response<Body> &&res) { boost::asio::post(stream.get_executor(), boost::beast::bind_front_handler(&plain_session::enqueue_response<Body>, this->shared_from_this(), std::move(res))); }
+
+    template <class Body>
     void do_write(boost::beast::http::response<Body> &res) { boost::beast::http::async_write(stream, res, boost::beast::bind_front_handler(&plain_session::on_write, this->shared_from_this(), res.keep_alive())); }
 
   private:
@@ -90,9 +93,6 @@ namespace network::async
     }
 
     template <class Body>
-    void enqueue(boost::beast::http::response<Body> &&res) { boost::asio::post(stream.get_executor(), boost::beast::bind_front_handler(&plain_session::enqueue_response<Body>, this->shared_from_this(), std::move(res))); }
-
-    template <class Body>
     void enqueue_response(boost::beast::http::response<Body> &&res)
     {
       response_queue.push(std::make_unique<server_response_impl<plain_session, Body>>(*this, std::move(res)));
@@ -107,6 +107,28 @@ namespace network::async
 
   private:
     std::queue<std::unique_ptr<server_response>> response_queue;
+  };
+
+  template <class ReqBody, class ResBody>
+  class plain_handler : public http_handler
+  {
+  public:
+    plain_handler(plain_session &session, const std::function<void(const boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> &handler) : handler(handler) {}
+
+    void handle_request(network::server_request &&req) override
+    {
+      auto &req_impl = static_cast<server_request_impl<ReqBody> &>(req);
+      boost::beast::http::response<ResBody> res{boost::beast::http::status::ok, req_impl.get().version()};
+      res.set(boost::beast::http::field::server, "ratioNet");
+      res.set(boost::beast::http::field::content_type, "text/html");
+      res.keep_alive(req_impl.get().keep_alive());
+      handler(req_impl.get(), res);
+      session.enqueue(std::move(res));
+    }
+
+  private:
+    plain_session &session;
+    const std::function<void(const boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> handler;
   };
 
   class plain_websocket_session : public network::plain_websocket_session, public std::enable_shared_from_this<plain_websocket_session>
@@ -153,6 +175,9 @@ namespace network::async
     void do_eof() override;
 
     template <class Body>
+    void enqueue(boost::beast::http::response<Body> &&res) { boost::asio::post(stream.get_executor(), boost::beast::bind_front_handler(&ssl_session::enqueue_response<Body>, this->shared_from_this(), std::move(res))); }
+
+    template <class Body>
     void do_write(boost::beast::http::response<Body> &res) { boost::beast::http::async_write(stream, res, boost::beast::bind_front_handler(&ssl_session::on_write, this->shared_from_this(), res.keep_alive())); }
 
   private:
@@ -174,9 +199,6 @@ namespace network::async
     }
 
     template <class Body>
-    void enqueue(boost::beast::http::response<Body> &&res) { boost::asio::post(stream.get_executor(), boost::beast::bind_front_handler(&ssl_session::enqueue_response<Body>, this->shared_from_this(), std::move(res))); }
-
-    template <class Body>
     void enqueue_response(boost::beast::http::response<Body> &&res)
     {
       response_queue.push(std::make_unique<server_response_impl<ssl_session, Body>>(*this, std::move(res)));
@@ -191,6 +213,28 @@ namespace network::async
 
   private:
     std::queue<std::unique_ptr<server_response>> response_queue;
+  };
+
+  template <class ReqBody, class ResBody>
+  class ssl_handler : public http_handler
+  {
+  public:
+    ssl_handler(ssl_session &session, const std::function<void(const boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> &handler) : handler(handler) {}
+
+    void handle_request(network::server_request &&req) override
+    {
+      auto &req_impl = static_cast<server_request_impl<ReqBody> &>(req);
+      boost::beast::http::response<ResBody> res{boost::beast::http::status::ok, req_impl.get().version()};
+      res.set(boost::beast::http::field::server, "ratioNet");
+      res.set(boost::beast::http::field::content_type, "text/html");
+      res.keep_alive(req_impl.get().keep_alive());
+      handler(req_impl.get(), res);
+      session.enqueue(std::move(res));
+    }
+
+  private:
+    ssl_session &session;
+    const std::function<void(const boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> handler;
   };
 
   class ssl_websocket_session : public network::ssl_websocket_session, public std::enable_shared_from_this<ssl_websocket_session>
