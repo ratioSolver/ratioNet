@@ -1,5 +1,7 @@
 # ratioNet
 
+![Build Status](https://github.com/ratioSolver/ratioNet/actions/workflows/cmake.yml/badge.svg)
+
 Welcome to the `ratioNet` documentation. This framework provides a powerful and flexible foundation for building networked applications using the [Boost.Beast](https://github.com/boostorg/beast) library. Whether you're developing a web server, a WebSocket application, or any other networked software, this framework will help you get started quickly and efficiently.
 
 ## Features
