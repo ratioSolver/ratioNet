@@ -11,27 +11,35 @@ namespace network
         signals.add(SIGQUIT);
 #endif // defined(SIGQUIT)
 
+        signals.async_wait([this](boost::beast::error_code const &ec, int)
+                           {
+                            if (ec)
+                                return error_handler(ec.message());
+                            stop(); });
+
         threads.reserve(concurrency_hint);
     }
 
     void server::start()
     {
+        log_handler("Starting server on " + endpoint.address().to_string() + ":" + std::to_string(endpoint.port()));
+
         boost::beast::error_code ec;
         acceptor.open(endpoint.protocol(), ec);
         if (ec)
-            throw std::runtime_error(ec.message());
+            return error_handler(ec.message());
 
         acceptor.set_option(boost::asio::socket_base::reuse_address(true), ec);
         if (ec)
-            throw std::runtime_error(ec.message());
+            return error_handler(ec.message());
 
         acceptor.bind(endpoint, ec);
         if (ec)
-            throw std::runtime_error(ec.message());
+            return error_handler(ec.message());
 
         acceptor.listen(boost::asio::socket_base::max_listen_connections, ec);
         if (ec)
-            throw std::runtime_error(ec.message());
+            return error_handler(ec.message());
 
         do_accept();
 

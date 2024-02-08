@@ -64,6 +64,9 @@ namespace network
     }
 
   protected:
+    void fire_on_error(const boost::beast::error_code &ec);
+
+  protected:
     server &srv;
     boost::beast::flat_buffer buffer;
     boost::optional<boost::beast::http::request_parser<boost::beast::http::string_body>> parser;
@@ -79,15 +82,6 @@ namespace network
   };
 
 #ifdef USE_SSL
-  class ssl_session : public http_session
-  {
-  public:
-    ssl_session(server &srv, boost::beast::tcp_stream &&str, boost::asio::ssl::context &ctx, boost::beast::flat_buffer &&buffer) : http_session(srv, std::move(buffer)), stream(std::move(str), ctx) {}
-
-  protected:
-    boost::beast::ssl_stream<boost::beast::tcp_stream> stream;
-  };
-
   class session_detector
   {
   public:
@@ -96,10 +90,22 @@ namespace network
     virtual void run() = 0;
 
   protected:
+    void fire_on_error(const boost::beast::error_code &ec);
+
+  protected:
     server &srv;
     boost::beast::tcp_stream stream;
     boost::asio::ssl::context &ctx;
     boost::beast::flat_buffer buffer;
+  };
+
+  class ssl_session : public http_session
+  {
+  public:
+    ssl_session(server &srv, boost::beast::tcp_stream &&str, boost::asio::ssl::context &ctx, boost::beast::flat_buffer &&buffer) : http_session(srv, std::move(buffer)), stream(std::move(str), ctx) {}
+
+  protected:
+    boost::beast::ssl_stream<boost::beast::tcp_stream> stream;
   };
 #endif
 } // namespace network

@@ -12,6 +12,9 @@ namespace network
   class server
   {
     friend class http_session;
+#ifdef USE_SSL
+    friend class session_detector;
+#endif
 
   public:
     server(const std::string &address = "0.0.0.0", unsigned short port = 8080, std::size_t concurrency_hint = std::thread::hardware_concurrency());
@@ -26,6 +29,9 @@ namespace network
     void set_ssl_context(const std::string &cert_chain_file, const std::string &private_key_file, const std::string &tmp_dh_file);
     websocket_handler &wss(const std::string &target);
 #endif
+
+    void set_log_handler(std::function<void(const std::string &)> handler) { log_handler = handler; }
+    void set_error_handler(std::function<void(const std::string &)> handler) { error_handler = handler; }
 
   private:
     virtual void do_accept() = 0;
@@ -42,6 +48,8 @@ namespace network
     static std::map<std::string, std::string> parse_query(const std::string &query);
 
   protected:
+    std::function<void(const std::string &)> log_handler = [](const std::string &) {};
+    std::function<void(const std::string &)> error_handler = [](const std::string &) {};
     boost::asio::io_context io_ctx;          // The io_context is required for all I/O
     std::vector<std::thread> threads;        // The thread pool
     boost::asio::signal_set signals;         // The signal_set is used to register for process termination notifications
