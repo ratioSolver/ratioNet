@@ -66,10 +66,10 @@ namespace network
 #ifdef USE_SSL
     void server::set_ssl_context(const std::string &cert_chain_file, const std::string &private_key_file, const std::string &tmp_dh_file)
     {
-        ctx.set_options(boost::asio::ssl::context::default_workarounds | boost::asio::ssl::context::no_sslv2 | boost::asio::ssl::context::no_sslv3 | boost::asio::ssl::context::single_dh_use);
-        ctx.use_certificate_chain_file(cert_chain_file);
-        ctx.use_private_key_file(private_key_file, boost::asio::ssl::context::pem);
-        ctx.use_tmp_dh_file(tmp_dh_file);
+        ssl_ctx.set_options(boost::asio::ssl::context::default_workarounds | boost::asio::ssl::context::no_sslv2 | boost::asio::ssl::context::no_sslv3 | boost::asio::ssl::context::single_dh_use);
+        ssl_ctx.use_certificate_chain_file(cert_chain_file);
+        ssl_ctx.use_private_key_file(private_key_file, boost::asio::ssl::context::pem);
+        ssl_ctx.use_tmp_dh_file(tmp_dh_file);
     }
 
     websocket_handler &server::wss(const std::string &target)

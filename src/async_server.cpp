@@ -14,7 +14,7 @@ namespace network::async
         {
             log_handler("Accepted connection from " + socket.remote_endpoint().address().to_string());
 #ifdef USE_SSL
-            std::make_shared<session_detector>(*this, std::move(socket), ctx)->run();
+            std::make_shared<session_detector>(*this, std::move(socket), ssl_ctx)->run();
 #else
             boost::beast::tcp_stream stream(std::move(socket));
             boost::beast::flat_buffer buffer;
@@ -145,7 +145,7 @@ namespace network::async
         if (ec)
             return fire_on_error(ec);
         else if (result)
-            std::make_shared<ssl_session>(srv, std::move(stream), ctx, std::move(buffer))->run();
+            std::make_shared<ssl_session>(srv, std::move(stream), ssl_ctx, std::move(buffer))->run();
         else
             std::make_shared<plain_session>(srv, std::move(stream), std::move(buffer))->run();
     }

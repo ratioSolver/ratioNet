@@ -58,7 +58,7 @@ namespace network
     std::unordered_map<boost::beast::http::verb, std::vector<std::pair<std::regex, std::unique_ptr<http_handler>>>> http_routes;
     std::vector<std::pair<std::regex, std::unique_ptr<websocket_handler>>> ws_routes;
 #ifdef USE_SSL
-    boost::asio::ssl::context ctx{boost::asio::ssl::context::TLS_VERSION}; // The SSL context is required, and holds certificates
+    boost::asio::ssl::context ssl_ctx{boost::asio::ssl::context::TLS_VERSION}; // The SSL context is required, and holds certificates
     std::unordered_map<boost::beast::http::verb, std::vector<std::pair<std::regex, std::unique_ptr<http_handler>>>> https_routes;
     std::vector<std::pair<std::regex, std::unique_ptr<websocket_handler>>> wss_routes;
 #endif

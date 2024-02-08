@@ -85,7 +85,7 @@ namespace network
   class session_detector
   {
   public:
-    session_detector(server &srv, boost::asio::ip::tcp::socket &&socket, boost::asio::ssl::context &ctx) : srv(srv), stream(std::move(socket)), ctx(ctx) {}
+    session_detector(server &srv, boost::asio::ip::tcp::socket &&socket, boost::asio::ssl::context &ssl_ctx) : srv(srv), stream(std::move(socket)), ssl_ctx(ssl_ctx) {}
 
     virtual void run() = 0;
 
@@ -95,14 +95,14 @@ namespace network
   protected:
     server &srv;
     boost::beast::tcp_stream stream;
-    boost::asio::ssl::context &ctx;
+    boost::asio::ssl::context &ssl_ctx;
     boost::beast::flat_buffer buffer;
   };
 
   class ssl_session : public http_session
   {
   public:
-    ssl_session(server &srv, boost::beast::tcp_stream &&str, boost::asio::ssl::context &ctx, boost::beast::flat_buffer &&buffer) : http_session(srv, std::move(buffer)), stream(std::move(str), ctx) {}
+    ssl_session(server &srv, boost::beast::tcp_stream &&str, boost::asio::ssl::context &ssl_ctx, boost::beast::flat_buffer &&buffer) : http_session(srv, std::move(buffer)), stream(std::move(str), ssl_ctx) {}
 
   protected:
     boost::beast::ssl_stream<boost::beast::tcp_stream> stream;

@@ -151,7 +151,7 @@ namespace network::async
   class session_detector : public network::session_detector, public std::enable_shared_from_this<session_detector>
   {
   public:
-    session_detector(network::server &srv, boost::asio::ip::tcp::socket &&socket, boost::asio::ssl::context &ctx) : network::session_detector(srv, std::move(socket), ctx) {}
+    session_detector(network::server &srv, boost::asio::ip::tcp::socket &&socket, boost::asio::ssl::context &ssl_ctx) : network::session_detector(srv, std::move(socket), ssl_ctx) {}
 
     void run() override;
 
@@ -163,7 +163,7 @@ namespace network::async
   class ssl_session : public network::ssl_session, public std::enable_shared_from_this<ssl_session>
   {
   public:
-    ssl_session(network::server &srv, boost::beast::tcp_stream &&str, boost::asio::ssl::context &ctx, boost::beast::flat_buffer &&buffer) : network::ssl_session(srv, std::move(str), ctx, std::move(buffer)) {}
+    ssl_session(network::server &srv, boost::beast::tcp_stream &&str, boost::asio::ssl::context &ssl_ctx, boost::beast::flat_buffer &&buffer) : network::ssl_session(srv, std::move(str), ssl_ctx, std::move(buffer)) {}
 
     void run() override;
     void do_eof() override;
