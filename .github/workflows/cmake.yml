@@ -24,9 +24,10 @@ jobs:
             sudo apt-get update
             sudo apt-get install libboost-all-dev
           elif [ "$RUNNER_OS" == "Windows" ]; then
-            choco install boost-msvc-14.3
+            choco install boost-msvc-14.1
+            choco info boost-msvc-14.1
           elif [ "$RUNNER_OS" == "macOS" ]; then
-            brew install boost
+            brew install boost@1.76
           fi
         shell: bash
       
