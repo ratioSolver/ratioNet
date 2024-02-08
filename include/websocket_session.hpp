@@ -40,7 +40,7 @@ namespace network
 
   protected:
     void fire_on_open();
-    void fire_on_message(const std::shared_ptr<const std::string> &msg);
+    void fire_on_message(const std::string &msg);
     void fire_on_close(boost::beast::websocket::close_reason const &cr);
     void fire_on_error(boost::beast::error_code const &ec);
 

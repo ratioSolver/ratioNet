@@ -95,7 +95,7 @@ namespace network::async
         else if (ec)
             return fire_on_error(ec);
 
-        fire_on_message(std::make_shared<const std::string>(boost::beast::buffers_to_string(buffer.data())));
+        fire_on_message(boost::beast::buffers_to_string(buffer.data()));
 
         buffer.consume(buffer.size());
 
@@ -242,7 +242,7 @@ namespace network::async
         else if (ec)
             return fire_on_error(ec);
 
-        fire_on_message(std::make_shared<const std::string>(boost::beast::buffers_to_string(buffer.data())));
+        fire_on_message(boost::beast::buffers_to_string(buffer.data()));
 
         buffer.consume(buffer.size());
 

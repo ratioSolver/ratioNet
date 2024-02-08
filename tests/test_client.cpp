@@ -3,7 +3,7 @@
 
 int main(int argc, char const *argv[])
 {
-    network::client client{"localhost", "8080"};
+    network::client client;
     auto res = client.get<boost::beast::http::string_body>("/");
     std::cout << res << std::endl;
 

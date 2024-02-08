@@ -163,7 +163,14 @@ namespace network
   class ssl_client : public base_client<ssl_client>
   {
   public:
-    ssl_client(const std::string &host = SERVER_ADDRESS, const std::string &port = SERVER_PORT) : base_client(host, port) { connect(); }
+    ssl_client(const std::string &host = SERVER_ADDRESS, const std::string &port = SERVER_PORT) : base_client(host, port)
+    {
+      // Set SNI Hostname (many hosts need this to handshake successfully)
+      if (!SSL_set_tlsext_host_name(stream.native_handle(), host.c_str()))
+        throw boost::beast::system_error{boost::beast::error_code{static_cast<int>(::ERR_get_error()), boost::asio::error::get_ssl_category()}};
+
+      connect();
+    }
     ~ssl_client() { disconnect(); }
 
     boost::beast::ssl_stream<boost::beast::tcp_stream> &get_stream() { return stream; }

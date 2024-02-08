@@ -26,7 +26,7 @@ namespace network
      * @param session The session of the client.
      * @param msg The message sent by the client.
      */
-    websocket_handler &on_message(std::function<void(websocket_session &, std::shared_ptr<const std::string>)> handler)
+    websocket_handler &on_message(std::function<void(websocket_session &, const std::string &)> handler)
     {
       on_message_handler = handler;
       return *this;
@@ -38,7 +38,7 @@ namespace network
      * @param session The session of the client.
      * @param cr The reason for closing the connection.
      */
-    websocket_handler &on_close(std::function<void(websocket_session &, boost::beast::websocket::close_reason const &)> handler)
+    websocket_handler &on_close(std::function<void(websocket_session &, const boost::beast::websocket::close_reason &)> handler)
     {
       on_close_handler = handler;
       return *this;
@@ -58,8 +58,8 @@ namespace network
 
   private:
     std::function<void(websocket_session &)> on_open_handler = [](websocket_session &) {};
-    std::function<void(websocket_session &, std::shared_ptr<const std::string>)> on_message_handler = [](websocket_session &, std::shared_ptr<const std::string>) {};
-    std::function<void(websocket_session &, boost::beast::websocket::close_reason const &)> on_close_handler = [](websocket_session &, boost::beast::websocket::close_reason const &) {};
+    std::function<void(websocket_session &, const std::string &)> on_message_handler = [](websocket_session &, const std::string &) {};
+    std::function<void(websocket_session &, const boost::beast::websocket::close_reason &)> on_close_handler = [](websocket_session &, const boost::beast::websocket::close_reason &) {};
     std::function<void(websocket_session &, boost::beast::error_code const &)> on_error_handler = [](websocket_session &, boost::beast::error_code const &) {};
   };
 } // namespace network
