@@ -26,7 +26,7 @@ if(USE_SSL)
     message(STATUS "TLS version:            ${TLS_VERSION}")
 endif()
 
-add_library(ratioNet src/server.cpp src/async_server.cpp src/http_session.cpp src/websocket_session.cpp)
+add_library(ratioNet src/base_server.cpp src/async_server.cpp src/http_session.cpp src/websocket_session.cpp)
 target_compile_features(ratioNet PUBLIC cxx_std_17)
 target_include_directories(ratioNet PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include)
 target_link_libraries(ratioNet PUBLIC Boost::system)

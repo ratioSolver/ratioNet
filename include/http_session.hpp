@@ -9,14 +9,14 @@
 
 namespace network
 {
-  class server;
+  class base_server;
   class http_handler;
   class websocket_handler;
 
-  class http_session
+  class base_http_session
   {
   public:
-    http_session(server &srv, boost::beast::flat_buffer &&buffer) : srv(srv), buffer(std::move(buffer)) {}
+    base_http_session(base_server &srv, boost::beast::flat_buffer &&buffer) : srv(srv), buffer(std::move(buffer)) {}
 
     virtual void run() = 0;
     virtual void do_eof() = 0;
@@ -67,15 +67,15 @@ namespace network
     void fire_on_error(const boost::beast::error_code &ec);
 
   protected:
-    server &srv;
+    base_server &srv;
     boost::beast::flat_buffer buffer;
     boost::optional<boost::beast::http::request_parser<boost::beast::http::string_body>> parser;
   };
 
-  class plain_session : public http_session
+  class http_session : public base_http_session
   {
   public:
-    plain_session(server &srv, boost::beast::tcp_stream &&str, boost::beast::flat_buffer &&buffer) : http_session(srv, std::move(buffer)), stream(std::move(str)) {}
+    http_session(base_server &srv, boost::beast::tcp_stream &&str, boost::beast::flat_buffer &&buffer) : base_http_session(srv, std::move(buffer)), stream(std::move(str)) {}
 
   protected:
     boost::beast::tcp_stream stream;
@@ -85,7 +85,7 @@ namespace network
   class session_detector
   {
   public:
-    session_detector(server &srv, boost::asio::ip::tcp::socket &&socket, boost::asio::ssl::context &ssl_ctx) : srv(srv), stream(std::move(socket)), ssl_ctx(ssl_ctx) {}
+    session_detector(base_server &srv, boost::asio::ip::tcp::socket &&socket, boost::asio::ssl::context &ssl_ctx) : srv(srv), stream(std::move(socket)), ssl_ctx(ssl_ctx) {}
 
     virtual void run() = 0;
 
@@ -93,16 +93,16 @@ namespace network
     void fire_on_error(const boost::beast::error_code &ec);
 
   protected:
-    server &srv;
+    base_server &srv;
     boost::beast::tcp_stream stream;
     boost::asio::ssl::context &ssl_ctx;
     boost::beast::flat_buffer buffer;
   };
 
-  class ssl_session : public http_session
+  class ssl_session : public base_http_session
   {
   public:
-    ssl_session(server &srv, boost::beast::tcp_stream &&str, boost::asio::ssl::context &ssl_ctx, boost::beast::flat_buffer &&buffer) : http_session(srv, std::move(buffer)), stream(std::move(str), ssl_ctx) {}
+    ssl_session(base_server &srv, boost::beast::tcp_stream &&str, boost::asio::ssl::context &ssl_ctx, boost::beast::flat_buffer &&buffer) : base_http_session(srv, std::move(buffer)), stream(std::move(str), ssl_ctx) {}
 
   protected:
     boost::beast::ssl_stream<boost::beast::tcp_stream> stream;

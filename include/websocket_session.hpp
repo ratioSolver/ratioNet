@@ -10,13 +10,13 @@
 
 namespace network
 {
-  class server;
+  class base_server;
   class websocket_handler;
 
   class websocket_session
   {
   public:
-    websocket_session(server &srv, websocket_handler &handler) : srv(srv), handler(handler) {}
+    websocket_session(base_server &srv, websocket_handler &handler) : srv(srv), handler(handler) {}
     virtual ~websocket_session() = default;
 
     /**
@@ -45,7 +45,7 @@ namespace network
     void fire_on_error(boost::beast::error_code const &ec);
 
   protected:
-    server &srv;
+    base_server &srv;
     websocket_handler &handler;
     boost::beast::flat_buffer buffer;
   };
@@ -53,7 +53,7 @@ namespace network
   class plain_websocket_session : public websocket_session
   {
   public:
-    plain_websocket_session(network::server &srv, boost::beast::tcp_stream &&str, websocket_handler &handler) : network::websocket_session(srv, handler), websocket(std::move(str)) {}
+    plain_websocket_session(network::base_server &srv, boost::beast::tcp_stream &&str, websocket_handler &handler) : network::websocket_session(srv, handler), websocket(std::move(str)) {}
 
   protected:
     boost::beast::websocket::stream<boost::beast::tcp_stream> websocket;
@@ -63,7 +63,7 @@ namespace network
   class ssl_websocket_session : public websocket_session
   {
   public:
-    ssl_websocket_session(network::server &srv, boost::beast::ssl_stream<boost::beast::tcp_stream> &&str, websocket_handler &handler) : network::websocket_session(srv, handler), websocket(std::move(str)) {}
+    ssl_websocket_session(network::base_server &srv, boost::beast::ssl_stream<boost::beast::tcp_stream> &&str, websocket_handler &handler) : network::websocket_session(srv, handler), websocket(std::move(str)) {}
 
   protected:
     boost::beast::websocket::stream<boost::beast::ssl_stream<boost::beast::tcp_stream>> websocket;

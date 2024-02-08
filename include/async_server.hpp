@@ -1,7 +1,7 @@
 #pragma once
 
 #include <queue>
-#include "server.hpp"
+#include "base_server.hpp"
 
 namespace network::async
 {
@@ -49,7 +49,7 @@ namespace network::async
     const std::function<void(const boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> handler;
   };
 
-  class server : public network::server
+  class server : public network::base_server
   {
   public:
     server(const std::string &address = SERVER_ADDRESS, const std::string &port = SERVER_PORT, std::size_t concurrency_hint = std::thread::hardware_concurrency());
@@ -67,10 +67,10 @@ namespace network::async
     void on_accept(boost::beast::error_code ec, boost::asio::ip::tcp::socket socket);
   };
 
-  class plain_session : public network::plain_session, public std::enable_shared_from_this<plain_session>
+  class plain_session : public network::http_session, public std::enable_shared_from_this<plain_session>
   {
   public:
-    plain_session(network::server &srv, boost::beast::tcp_stream &&str, boost::beast::flat_buffer &&buffer) : network::plain_session(srv, std::move(str), std::move(buffer)) {}
+    plain_session(network::base_server &srv, boost::beast::tcp_stream &&str, boost::beast::flat_buffer &&buffer) : network::http_session(srv, std::move(str), std::move(buffer)) {}
 
     void run() override;
     void do_eof() override;
@@ -116,7 +116,7 @@ namespace network::async
   class plain_websocket_session : public network::plain_websocket_session, public std::enable_shared_from_this<plain_websocket_session>
   {
   public:
-    plain_websocket_session(network::server &srv, boost::beast::tcp_stream &&str, websocket_handler &handler) : network::plain_websocket_session(srv, std::move(str), handler) {}
+    plain_websocket_session(network::base_server &srv, boost::beast::tcp_stream &&str, websocket_handler &handler) : network::plain_websocket_session(srv, std::move(str), handler) {}
 
     template <class Body>
     void do_accept(boost::beast::http::request<Body> &&req)
@@ -151,7 +151,7 @@ namespace network::async
   class session_detector : public network::session_detector, public std::enable_shared_from_this<session_detector>
   {
   public:
-    session_detector(network::server &srv, boost::asio::ip::tcp::socket &&socket, boost::asio::ssl::context &ssl_ctx) : network::session_detector(srv, std::move(socket), ssl_ctx) {}
+    session_detector(network::base_server &srv, boost::asio::ip::tcp::socket &&socket, boost::asio::ssl::context &ssl_ctx) : network::session_detector(srv, std::move(socket), ssl_ctx) {}
 
     void run() override;
 
@@ -163,7 +163,7 @@ namespace network::async
   class ssl_session : public network::ssl_session, public std::enable_shared_from_this<ssl_session>
   {
   public:
-    ssl_session(network::server &srv, boost::beast::tcp_stream &&str, boost::asio::ssl::context &ssl_ctx, boost::beast::flat_buffer &&buffer) : network::ssl_session(srv, std::move(str), ssl_ctx, std::move(buffer)) {}
+    ssl_session(network::base_server &srv, boost::beast::tcp_stream &&str, boost::asio::ssl::context &ssl_ctx, boost::beast::flat_buffer &&buffer) : network::ssl_session(srv, std::move(str), ssl_ctx, std::move(buffer)) {}
 
     void run() override;
     void do_eof() override;
@@ -213,7 +213,7 @@ namespace network::async
   class ssl_websocket_session : public network::ssl_websocket_session, public std::enable_shared_from_this<ssl_websocket_session>
   {
   public:
-    ssl_websocket_session(network::server &srv, boost::beast::ssl_stream<boost::beast::tcp_stream> &&str, websocket_handler &handler) : network::ssl_websocket_session(srv, std::move(str), handler) {}
+    ssl_websocket_session(network::base_server &srv, boost::beast::ssl_stream<boost::beast::tcp_stream> &&str, websocket_handler &handler) : network::ssl_websocket_session(srv, std::move(str), handler) {}
 
     template <class Body>
     void do_accept(boost::beast::http::request<Body> &&req)

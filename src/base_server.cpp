@@ -1,9 +1,9 @@
-#include "server.hpp"
+#include "base_server.hpp"
 #include <boost/beast.hpp>
 
 namespace network
 {
-    server::server(const std::string &address, const std::string &port, std::size_t concurrency_hint) : io_ctx(concurrency_hint), signals(io_ctx), endpoint(boost::asio::ip::make_address(address), std::stoi(port)), acceptor(boost::asio::make_strand(io_ctx))
+    base_server::base_server(const std::string &address, const std::string &port, std::size_t concurrency_hint) : io_ctx(concurrency_hint), signals(io_ctx), endpoint(boost::asio::ip::make_address(address), std::stoi(port)), acceptor(boost::asio::make_strand(io_ctx))
     {
         signals.add(SIGINT);
         signals.add(SIGTERM);
@@ -20,7 +20,7 @@ namespace network
         threads.reserve(concurrency_hint);
     }
 
-    void server::start()
+    void base_server::start()
     {
         log_handler("Starting server on " + endpoint.address().to_string() + ":" + std::to_string(endpoint.port()));
 
@@ -50,21 +50,21 @@ namespace network
         io_ctx.run();
     }
 
-    void server::stop()
+    void base_server::stop()
     {
         io_ctx.stop();
         for (auto &thread : threads)
             thread.join();
     }
 
-    websocket_handler &server::ws(const std::string &target)
+    websocket_handler &base_server::ws(const std::string &target)
     {
         ws_routes.emplace_back(std::regex(target), std::make_unique<websocket_handler>());
         return *ws_routes.back().second;
     }
 
 #ifdef USE_SSL
-    void server::set_ssl_context(const std::string &cert_chain_file, const std::string &private_key_file, const std::string &tmp_dh_file)
+    void base_server::set_ssl_context(const std::string &cert_chain_file, const std::string &private_key_file, const std::string &tmp_dh_file)
     {
         ssl_ctx.set_options(boost::asio::ssl::context::default_workarounds | boost::asio::ssl::context::no_sslv2 | boost::asio::ssl::context::no_sslv3 | boost::asio::ssl::context::single_dh_use);
         ssl_ctx.use_certificate_chain_file(cert_chain_file);
@@ -72,21 +72,21 @@ namespace network
         ssl_ctx.use_tmp_dh_file(tmp_dh_file);
     }
 
-    websocket_handler &server::wss(const std::string &target)
+    websocket_handler &base_server::wss(const std::string &target)
     {
         wss_routes.emplace_back(std::regex(target), std::make_unique<websocket_handler>());
         return *wss_routes.back().second;
     }
 #endif
 
-    boost::optional<http_handler &> server::get_http_handler(boost::beast::http::verb method, const std::string &target)
+    boost::optional<http_handler &> base_server::get_http_handler(boost::beast::http::verb method, const std::string &target)
     {
         for (auto &handler : http_routes[method])
             if (std::regex_match(target, handler.first))
                 return *handler.second;
         return boost::none;
     }
-    boost::optional<websocket_handler &> server::get_ws_handler(const std::string &target)
+    boost::optional<websocket_handler &> base_server::get_ws_handler(const std::string &target)
     {
         for (auto &handler : ws_routes)
             if (std::regex_match(target, handler.first))
@@ -95,14 +95,14 @@ namespace network
     }
 
 #ifdef USE_SSL
-    boost::optional<http_handler &> server::get_https_handler(boost::beast::http::verb method, const std::string &target)
+    boost::optional<http_handler &> base_server::get_https_handler(boost::beast::http::verb method, const std::string &target)
     {
         for (auto &handler : https_routes[method])
             if (std::regex_match(target, handler.first))
                 return *handler.second;
         return boost::none;
     }
-    boost::optional<websocket_handler &> server::get_wss_handler(const std::string &target)
+    boost::optional<websocket_handler &> base_server::get_wss_handler(const std::string &target)
     {
         for (auto &handler : wss_routes)
             if (std::regex_match(target, handler.first))
@@ -111,7 +111,7 @@ namespace network
     }
 #endif
 
-    std::map<std::string, std::string> server::parse_query(const std::string &query)
+    std::map<std::string, std::string> base_server::parse_query(const std::string &query)
     {
         std::map<std::string, std::string> params;
 

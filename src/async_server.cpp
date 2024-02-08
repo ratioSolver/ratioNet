@@ -2,7 +2,7 @@
 
 namespace network::async
 {
-    server::server(const std::string &address, const std::string &port, std::size_t concurrency_hint) : network::server(address, port, concurrency_hint) {}
+    server::server(const std::string &address, const std::string &port, std::size_t concurrency_hint) : network::base_server(address, port, concurrency_hint) {}
 
     void server::do_accept() { acceptor.async_accept(boost::asio::make_strand(io_ctx), boost::beast::bind_front_handler(&server::on_accept, this)); }
 

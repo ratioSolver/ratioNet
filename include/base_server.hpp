@@ -9,15 +9,15 @@
 
 namespace network
 {
-  class server
+  class base_server
   {
-    friend class http_session;
+    friend class base_http_session;
 #ifdef USE_SSL
     friend class session_detector;
 #endif
 
   public:
-    server(const std::string &address = SERVER_ADDRESS, const std::string &port = SERVER_PORT, std::size_t concurrency_hint = std::thread::hardware_concurrency());
+    base_server(const std::string &address = SERVER_ADDRESS, const std::string &port = SERVER_PORT, std::size_t concurrency_hint = std::thread::hardware_concurrency());
 
     void start();
 
