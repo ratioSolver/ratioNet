@@ -17,8 +17,8 @@ namespace network
 #endif
 
   inline std::function<void()> default_on_connect_handler = []() {};
-  inline std::function<void(boost::beast::error_code)> default_on_error_handler = []([[maybe_unused]] boost::beast::error_code ec) {};
   inline std::function<void(const std::string &)> default_on_message_handler = []([[maybe_unused]] const std::string &message) {};
+  inline std::function<void(boost::beast::error_code)> default_on_error_handler = []([[maybe_unused]] boost::beast::error_code ec) {};
   inline std::function<void()> default_on_close_handler = []() {};
 
   template <class Derived>
@@ -32,7 +32,7 @@ namespace network
     Derived &derived() { return static_cast<Derived &>(*this); }
 
   public:
-    base_ws_client(const std::string &host = SERVER_ADDRESS, const std::string &port = SERVER_PORT, const std::string &path = "/ws", std::function<void()> on_connect_handler = default_on_connect_handler, std::function<void(boost::beast::error_code)> on_error_handler = default_on_error_handler, std::function<void(const std::string &)> on_message_handler = default_on_message_handler, std::function<void()> on_close_handler = default_on_close_handler) : host(host), port(port), path(path), on_connect_handler(on_connect_handler), on_error_handler(on_error_handler), on_message_handler(on_message_handler), on_close_handler(on_close_handler)
+    base_ws_client(const std::string &host = SERVER_ADDRESS, const std::string &port = SERVER_PORT, const std::string &path = "/ws", std::function<void()> on_connect_handler = default_on_connect_handler, std::function<void(const std::string &)> on_message_handler = default_on_message_handler, std::function<void(boost::beast::error_code)> on_error_handler = default_on_error_handler, std::function<void()> on_close_handler = default_on_close_handler) : host(host), port(port), path(path), on_connect_handler(on_connect_handler), on_message_handler(on_message_handler), on_error_handler(on_error_handler), on_close_handler(on_close_handler)
     {
 #ifdef SIGQUIT
       signals.add(SIGQUIT);
@@ -135,7 +135,7 @@ namespace network
   class ws_client : public base_ws_client<ws_client>
   {
   public:
-    ws_client(const std::string &host = SERVER_ADDRESS, const std::string &port = SERVER_PORT, const std::string &path = "/ws", std::function<void()> on_connect_handler = default_on_connect_handler, std::function<void(boost::beast::error_code)> on_error_handler = default_on_error_handler, std::function<void(const std::string &)> on_message_handler = default_on_message_handler, std::function<void()> on_close_handler = default_on_close_handler) : base_ws_client(host, port, path, on_connect_handler, on_error_handler, on_message_handler, on_close_handler) { do_resolve(); }
+    ws_client(const std::string &host = SERVER_ADDRESS, const std::string &port = SERVER_PORT, const std::string &path = "/ws", std::function<void()> on_connect_handler = default_on_connect_handler, std::function<void(const std::string &)> on_message_handler = default_on_message_handler, std::function<void(boost::beast::error_code)> on_error_handler = default_on_error_handler, std::function<void()> on_close_handler = default_on_close_handler) : base_ws_client(host, port, path, on_connect_handler, on_message_handler, on_error_handler, on_close_handler) { do_resolve(); }
 
     boost::beast::websocket::stream<boost::beast::tcp_stream> &get_stream() { return stream; }
 
@@ -172,7 +172,7 @@ namespace network
   class wss_client : public base_ws_client<wss_client>
   {
   public:
-    wss_client(const std::string &host = SERVER_ADDRESS, const std::string &port = SERVER_PORT, const std::string &path = "/wss", std::function<void()> on_connect_handler = default_on_connect_handler, std::function<void(boost::beast::error_code)> on_error_handler = default_on_error_handler, std::function<void(const std::string &)> on_message_handler = default_on_message_handler, std::function<void()> on_close_handler = default_on_close_handler) : base_ws_client(host, port, path, on_connect_handler, on_error_handler, on_message_handler, on_close_handler) {}
+    wss_client(const std::string &host = SERVER_ADDRESS, const std::string &port = SERVER_PORT, const std::string &path = "/wss", std::function<void()> on_connect_handler = default_on_connect_handler, std::function<void(const std::string &)> on_message_handler = default_on_message_handler, std::function<void(boost::beast::error_code)> on_error_handler = default_on_error_handler, std::function<void()> on_close_handler = default_on_close_handler) : base_ws_client(host, port, path, on_connect_handler, on_message_handler, on_error_handler, on_close_handler) { do_resolve(); }
 
     boost::beast::websocket::stream<boost::beast::ssl_stream<boost::beast::tcp_stream>> &get_stream() { return stream; }
 
