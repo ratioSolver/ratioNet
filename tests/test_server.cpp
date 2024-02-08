@@ -5,8 +5,6 @@
 using string_req = boost::beast::http::request<boost::beast::http::string_body>;
 using string_res = boost::beast::http::response<boost::beast::http::string_body>;
 
-#define GET(server, target, handler) server.add_route(boost::beast::http::verb::get, target, std::function{handler})
-
 void test_plain_async_server()
 {
     network::async::server server;

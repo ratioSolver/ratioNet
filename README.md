@@ -38,18 +38,19 @@ using string_res = boost::beast::http::response<boost::beast::http::string_body>
 int main()
 {
     // Create the server instance
-    network::server server;
+    network::async::server server;
+    server.set_log_handler([](const std::string &msg) { std::cout << msg << std::endl; });
+    server.set_error_handler([](const std::string &msg) { std::cerr << msg << std::endl; });
 
     // Add a GET route to the server
-    server.add_route(boost::beast::http::verb::get, "/", std::function{[](const string_req &, string_res &res)
+    GET(server, "/", (const string_req &, string_res &res)
     {
         res.set(boost::beast::http::field::content_type, "html");
         res.body() = R"(<html><body><h1>Hello, world!</h1></body></html>)";
-    }});
+    });
 
     // Add a WebSocket route to the server
-    server.add_ws_route("/ws").on_open([](network::websocket_session &session)
-    { session.send("Hello, world!"); });
+    server.ws("/ws").on_open([](network::websocket_session &session) { session.send("Hello, world!"); });
 
     // Start the server
     server.start();
@@ -68,16 +69,10 @@ using string_res = boost::beast::http::response<boost::beast::http::string_body>
 int main()
 {
     // Create the client instance
-    network::plain_client client("localhost", "8080", []() { std::cout << "Connected!" << std::endl; });
+    network::client client("localhost", "8080");
 
     // Send a GET request to the server
-    auto res = client.get("/", std::function{[](const string_res &res, boost::beast::error_code ec)
-    {
-        if (ec)
-            std::cout << "Error: " << ec.message() << std::endl;
-        else
-            std::cout << res.body() << std::endl;
-    }});
+    auto res = client.get<boost::beast::http::string_body>("/");
 
     return 0;
 }
@@ -87,16 +82,26 @@ Finally, here's an example of how to create a WebSocket client:
 
 ```cpp
 #include <ws_client.hpp>
+#include <iostream>
 
 int main()
 {
     // Create the client instance
-    network::plain_ws_client client("localhost", "8080", "/ws",
-        []() { std::cout << "Connected!" << std::endl; },
-        [](const std::string &msg) { std::cout << "Received: " << msg << std::endl; });
+    auto client = std::make_shared<network::ws_client>(
+        "localhost", SERVER_PORT, "/ws", []()
+        { std::cout << "Connected" << std::endl; },
+        [](const std::string &message)
+        { std::cout << "Received message: " << message << std::endl; },
+        [](boost::beast::error_code ec)
+        { std::cerr << ec.message() << std::endl; },
+        []()
+        { std::cout << "Connection closed" << std::endl; });
+
+    // Connect to the server
+    client->connect();
 
     // Send a message to the server
-    client.send("Hello, world!");
+    client->send("Hello, world!");
 
     return 0;
 }
