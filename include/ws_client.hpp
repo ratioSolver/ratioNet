@@ -22,7 +22,7 @@ namespace network
   inline std::function<void()> default_on_close_handler = []() {};
 
   template <class Derived>
-  class base_ws_client
+  class base_ws_client : public std::enable_shared_from_this<Derived>
   {
     friend class ws_client;
 #ifdef USE_SSL
@@ -32,24 +32,19 @@ namespace network
     Derived &derived() { return static_cast<Derived &>(*this); }
 
   public:
-    base_ws_client(const std::string &host = SERVER_ADDRESS, const std::string &port = SERVER_PORT, const std::string &path = "/ws", std::function<void()> on_connect_handler = default_on_connect_handler, std::function<void(const std::string &)> on_message_handler = default_on_message_handler, std::function<void(boost::beast::error_code)> on_error_handler = default_on_error_handler, std::function<void()> on_close_handler = default_on_close_handler) : host(host), port(port), path(path), on_connect_handler(on_connect_handler), on_message_handler(on_message_handler), on_error_handler(on_error_handler), on_close_handler(on_close_handler)
-    {
-#ifdef SIGQUIT
-      signals.add(SIGQUIT);
-#endif
-      signals.async_wait([this](boost::beast::error_code, int)
-                         { close(); });
-    }
+    base_ws_client(const std::string &host = SERVER_ADDRESS, const std::string &port = SERVER_PORT, const std::string &path = "/ws", std::function<void()> on_connect_handler = default_on_connect_handler, std::function<void(const std::string &)> on_message_handler = default_on_message_handler, std::function<void(boost::beast::error_code)> on_error_handler = default_on_error_handler, std::function<void()> on_close_handler = default_on_close_handler) : host(host), port(port), path(path), on_connect_handler(on_connect_handler), on_message_handler(on_message_handler), on_error_handler(on_error_handler), on_close_handler(on_close_handler) {}
     virtual ~base_ws_client() = default;
+
+    void connect() { do_resolve(); }
 
     void send(const std::string &&msg) { enqueue(std::make_shared<const std::string>(std::move(msg))); }
 
-    void send(const std::shared_ptr<const std::string> &msg) { boost::asio::post(derived().get_stream().get_executor(), boost::beast::bind_front_handler(&base_ws_client::enqueue, this, msg)); }
+    void send(const std::shared_ptr<const std::string> &msg) { boost::asio::post(derived().get_stream().get_executor(), boost::beast::bind_front_handler(&base_ws_client::enqueue, this->shared_from_this(), msg)); }
 
-    void close() { derived().get_stream().async_close(boost::beast::websocket::close_code::normal, boost::beast::bind_front_handler(&base_ws_client::on_close, this)); }
+    void disconnect() { derived().get_stream().async_close(boost::beast::websocket::close_code::normal, boost::beast::bind_front_handler(&base_ws_client::on_close, this->shared_from_this())); }
 
   private:
-    void do_resolve() { resolver.async_resolve(host, port, boost::beast::bind_front_handler(&base_ws_client::on_resolve, this)); }
+    void do_resolve() { resolver.async_resolve(host, port, boost::beast::bind_front_handler(&base_ws_client::on_resolve, this->shared_from_this())); }
 
     void on_resolve(boost::beast::error_code ec, boost::asio::ip::tcp::resolver::results_type results)
     {
@@ -60,7 +55,7 @@ namespace network
       boost::beast::get_lowest_layer(derived().get_stream()).expires_after(std::chrono::seconds(30));
 
       // Make the connection on the IP address we get from a lookup
-      boost::beast::get_lowest_layer(derived().get_stream()).async_connect(results, boost::beast::bind_front_handler(&base_ws_client::on_connect, this));
+      boost::beast::get_lowest_layer(derived().get_stream()).async_connect(results, boost::beast::bind_front_handler(&base_ws_client::on_connect, this->shared_from_this()));
     }
 
     virtual void on_connect(boost::beast::error_code ec, boost::asio::ip::tcp::resolver::results_type::endpoint_type ep) = 0;
@@ -86,7 +81,7 @@ namespace network
       do_write();
     }
 
-    void do_read() { derived().get_stream().async_read(buffer, boost::beast::bind_front_handler(&base_ws_client::on_read, this)); }
+    void do_read() { derived().get_stream().async_read(buffer, boost::beast::bind_front_handler(&base_ws_client::on_read, this->shared_from_this())); }
     void on_read(boost::beast::error_code ec, [[maybe_unused]] std::size_t bytes_transferred)
     {
       if (ec)
@@ -95,7 +90,7 @@ namespace network
       on_message_handler(boost::beast::buffers_to_string(buffer.data()));
     }
 
-    void do_write() { derived().get_stream().async_write(boost::asio::buffer(*send_queue.front()), boost::asio::bind_executor(derived().get_stream().get_executor(), boost::beast::bind_front_handler(&base_ws_client::on_write, this))); }
+    void do_write() { derived().get_stream().async_write(boost::asio::buffer(*send_queue.front()), boost::asio::bind_executor(derived().get_stream().get_executor(), boost::beast::bind_front_handler(&base_ws_client::on_write, this->shared_from_this()))); }
     void on_write(boost::beast::error_code ec, [[maybe_unused]] std::size_t bytes_transferred)
     {
       if (ec)
@@ -120,7 +115,6 @@ namespace network
     std::string port;
     std::string path;
     boost::asio::strand<boost::asio::system_executor> strand{boost::asio::system_executor()};
-    boost::asio::signal_set signals{strand, SIGINT, SIGTERM};
     boost::asio::ip::tcp::resolver resolver{strand};
     boost::beast::flat_buffer buffer;
     std::function<void()> on_connect_handler;
@@ -135,7 +129,7 @@ namespace network
   class ws_client : public base_ws_client<ws_client>
   {
   public:
-    ws_client(const std::string &host = SERVER_ADDRESS, const std::string &port = SERVER_PORT, const std::string &path = "/ws", std::function<void()> on_connect_handler = default_on_connect_handler, std::function<void(const std::string &)> on_message_handler = default_on_message_handler, std::function<void(boost::beast::error_code)> on_error_handler = default_on_error_handler, std::function<void()> on_close_handler = default_on_close_handler) : base_ws_client(host, port, path, on_connect_handler, on_message_handler, on_error_handler, on_close_handler) { do_resolve(); }
+    ws_client(const std::string &host = SERVER_ADDRESS, const std::string &port = SERVER_PORT, const std::string &path = "/ws", std::function<void()> on_connect_handler = default_on_connect_handler, std::function<void(const std::string &)> on_message_handler = default_on_message_handler, std::function<void(boost::beast::error_code)> on_error_handler = default_on_error_handler, std::function<void()> on_close_handler = default_on_close_handler) : base_ws_client(host, port, path, on_connect_handler, on_message_handler, on_error_handler, on_close_handler) {}
 
     boost::beast::websocket::stream<boost::beast::tcp_stream> &get_stream() { return stream; }
 
@@ -161,7 +155,7 @@ namespace network
       host += ':' + std::to_string(ep.port());
 
       // Perform the websocket handshake
-      stream.async_handshake(host, path, boost::beast::bind_front_handler(&base_ws_client::on_handshake, this));
+      stream.async_handshake(host, path, boost::beast::bind_front_handler(&base_ws_client::on_handshake, this->shared_from_this()));
     }
 
   private:
@@ -172,7 +166,7 @@ namespace network
   class wss_client : public base_ws_client<wss_client>
   {
   public:
-    wss_client(const std::string &host = SERVER_ADDRESS, const std::string &port = SERVER_PORT, const std::string &path = "/wss", std::function<void()> on_connect_handler = default_on_connect_handler, std::function<void(const std::string &)> on_message_handler = default_on_message_handler, std::function<void(boost::beast::error_code)> on_error_handler = default_on_error_handler, std::function<void()> on_close_handler = default_on_close_handler) : base_ws_client(host, port, path, on_connect_handler, on_message_handler, on_error_handler, on_close_handler) { do_resolve(); }
+    wss_client(const std::string &host = SERVER_ADDRESS, const std::string &port = SERVER_PORT, const std::string &path = "/wss", std::function<void()> on_connect_handler = default_on_connect_handler, std::function<void(const std::string &)> on_message_handler = default_on_message_handler, std::function<void(boost::beast::error_code)> on_error_handler = default_on_error_handler, std::function<void()> on_close_handler = default_on_close_handler) : base_ws_client(host, port, path, on_connect_handler, on_message_handler, on_error_handler, on_close_handler) {}
 
     boost::beast::websocket::stream<boost::beast::ssl_stream<boost::beast::tcp_stream>> &get_stream() { return stream; }
 
@@ -198,7 +192,7 @@ namespace network
       host += ':' + std::to_string(ep.port());
 
       // Perform the SSL handshake
-      stream.next_layer().async_handshake(boost::asio::ssl::stream_base::client, boost::beast::bind_front_handler(&wss_client::on_ssl_handshake, this));
+      stream.next_layer().async_handshake(boost::asio::ssl::stream_base::client, boost::beast::bind_front_handler(&wss_client::on_ssl_handshake, this->shared_from_this()));
     }
 
     void on_ssl_handshake(boost::beast::error_code ec)
@@ -218,7 +212,7 @@ namespace network
                                                                         { req.set(boost::beast::http::field::user_agent, "ratioNet wss_client"); }));
 
       // Perform the websocket handshake
-      stream.async_handshake(host, path, boost::beast::bind_front_handler(&base_ws_client::on_handshake, this));
+      stream.async_handshake(host, path, boost::beast::bind_front_handler(&base_ws_client::on_handshake, this->shared_from_this()));
     }
 
   private:

@@ -3,6 +3,11 @@
 #include <queue>
 #include "base_server.hpp"
 
+#define GET(server, target, handler) server.add_route(boost::beast::http::verb::get, target, std::function{handler})
+#define POST(server, target, handler) server.add_route(boost::beast::http::verb::post, target, std::function{handler})
+#define PUT(server, target, handler) server.add_route(boost::beast::http::verb::put, target, std::function{handler})
+#define DELETE(server, target, handler) server.add_route(boost::beast::http::verb::delete_, target, std::function{handler})
+
 namespace network::async
 {
   class plain_session;

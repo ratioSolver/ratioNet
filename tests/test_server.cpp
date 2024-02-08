@@ -19,14 +19,6 @@ void test_plain_async_server()
             res.set(boost::beast::http::field::content_type, "html");
             res.body() = R"(<html><body><h1>Hello, world!</h1></body></html>)"; });
 
-    server.ws("/ws")
-        .on_open([](network::websocket_session &)
-                 { std::cout << "New connection" << std::endl; })
-        .on_message([](network::websocket_session &, const std::string &msg)
-                    { std::cout << "Received message: " << msg << std::endl; })
-        .on_close([](network::websocket_session &, const boost::beast::websocket::close_reason)
-                  { std::cout << "Connection closed" << std::endl; });
-
     std::thread t{[&server]
                   { server.start(); }};
 
@@ -59,8 +51,7 @@ void test_ws_server()
 
     server.ws("/ws")
         .on_open([](network::websocket_session &session)
-                 {
-                    std::cout << "New connection" << std::endl; })
+                 { std::cout << "New connection" << std::endl; })
         .on_message([](network::websocket_session &, const std::string &msg)
                     { std::cout << "Received message: " << msg << std::endl; })
         .on_close([](network::websocket_session &, const boost::beast::websocket::close_reason)
@@ -69,13 +60,14 @@ void test_ws_server()
     std::thread t{[&server]
                   { server.start(); }};
 
-    std::this_thread::sleep_for(std::chrono::seconds(1000));
+    std::this_thread::sleep_for(std::chrono::seconds(10));
     server.stop();
     t.join();
 }
 
 int main(int argc, char const *argv[])
 {
+    test_plain_async_server();
     test_ws_server();
 
     return 0;
