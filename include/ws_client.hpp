@@ -32,7 +32,14 @@ namespace network
     Derived &derived() { return static_cast<Derived &>(*this); }
 
   public:
-    base_ws_client(const std::string &host = SERVER_ADDRESS, const std::string &port = SERVER_PORT, const std::string &path = "/ws", std::function<void()> on_connect_handler = default_on_connect_handler, std::function<void(boost::beast::error_code)> on_error_handler = default_on_error_handler, std::function<void(const std::string &)> on_message_handler = default_on_message_handler, std::function<void()> on_close_handler = default_on_close_handler) : host(host), port(port), path(path), on_connect_handler(on_connect_handler), on_error_handler(on_error_handler), on_message_handler(on_message_handler), on_close_handler(on_close_handler) {}
+    base_ws_client(const std::string &host = SERVER_ADDRESS, const std::string &port = SERVER_PORT, const std::string &path = "/ws", std::function<void()> on_connect_handler = default_on_connect_handler, std::function<void(boost::beast::error_code)> on_error_handler = default_on_error_handler, std::function<void(const std::string &)> on_message_handler = default_on_message_handler, std::function<void()> on_close_handler = default_on_close_handler) : host(host), port(port), path(path), on_connect_handler(on_connect_handler), on_error_handler(on_error_handler), on_message_handler(on_message_handler), on_close_handler(on_close_handler)
+    {
+#ifdef SIGQUIT
+      signals.add(SIGQUIT);
+#endif
+      signals.async_wait([this](boost::beast::error_code, int)
+                         { close(); });
+    }
     virtual ~base_ws_client() = default;
 
     void send(const std::string &&msg) { enqueue(std::make_shared<const std::string>(std::move(msg))); }
@@ -112,8 +119,9 @@ namespace network
     std::string host;
     std::string port;
     std::string path;
-    boost::asio::io_context ioc;
-    boost::asio::ip::tcp::resolver resolver{ioc};
+    boost::asio::strand<boost::asio::system_executor> strand{boost::asio::system_executor()};
+    boost::asio::signal_set signals{strand, SIGINT, SIGTERM};
+    boost::asio::ip::tcp::resolver resolver{strand};
     boost::beast::flat_buffer buffer;
     std::function<void()> on_connect_handler;
     std::function<void(boost::beast::error_code)> on_error_handler;
@@ -157,7 +165,7 @@ namespace network
     }
 
   private:
-    boost::beast::websocket::stream<boost::beast::tcp_stream> stream{ioc};
+    boost::beast::websocket::stream<boost::beast::tcp_stream> stream{strand};
   };
 
 #ifdef USE_SSL
@@ -215,7 +223,7 @@ namespace network
 
   private:
     boost::asio::ssl::context ssl_ctx{boost::asio::ssl::context::TLS_VERSION};
-    boost::beast::websocket::stream<boost::beast::ssl_stream<boost::beast::tcp_stream>> stream{ioc, ssl_ctx};
+    boost::beast::websocket::stream<boost::beast::ssl_stream<boost::beast::tcp_stream>> stream{strand, ssl_ctx};
   };
 #endif
 } // namespace network
