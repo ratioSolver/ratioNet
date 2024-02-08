@@ -52,7 +52,7 @@ namespace network::async
   class server : public network::server
   {
   public:
-    server(const std::string &address = "0.0.0.0", unsigned short port = 8080, std::size_t concurrency_hint = std::thread::hardware_concurrency());
+    server(const std::string &address = SERVER_ADDRESS, const std::string &port = SERVER_PORT, std::size_t concurrency_hint = std::thread::hardware_concurrency());
 
     template <class ReqBody, class ResBody>
     void add_route(boost::beast::http::verb method, const std::string &path, const std::function<void(const boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> &handler) { http_routes[method].emplace_back(std::regex(path), std::make_unique<http_handler<plain_session, ReqBody, ResBody>>(handler)); }

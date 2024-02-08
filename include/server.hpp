@@ -17,7 +17,7 @@ namespace network
 #endif
 
   public:
-    server(const std::string &address = "0.0.0.0", unsigned short port = 8080, std::size_t concurrency_hint = std::thread::hardware_concurrency());
+    server(const std::string &address = SERVER_ADDRESS, const std::string &port = SERVER_PORT, std::size_t concurrency_hint = std::thread::hardware_concurrency());
 
     void start();
 

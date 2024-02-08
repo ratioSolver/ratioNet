@@ -15,7 +15,7 @@ namespace network
     Derived &derived() { return static_cast<Derived &>(*this); }
 
   public:
-    base_client(const std::string &host, const std::string &port) : host(host), port(port), resolver(ioc)
+    base_client(const std::string &host = SERVER_ADDRESS, const std::string &port = SERVER_PORT) : host(host), port(port), resolver(ioc)
     {
       boost::beast::error_code ec;
       auto results = resolver.resolve(host, port, ec);
@@ -147,7 +147,7 @@ namespace network
   class client : public base_client<client>
   {
   public:
-    client(const std::string &host, const std::string &port) : base_client(host, port) { connect(); }
+    client(const std::string &host = SERVER_ADDRESS, const std::string &port = SERVER_PORT) : base_client(host, port) { connect(); }
     ~client() { disconnect(); }
 
     boost::beast::tcp_stream &get_stream() { return stream; }
@@ -163,7 +163,7 @@ namespace network
   class ssl_client : public base_client<ssl_client>
   {
   public:
-    ssl_client(const std::string &host, const std::string &port) : base_client(host, port) { connect(); }
+    ssl_client(const std::string &host = SERVER_ADDRESS, const std::string &port = SERVER_PORT) : base_client(host, port) { connect(); }
     ~ssl_client() { disconnect(); }
 
     boost::beast::ssl_stream<boost::beast::tcp_stream> &get_stream() { return stream; }
