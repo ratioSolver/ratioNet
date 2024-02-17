@@ -153,7 +153,19 @@ namespace network
     boost::beast::tcp_stream &get_stream() { return stream; }
 
     void connect() override { stream.connect(resolver.resolve(host, port)); }
-    void disconnect() override { stream.socket().shutdown(boost::asio::ip::tcp::socket::shutdown_both); }
+    void disconnect() override
+    {
+      boost::beast::error_code ec;
+      stream.socket().shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
+      if (ec == boost::asio::error::eof)
+      {
+        // Rationale:
+        // http://stackoverflow.com/questions/25587403/boost-asio-ssl-async-shutdown-always-finishes-with-an-error
+        ec = {};
+      }
+      if (ec)
+        throw boost::beast::system_error{ec};
+    }
 
   protected:
     boost::beast::tcp_stream stream{ioc};
@@ -180,7 +192,19 @@ namespace network
       stream.next_layer().connect(resolver.resolve(host, port));
       stream.handshake(boost::asio::ssl::stream_base::client);
     }
-    void disconnect() override { stream.next_layer().socket().shutdown(boost::asio::ip::tcp::socket::shutdown_both); }
+    void disconnect() override
+    {
+      boost::beast::error_code ec;
+      stream.next_layer().socket().shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
+      if (ec == boost::asio::error::eof)
+      {
+        // Rationale:
+        // http://stackoverflow.com/questions/25587403/boost-asio-ssl-async-shutdown-always-finishes-with-an-error
+        ec = {};
+      }
+      if (ec)
+        throw boost::beast::system_error{ec};
+    }
 
   protected:
     boost::asio::ssl::context ssl_ctx{boost::asio::ssl::context::TLS_VERSION};
