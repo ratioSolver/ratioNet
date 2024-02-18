@@ -120,9 +120,9 @@ namespace network
     template <class ReqBody, class ResBody>
     boost::beast::http::response<ResBody> send(boost::beast::http::request<ReqBody> &&req)
     {
+      connect();
       req.prepare_payload();
       boost::beast::http::response<ResBody> res;
-      boost::beast::get_lowest_layer(derived().get_stream()).expires_after(std::chrono::seconds(30));
       boost::beast::error_code ec;
       boost::beast::http::write(derived().get_stream(), req, ec);
       if (ec)
@@ -131,6 +131,8 @@ namespace network
       boost::beast::http::read(derived().get_stream(), buffer, res, ec);
       if (ec)
         throw boost::beast::system_error{ec};
+      if (!res.keep_alive())
+        disconnect();
       return res;
     }
 
@@ -147,12 +149,21 @@ namespace network
   class client : public base_client<client>
   {
   public:
-    client(const std::string &host = SERVER_ADDRESS, const std::string &port = SERVER_PORT) : base_client(host, port) { connect(); }
+    client(const std::string &host = SERVER_ADDRESS, const std::string &port = SERVER_PORT) : base_client(host, port) {}
     ~client() { disconnect(); }
 
     boost::beast::tcp_stream &get_stream() { return stream; }
 
-    void connect() override { stream.connect(resolver.resolve(host, port)); }
+    void connect() override
+    {
+      boost::beast::error_code ec;
+      auto results = resolver.resolve(host, port, ec);
+      if (ec)
+        throw boost::beast::system_error{ec};
+      stream.connect(results, ec);
+      if (ec)
+        throw boost::beast::system_error{ec};
+    }
     void disconnect() override
     {
       boost::beast::error_code ec;
@@ -180,8 +191,6 @@ namespace network
       // Set SNI Hostname (many hosts need this to handshake successfully)
       if (!SSL_set_tlsext_host_name(stream.native_handle(), host.c_str()))
         throw boost::beast::system_error{boost::beast::error_code{static_cast<int>(::ERR_get_error()), boost::asio::error::get_ssl_category()}};
-
-      connect();
     }
     ~ssl_client() { disconnect(); }
 
@@ -189,8 +198,16 @@ namespace network
 
     void connect() override
     {
-      stream.next_layer().connect(resolver.resolve(host, port));
-      stream.handshake(boost::asio::ssl::stream_base::client);
+      boost::beast::error_code ec;
+      auto results = resolver.resolve(host, port, ec);
+      if (ec)
+        throw boost::beast::system_error{ec};
+      stream.next_layer().connect(results, ec);
+      if (ec)
+        throw boost::beast::system_error{ec};
+      stream.handshake(boost::asio::ssl::stream_base::client, ec);
+      if (ec)
+        throw boost::beast::system_error{ec};
     }
     void disconnect() override
     {
