@@ -1,10 +1,12 @@
 #pragma once
 
 #include <boost/asio.hpp>
-#include <boost/asio/ssl.hpp>
 #include <boost/beast.hpp>
 #include <boost/beast/http.hpp>
+#ifdef USE_SSL
+#include <boost/asio/ssl.hpp>
 #include <boost/beast/ssl.hpp>
+#endif
 #include <boost/beast/websocket.hpp>
 #include <functional>
 #include <regex>
@@ -229,6 +231,7 @@ namespace network
     boost::beast::websocket::stream<boost::beast::tcp_stream> websocket;
   };
 
+#ifdef USE_SSL
   class ssl_websocket_session : public websocket_session_impl<ssl_websocket_session>
   {
     friend class websocket_session_impl<ssl_websocket_session>;
@@ -243,6 +246,7 @@ namespace network
   private:
     boost::beast::websocket::stream<boost::beast::ssl_stream<boost::beast::tcp_stream>> websocket;
   };
+#endif
 
   class server_request
   {
@@ -337,11 +341,18 @@ namespace network
   template <class Body>
   void make_websocket_session(server &srv, boost::beast::tcp_stream stream, boost::beast::http::request<Body> req, ws_handler &handler) { std::make_shared<plain_websocket_session>(srv, std::move(stream), handler)->do_accept(std::move(req)); }
 
+#ifdef USE_SSL
   template <class Body>
   void make_websocket_session(server &srv, boost::beast::ssl_stream<boost::beast::tcp_stream> stream, boost::beast::http::request<Body> req, ws_handler &handler) { std::make_shared<ssl_websocket_session>(srv, std::move(stream), handler)->do_accept(std::move(req)); }
+#endif
 
-  boost::optional<http_handler &> get_http_handler(server &srv, boost::beast::http::verb method, const std::string &target, bool ssl);
-  boost::optional<ws_handler &> get_ws_handler(server &srv, const std::string &target, bool ssl);
+  boost::optional<http_handler &> get_http_handler(server &srv, boost::beast::http::verb method, const std::string &target);
+  boost::optional<ws_handler &> get_ws_handler(server &srv, const std::string &target);
+
+#ifdef USE_SSL
+  boost::optional<http_handler &> get_https_handler(server &srv, boost::beast::http::verb method, const std::string &target);
+  boost::optional<ws_handler &> get_wss_handler(server &srv, const std::string &target);
+#endif
 
   template <class Derived>
   class http_session : public std::enable_shared_from_this<Derived>
@@ -352,7 +363,9 @@ namespace network
     http_session(server &srv, boost::beast::flat_buffer &&buffer) : srv(srv), buffer(std::move(buffer)) {}
     virtual ~http_session() = default;
 
+#ifdef USE_SSL
     virtual bool is_ssl() const = 0;
+#endif
 
     template <class Body>
     void enqueue(boost::beast::http::response<Body> &&res) { boost::asio::post(derived().get_stream().get_executor(), boost::beast::bind_front_handler(&http_session::enqueue_response<Body>, this->shared_from_this(), std::move(res))); }
@@ -397,9 +410,17 @@ namespace network
       {                                                                         // If this is a WebSocket upgrade request, transfer control to a WebSocket session
         boost::beast::get_lowest_layer(derived().get_stream()).expires_never(); // Turn off the timeout on the tcp_stream, because the websocket stream has its own timeout system.
         auto req = parser->release();
-        auto handler = get_ws_handler(srv, req.target().to_string(), is_ssl());
+#ifdef USE_SSL
+        auto handler = is_ssl() ? get_wss_handler(srv, req.target().to_string()) : get_ws_handler(srv, req.target().to_string());
+#else
+        auto handler = get_ws_handler(srv, req.target().to_string());
+#endif
         if (handler)
           make_websocket_session(srv, derived().release_stream(), std::move(req), handler.get());
+        else
+        {
+          LOG_WARN("No handler found for WebSocket " << req.target());
+        }
         return;
       }
 
@@ -429,7 +450,12 @@ namespace network
       }
 
       std::string target = req.target().to_string();
-      if (auto handler = get_http_handler(srv, req.method(), target, is_ssl()); handler)
+#ifdef USE_SSL
+      auto handler = is_ssl() ? get_https_handler(srv, req.method(), target) : get_http_handler(srv, req.method(), target);
+#else
+      auto handler = get_http_handler(srv, req.method(), target);
+#endif
+      if (handler)
         return handler.get().handle_request(server_request_impl<Derived, Body>(derived(), std::move(req)));
       else
       {
@@ -478,7 +504,9 @@ namespace network
   public:
     plain_http_session(server &srv, boost::beast::tcp_stream &&str, boost::beast::flat_buffer &&buffer) : http_session(srv, std::move(buffer)), stream(std::move(str)) {}
 
+#ifdef USE_SSL
     bool is_ssl() const override { return false; }
+#endif
 
     void run() { do_read(); }
 
@@ -496,6 +524,7 @@ namespace network
     boost::beast::tcp_stream stream;
   };
 
+#ifdef USE_SSL
   class ssl_http_session : public http_session<ssl_http_session>
   {
     friend class http_session<ssl_http_session>;
@@ -577,6 +606,7 @@ namespace network
     boost::asio::ssl::context &ctx;
     boost::beast::flat_buffer buffer;
   };
+#endif
 
   /**
    * @brief The server class.
@@ -606,31 +636,15 @@ namespace network
       threads.reserve(concurrency_hint);
     }
 
-    void set_log_handler(std::function<void(const std::string &)> handler) { log_handler = handler; }
-    void set_error_handler(std::function<void(const std::string &)> handler) { error_handler = handler; }
-
     template <class ReqBody, class ResBody>
-    void add_route(boost::beast::http::verb method, const std::string &path, const std::function<void(const boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> &handler, bool ssl = false) noexcept
-    {
-      if (ssl)
-        https_routes[method].push_back(std::make_pair(std::regex(path), std::make_unique<http_handler_impl<ssl_http_session, ReqBody, ResBody>>(handler)));
-      else
-        http_routes[method].push_back(std::make_pair(std::regex(path), std::make_unique<http_handler_impl<plain_http_session, ReqBody, ResBody>>(handler)));
-    }
+    void add_route(boost::beast::http::verb method, const std::string &path, const std::function<void(const boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> &handler) noexcept { http_routes[method].push_back(std::make_pair(std::regex(path), std::make_unique<http_handler_impl<plain_http_session, ReqBody, ResBody>>(handler))); }
+    ws_handler &ws(const std::string &path) noexcept { return *ws_routes.emplace_back(std::regex(path), std::make_unique<ws_handler>()).second; }
 
-    ws_handler &ws(const std::string &path, bool ssl = false) noexcept
-    {
-      if (ssl)
-      {
-        wss_routes.push_back(std::make_pair(std::regex(path), std::make_unique<ws_handler>()));
-        return *wss_routes.back().second;
-      }
-      else
-      {
-        ws_routes.push_back(std::make_pair(std::regex(path), std::make_unique<ws_handler>()));
-        return *ws_routes.back().second;
-      }
-    }
+#ifdef USE_SSL
+    template <class ReqBody, class ResBody>
+    void add_ssl_route(boost::beast::http::verb method, const std::string &path, const std::function<void(const boost::beast::http::request<ReqBody> &, boost::beast::http::response<ResBody> &)> &handler) noexcept { https_routes[method].push_back(std::make_pair(std::regex(path), std::make_unique<http_handler_impl<ssl_http_session, ReqBody, ResBody>>(handler))); }
+    ws_handler &wss(const std::string &path) noexcept { return *wss_routes.emplace_back(std::regex(path), std::make_unique<ws_handler>()).second; }
+#endif
 
     /**
      * @brief Start the server.
@@ -687,6 +701,14 @@ namespace network
         thread.join();
     }
 
+#ifdef USE_SSL
+    /**
+     * @brief Set the ssl context.
+     *
+     * @param certificate_file The certificate file.
+     * @param private_key_file The private key file.
+     * @param dh_file The dh file.
+     */
     void set_ssl_context(const std::string &certificate_file, const std::string &private_key_file, const std::string &dh_file)
     {
       ctx.set_options(boost::asio::ssl::context::default_workarounds | boost::asio::ssl::context::no_sslv2 | boost::asio::ssl::context::single_dh_use);
@@ -695,6 +717,7 @@ namespace network
       ctx.use_private_key_file(private_key_file, boost::asio::ssl::context::pem);
       ctx.use_tmp_dh_file(dh_file);
     }
+#endif
 
   private:
     void do_accept() { acceptor.async_accept(boost::asio::make_strand(io_ctx), boost::beast::bind_front_handler(&server::on_accept, this)); }
@@ -708,26 +731,37 @@ namespace network
       else
       {
         LOG_DEBUG("Accepted connection from " << socket.remote_endpoint());
+#ifdef USE_SSL
         std::make_shared<session_detector>(*this, std::move(socket), ctx)->run();
+#else
+        std::make_shared<plain_http_session>(*this, boost::beast::tcp_stream(std::move(socket)), boost::beast::flat_buffer())->run();
+#endif
       }
 
       do_accept();
     }
 
-    friend boost::optional<http_handler &> get_http_handler(server &srv, boost::beast::http::verb method, const std::string &target, bool ssl);
-    friend boost::optional<ws_handler &> get_ws_handler(server &srv, const std::string &target, bool ssl);
+    friend boost::optional<http_handler &> get_http_handler(server &srv, boost::beast::http::verb method, const std::string &target);
+    friend boost::optional<ws_handler &> get_ws_handler(server &srv, const std::string &target);
+
+#ifdef USE_SSL
+    friend boost::optional<http_handler &> get_https_handler(server &srv, boost::beast::http::verb method, const std::string &target);
+    friend boost::optional<ws_handler &> get_wss_handler(server &srv, const std::string &target);
+#endif
 
   private:
-    std::function<void(const std::string &)> log_handler = [](const std::string &) {};
-    std::function<void(const std::string &)> error_handler = [](const std::string &) {};
-    boost::asio::io_context io_ctx;                                        // The io_context is required for all I/O
-    std::vector<std::thread> threads;                                      // The thread pool
-    boost::asio::signal_set signals;                                       // The signal_set is used to register for process termination notifications
-    boost::asio::ip::tcp::endpoint endpoint;                               // The endpoint for the server
+    boost::asio::io_context io_ctx;          // The io_context is required for all I/O
+    std::vector<std::thread> threads;        // The thread pool
+    boost::asio::signal_set signals;         // The signal_set is used to register for process termination notifications
+    boost::asio::ip::tcp::endpoint endpoint; // The endpoint for the server
+    boost::asio::ip::tcp::acceptor acceptor; // The acceptor receives incoming connections
+    std::unordered_map<boost::beast::http::verb, std::vector<std::pair<std::regex, std::unique_ptr<http_handler>>>> http_routes;
+    std::vector<std::pair<std::regex, std::unique_ptr<ws_handler>>> ws_routes;
+#ifdef USE_SSL
     boost::asio::ssl::context ctx{boost::asio::ssl::context::TLS_VERSION}; // The SSL context is required, and holds certificates
-    boost::asio::ip::tcp::acceptor acceptor;                               // The acceptor receives incoming connections
-    std::unordered_map<boost::beast::http::verb, std::vector<std::pair<std::regex, std::unique_ptr<http_handler>>>> http_routes, https_routes;
-    std::vector<std::pair<std::regex, std::unique_ptr<ws_handler>>> ws_routes, wss_routes;
+    std::unordered_map<boost::beast::http::verb, std::vector<std::pair<std::regex, std::unique_ptr<http_handler>>>> https_routes;
+    std::vector<std::pair<std::regex, std::unique_ptr<ws_handler>>> wss_routes;
+#endif
   };
 
   /**
@@ -740,9 +774,9 @@ namespace network
    * @param target The target.
    * @param ssl Whether the connection is ssl or not.
    */
-  inline boost::optional<http_handler &> get_http_handler(server &srv, boost::beast::http::verb method, const std::string &target, bool ssl = false)
+  inline boost::optional<http_handler &> get_http_handler(server &srv, boost::beast::http::verb method, const std::string &target)
   {
-    for (auto &handler : ssl ? srv.https_routes[method] : srv.http_routes[method])
+    for (auto &handler : srv.http_routes[method])
       if (std::regex_match(target, handler.first))
         return *handler.second;
     return boost::none;
@@ -757,13 +791,50 @@ namespace network
    * @param target The target.
    * @param ssl Whether the connection is ssl or not.
    */
-  inline boost::optional<ws_handler &> get_ws_handler(server &srv, const std::string &target, bool ssl = false)
+  inline boost::optional<ws_handler &> get_ws_handler(server &srv, const std::string &target)
   {
-    for (auto &handler : ssl ? srv.wss_routes : srv.ws_routes)
+    for (auto &handler : srv.ws_routes)
       if (std::regex_match(target, handler.first))
         return *handler.second;
     return boost::none;
   }
+
+#ifdef USE_SSL
+  /**
+   * @brief Get the http handler object.
+   *
+   * Returns the http handler for the given method and target.
+   *
+   * @param srv The server.
+   * @param method The http method.
+   * @param target The target.
+   * @param ssl Whether the connection is ssl or not.
+   */
+  inline boost::optional<http_handler &> get_https_handler(server &srv, boost::beast::http::verb method, const std::string &target)
+  {
+    for (auto &handler : srv.https_routes[method])
+      if (std::regex_match(target, handler.first))
+        return *handler.second;
+    return boost::none;
+  }
+
+  /**
+   * @brief Get the websocket handler object.
+   *
+   * Returns the websocket handler for the given target.
+   *
+   * @param srv The server.
+   * @param target The target.
+   * @param ssl Whether the connection is ssl or not.
+   */
+  inline boost::optional<ws_handler &> get_wss_handler(server &srv, const std::string &target)
+  {
+    for (auto &handler : srv.wss_routes)
+      if (std::regex_match(target, handler.first))
+        return *handler.second;
+    return boost::none;
+  }
+#endif
 
   inline std::map<std::string, std::string> parse_query(const std::string &query)
   {

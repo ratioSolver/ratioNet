@@ -6,10 +6,10 @@ enable_testing()
 
 find_package(Boost REQUIRED COMPONENTS system)
 
-option(USE_SSL "Use Secure Sockets Layer (SSL) for secure communication" ON)
+option(USE_SSL "Use Secure Sockets Layer (SSL) for secure communication" OFF)
 set(SERVER_ADDRESS "0.0.0.0" CACHE STRING "The address the server listens on")
 set(SERVER_PORT "8080" CACHE STRING "The port the server listens on")
-option(VERBOSE_LOG "Enable verbose logging" OFF)
+option(VERBOSE_LOG "Enable verbose logging" ON)
 
 message(STATUS "Use SSL:                ${USE_SSL}")
 message(STATUS "Server address:         ${SERVER_ADDRESS}")

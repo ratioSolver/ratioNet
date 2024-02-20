@@ -9,10 +9,6 @@ int main(int argc, char const *argv[])
 {
     // we create a server to test the client
     network::server server;
-    server.set_log_handler([](const std::string &msg)
-                           { std::cout << msg << std::endl; });
-    server.set_error_handler([](const std::string &msg)
-                             { std::cerr << msg << std::endl; });
     GET(server, "/", [](const string_req &, string_res &res)
         {
             res.set(boost::beast::http::field::content_type, "html");

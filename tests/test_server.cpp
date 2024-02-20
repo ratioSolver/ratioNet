@@ -8,10 +8,6 @@ using string_res = boost::beast::http::response<boost::beast::http::string_body>
 void test_plain_server()
 {
     network::server server("0.0.0.0", 8085);
-    server.set_log_handler([](const std::string &msg)
-                           { std::cout << msg << std::endl; });
-    server.set_error_handler([](const std::string &msg)
-                             { std::cerr << msg << std::endl; });
     GET(server, "/", [](const string_req &, string_res &res)
         {
             res.set(boost::beast::http::field::content_type, "html");
@@ -28,10 +24,6 @@ void test_plain_server()
 void test_ws_server()
 {
     network::server server;
-    server.set_log_handler([](const std::string &msg)
-                           { std::cout << msg << std::endl; });
-    server.set_error_handler([](const std::string &msg)
-                             { std::cerr << msg << std::endl; });
     GET(server, "/", [](const string_req &, string_res &res)
         {
             res.set(boost::beast::http::field::content_type, "html");
