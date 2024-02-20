@@ -24,10 +24,10 @@ namespace network
     boost::beast::http::request<Body> req;
   };
 
-  class http_handler
+  class base_http_handler
   {
   public:
-    virtual ~http_handler() = default;
+    virtual ~base_http_handler() = default;
 
     virtual void handle_request(request &&req) = 0;
   };

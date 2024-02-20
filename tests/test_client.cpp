@@ -1,5 +1,5 @@
 #include <iostream>
-#include "async_server.hpp"
+#include "server.hpp"
 #include "client.hpp"
 
 using string_req = boost::beast::http::request<boost::beast::http::string_body>;
@@ -8,7 +8,7 @@ using string_res = boost::beast::http::response<boost::beast::http::string_body>
 int main(int argc, char const *argv[])
 {
     // we create a server to test the client
-    network::async::server server;
+    network::server server;
     server.set_log_handler([](const std::string &msg)
                            { std::cout << msg << std::endl; });
     server.set_error_handler([](const std::string &msg)
