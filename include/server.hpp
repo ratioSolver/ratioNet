@@ -670,7 +670,7 @@ namespace network
 
       do_accept();
 
-      for (auto i = threads.size(); i > 0; --i)
+      for (auto i = threads.capacity(); i > 0; --i)
         threads.emplace_back([this]
                              { io_ctx.run(); });
 
