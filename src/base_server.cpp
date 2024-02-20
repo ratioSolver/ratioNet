@@ -43,7 +43,7 @@ namespace network
 
         do_accept();
 
-        for (std::size_t i = 0; i < threads.capacity(); ++i)
+        for (auto i = threads.capacity(); i > 0; --i)
             threads.emplace_back([this]
                                  { io_ctx.run(); });
 
