@@ -62,6 +62,21 @@ namespace network
             thread.join();
     }
 
+    boost::optional<base_http_handler &> base_server::get_http_handler(boost::beast::http::verb method, const std::string &target)
+    {
+        for (auto &handler : http_routes[method])
+            if (std::regex_match(target, handler.first))
+                return *handler.second;
+        return boost::none;
+    }
+    boost::optional<websocket_handler &> base_server::get_ws_handler(const std::string &target)
+    {
+        for (auto &handler : ws_routes)
+            if (std::regex_match(target, handler.first))
+                return *handler.second;
+        return boost::none;
+    }
+
     void base_server::do_accept() { acceptor.async_accept(boost::asio::make_strand(io_ctx), boost::beast::bind_front_handler(&server::on_accept, this)); }
 
     void base_server::on_accept(boost::beast::error_code ec, boost::asio::ip::tcp::socket socket)
@@ -71,6 +86,7 @@ namespace network
         else
         {
             log_handler("Accepted connection from " + socket.remote_endpoint().address().to_string() + ":" + std::to_string(socket.remote_endpoint().port()));
+            std::make_shared<http_session>(*this, std::move(socket))->run();
         }
 
         do_accept();

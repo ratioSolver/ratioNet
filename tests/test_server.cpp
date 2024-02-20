@@ -20,7 +20,7 @@ void test_plain_server()
     std::thread t{[&server]
                   { server.start(); }};
 
-    std::this_thread::sleep_for(std::chrono::seconds(10));
+    std::this_thread::sleep_for(std::chrono::seconds(100));
     server.stop();
     t.join();
 }

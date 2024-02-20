@@ -21,6 +21,11 @@ namespace network
     void handle_request(request &&req) override
     {
       auto &req_impl = static_cast<request_impl<Session, ReqBody> &>(req);
+      boost::beast::http::response<ResBody> res{boost::beast::http::status::ok, req_impl.get_request().version()};
+      res.set(boost::beast::http::field::server, "ratioNet");
+      res.set(boost::beast::http::field::content_type, "text/html");
+      res.keep_alive(req_impl.get_request().keep_alive());
+      handler(req_impl.get_request(), res);
     }
 
   private:
@@ -29,6 +34,8 @@ namespace network
 
   class base_server
   {
+    friend class base_http_session;
+
   public:
     base_server(const std::string &address = SERVER_ADDRESS, const std::string &port = SERVER_PORT, std::size_t concurrency_hint = std::thread::hardware_concurrency());
 
@@ -43,9 +50,12 @@ namespace network
     websocket_handler &ws(const std::string &target) { return *ws_routes.emplace_back(std::regex(target), std::make_unique<websocket_handler>()).second; }
 
   private:
+    boost::optional<base_http_handler &> get_http_handler(boost::beast::http::verb method, const std::string &target);
+    boost::optional<websocket_handler &> get_ws_handler(const std::string &target);
+
+  private:
     void do_accept();
     void on_accept(boost::beast::error_code ec, boost::asio::ip::tcp::socket socket);
-    void on_shutdown(boost::beast::error_code ec);
 
   private:
     boost::asio::io_context io_ctx;          // The io_context is required for all I/O
