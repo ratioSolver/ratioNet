@@ -9,10 +9,12 @@ find_package(Boost REQUIRED COMPONENTS system)
 option(USE_SSL "Use Secure Sockets Layer (SSL) for secure communication" ON)
 set(SERVER_ADDRESS "0.0.0.0" CACHE STRING "The address the server listens on")
 set(SERVER_PORT "8080" CACHE STRING "The port the server listens on")
+option(VERBOSE_LOG "Enable verbose logging" OFF)
 
 message(STATUS "Use SSL:                ${USE_SSL}")
 message(STATUS "Server address:         ${SERVER_ADDRESS}")
 message(STATUS "Server port:            ${SERVER_PORT}")
+message(STATUS "Verbose logging:        ${VERBOSE_LOG}")
 
 if(USE_SSL)
     find_package(OpenSSL REQUIRED)
@@ -35,6 +37,10 @@ target_compile_definitions(ratioNet INTERFACE SERVER_ADDRESS="${SERVER_ADDRESS}"
 if (USE_SSL)
     target_link_libraries(ratioNet INTERFACE OpenSSL::SSL OpenSSL::Crypto)
     target_compile_definitions(ratioNet INTERFACE USE_SSL TLS_VERSION=${TLS_VERSION})
+endif()
+
+if (VERBOSE_LOG)
+    target_compile_definitions(ratioNet INTERFACE VERBOSE_LOG)
 endif()
 
 if(BUILD_TESTING)
