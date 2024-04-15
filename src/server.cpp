@@ -129,23 +129,6 @@ namespace network
 
     void server::handle_request(request &&req)
     {
-        switch (req.get_verb())
-        {
-        case GET:
-            std::cout << "GET ";
-            break;
-        case POST:
-            std::cout << "POST ";
-            break;
-        case PUT:
-            std::cout << "PUT ";
-            break;
-        case DELETE:
-            std::cout << "DELETE ";
-            break;
-        }
-        std::cout << req.get_target() << " " << req.get_version() << std::endl;
-        for (const auto &[header, value] : req.get_headers())
-            std::cout << header << ": " << value << std::endl;
+        std::cout << req << std::endl;
     }
 } // namespace network

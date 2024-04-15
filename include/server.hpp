@@ -41,6 +41,29 @@ namespace network
     const std::string &get_version() const { return version; }
     const std::map<std::string, std::string> &get_headers() const { return headers; }
 
+    friend std::ostream &operator<<(std::ostream &os, const request &req)
+    {
+      switch (req.v)
+      {
+      case GET:
+        os << "GET ";
+        break;
+      case POST:
+        os << "POST ";
+        break;
+      case PUT:
+        os << "PUT ";
+        break;
+      case DELETE:
+        os << "DELETE ";
+        break;
+      }
+      os << req.target << " " << req.version << std::endl;
+      for (const auto &header : req.headers)
+        os << header.first << ": " << header.second << std::endl;
+      return os;
+    }
+
   private:
     std::shared_ptr<session> s;
     verb v;
