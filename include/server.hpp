@@ -12,6 +12,22 @@ namespace network
     DELETE
   };
 
+  inline std::string to_string(verb v)
+  {
+    switch (v)
+    {
+    case GET:
+      return "GET";
+    case POST:
+      return "POST";
+    case PUT:
+      return "PUT";
+    case DELETE:
+      return "DELETE";
+    }
+    return {};
+  }
+
   class server;
 
   class session : public std::enable_shared_from_this<session>
@@ -43,22 +59,7 @@ namespace network
 
     friend std::ostream &operator<<(std::ostream &os, const request &req)
     {
-      switch (req.v)
-      {
-      case GET:
-        os << "GET ";
-        break;
-      case POST:
-        os << "POST ";
-        break;
-      case PUT:
-        os << "PUT ";
-        break;
-      case DELETE:
-        os << "DELETE ";
-        break;
-      }
-      os << req.target << " " << req.version << std::endl;
+      os << to_string(req.v) << ' ' << req.target << " " << req.version << std::endl;
       for (const auto &header : req.headers)
         os << header.first << ": " << header.second << std::endl;
       return os;
