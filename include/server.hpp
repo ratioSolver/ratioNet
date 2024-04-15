@@ -4,6 +4,14 @@
 
 namespace network
 {
+  enum verb
+  {
+    GET,
+    POST,
+    PUT,
+    DELETE
+  };
+
   class session : public std::enable_shared_from_this<session>
   {
   public:

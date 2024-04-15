@@ -6,7 +6,7 @@ namespace network
     session::session(boost::asio::ip::tcp::socket socket) : socket(std::move(socket)) {}
     session::~session() {}
 
-    void session::start() { boost::asio::async_read_until(socket, buffer, '\n', std::bind(&session::on_read, shared_from_this(), std::placeholders::_1, std::placeholders::_2)); }
+    void session::start() { boost::asio::async_read_until(socket, buffer, '\r\n\r\n', std::bind(&session::on_read, shared_from_this(), std::placeholders::_1, std::placeholders::_2)); }
 
     void session::on_read(const boost::system::error_code &ec, std::size_t bytes_transferred)
     {
@@ -17,8 +17,40 @@ namespace network
         }
 
         std::istream is(&buffer);
-        std::string line;
-        std::getline(is, line);
+
+        verb v;
+        switch (is.get())
+        {
+        case 'D':
+            if (is.get() == 'E' && is.get() == 'L' && is.get() == 'E' && is.get() == 'T' && is.get() == 'E' && is.get() == ' ')
+                v = DELETE;
+            break;
+        case 'G':
+            if (is.get() == 'E' && is.get() == 'T' && is.get() == ' ')
+                v = GET;
+            break;
+        case 'P':
+            switch (is.get())
+            {
+            case 'O':
+                if (is.get() == 'S' && is.get() == 'T' && is.get() == ' ')
+                    v = POST;
+                break;
+            case 'U':
+                if (is.get() == 'T' && is.get() == ' ')
+                    v = PUT;
+                break;
+            }
+            break;
+        }
+
+        std::string target;
+        while (is.get() != ' ')
+            target += is.get();
+
+        std::string version;
+        while (is.get() != '\n')
+            version += is.get();
     }
 
     server::server(const std::string &address, unsigned short port, std::size_t concurrency_hint) : io_ctx(concurrency_hint), endpoint(boost::asio::ip::make_address(address), port), acceptor(boost::asio::make_strand(io_ctx)) { threads.reserve(concurrency_hint); }
