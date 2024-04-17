@@ -1,10 +1,13 @@
 cmake_minimum_required(VERSION 3.5.0)
 project(ratioNet VERSION 0.2.0 LANGUAGES CXX)
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=undefined")
 
 include(CTest)
 enable_testing()
 
 find_package(Boost REQUIRED COMPONENTS system)
+
+add_subdirectory(extern/json)
 
 option(USE_SSL "Use Secure Sockets Layer (SSL) for secure communication" OFF)
 set(SERVER_ADDRESS "0.0.0.0" CACHE STRING "The address the server listens on")
@@ -28,7 +31,7 @@ endif()
 
 
 add_library(ratioNet src/server.cpp)
-target_link_libraries(ratioNet PUBLIC Boost::system)
+target_link_libraries(ratioNet PUBLIC Boost::system json)
 target_include_directories(ratioNet PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
 target_compile_definitions(ratioNet PUBLIC SERVER_ADDRESS="${SERVER_ADDRESS}" SERVER_PORT="${SERVER_PORT}")
 

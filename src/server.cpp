@@ -1,5 +1,6 @@
 #include <iostream>
 #include "server.hpp"
+#include "logging.hpp"
 
 namespace network
 {
@@ -12,13 +13,12 @@ namespace network
     {
         if (ec)
         {
-            std::cerr << ec.message() << std::endl;
+            LOG_ERR(ec.message());
             return;
         }
 
         std::istream is(&buffer);
 
-        verb v;
         switch (is.get())
         {
         case 'D':
@@ -45,18 +45,15 @@ namespace network
         }
         is.get(); // consume space
 
-        std::string target;
         while (is.peek() != ' ')
             target += is.get();
         is.get(); // consume space
 
-        std::string version;
         while (is.peek() != '\r')
             version += is.get();
         is.get(); // consume '\r'
         is.get(); // consume '\n'
 
-        std::map<std::string, std::string> headers;
         while (is.peek() != '\r')
         {
             std::string header, value;
@@ -73,6 +70,39 @@ namespace network
         is.get(); // consume '\r'
         is.get(); // consume '\n'
 
+        if (headers.find("Upgrade") != headers.end())
+        { // handle websocket
+            LOG_DEBUG("Websocket not implemented");
+            return;
+        }
+
+        if (headers.find("Content-Length") != headers.end())
+        { // read body
+            std::size_t content_length = std::stoul(headers["Content-Length"]);
+            boost::asio::async_read(socket, buffer, boost::asio::transfer_exactly(content_length), std::bind(&session::on_body, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
+        }
+        else
+            srv.handle_request(request(shared_from_this(), v, std::move(target), std::move(version), std::move(headers)));
+    }
+
+    void session::on_body(const boost::system::error_code &ec, std::size_t bytes_transferred)
+    {
+        if (ec)
+        {
+            LOG_ERR(ec.message());
+            return;
+        }
+
+        std::istream is(&buffer);
+        if (headers.find("Content-Type") != headers.end())
+        {
+            if (headers["Content-Type"] == "application/json")
+                return srv.handle_request(json_request(shared_from_this(), v, std::move(target), std::move(version), std::move(headers), json::load(is)));
+            std::string body;
+            while (is.peek() != EOF)
+                body += is.get();
+            return srv.handle_request(string_request(shared_from_this(), v, std::move(target), std::move(version), std::move(headers), std::move(body)));
+        }
         srv.handle_request(request(shared_from_this(), v, std::move(target), std::move(version), std::move(headers)));
     }
 
@@ -80,31 +110,31 @@ namespace network
 
     void server::start()
     {
-        std::cout << "Starting server on " << endpoint << std::endl;
+        LOG_INFO("Starting server on " + endpoint.address().to_string() + ":" + std::to_string(endpoint.port()));
 
         boost::system::error_code ec;
         acceptor.open(endpoint.protocol(), ec);
         if (ec)
         {
-            std::cerr << ec.message() << std::endl;
+            LOG_ERR(ec.message());
             return;
         }
         acceptor.set_option(boost::asio::socket_base::reuse_address(true), ec);
         if (ec)
         {
-            std::cerr << ec.message() << std::endl;
+            LOG_ERR(ec.message());
             return;
         }
         acceptor.bind(endpoint, ec);
         if (ec)
         {
-            std::cerr << ec.message() << std::endl;
+            LOG_ERR(ec.message());
             return;
         }
         acceptor.listen(boost::asio::socket_base::max_listen_connections, ec);
         if (ec)
         {
-            std::cerr << ec.message() << std::endl;
+            LOG_ERR(ec.message());
             return;
         }
 

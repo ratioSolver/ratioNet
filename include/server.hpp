@@ -1,6 +1,7 @@
 #pragma once
 
 #include <boost/asio.hpp>
+#include "json.hpp"
 
 namespace network
 {
@@ -40,17 +41,22 @@ namespace network
 
   private:
     void on_read(const boost::system::error_code &ec, std::size_t bytes_transferred);
+    void on_body(const boost::system::error_code &ec, std::size_t bytes_transferred);
 
   private:
     server &srv;
     boost::asio::ip::tcp::socket socket;
     boost::asio::streambuf buffer;
+    verb v;
+    std::string target, version;
+    std::map<std::string, std::string> headers;
   };
 
   class request
   {
   public:
     request(std::shared_ptr<session> s, verb v, std::string &&trgt, std::string &&ver, std::map<std::string, std::string> &&hdrs) : s(s), v(v), target(trgt), version(ver), headers(hdrs) {}
+    ~request() = default;
 
     verb get_verb() const { return v; }
     const std::string &get_target() const { return target; }
@@ -65,12 +71,49 @@ namespace network
       return os;
     }
 
-  private:
+  protected:
     std::shared_ptr<session> s;
     verb v;
-    std::string target;
-    std::string version;
+    std::string target, version;
     std::map<std::string, std::string> headers;
+  };
+
+  class string_request : public request
+  {
+  public:
+    string_request(std::shared_ptr<session> s, verb v, std::string &&trgt, std::string &&ver, std::map<std::string, std::string> &&hdrs, std::string &&b) : request(s, v, std::move(trgt), std::move(ver), std::move(hdrs)), body(std::move(b)) {}
+    ~string_request() = default;
+
+    const std::string &get_body() const { return body; }
+
+    friend std::ostream &operator<<(std::ostream &os, const string_request &req)
+    {
+      os << static_cast<const request &>(req);
+      os << req.body;
+      return os;
+    }
+
+  private:
+    std::string body;
+  };
+
+  class json_request : public request
+  {
+  public:
+    json_request(std::shared_ptr<session> s, verb v, std::string &&trgt, std::string &&ver, std::map<std::string, std::string> &&hdrs, json::json &&b) : request(s, v, std::move(trgt), std::move(ver), std::move(hdrs)), body(std::move(b)) {}
+    ~json_request() = default;
+
+    const json::json &get_body() const { return body; }
+
+    friend std::ostream &operator<<(std::ostream &os, const json_request &req)
+    {
+      os << static_cast<const request &>(req);
+      os << req.body;
+      return os;
+    }
+
+  private:
+    json::json body;
   };
 
   class server
