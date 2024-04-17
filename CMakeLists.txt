@@ -30,7 +30,7 @@ if(USE_SSL)
 endif()
 
 
-add_library(ratioNet src/server.cpp)
+add_library(ratioNet src/server.cpp src/session.cpp)
 target_link_libraries(ratioNet PUBLIC Boost::system json)
 target_include_directories(ratioNet PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
 target_compile_definitions(ratioNet PUBLIC SERVER_ADDRESS="${SERVER_ADDRESS}" SERVER_PORT="${SERVER_PORT}")
