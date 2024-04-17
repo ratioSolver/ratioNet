@@ -79,7 +79,10 @@ namespace network
         if (headers.find("Content-Length") != headers.end())
         { // read body
             std::size_t content_length = std::stoul(headers["Content-Length"]);
-            boost::asio::async_read(socket, buffer, boost::asio::transfer_exactly(content_length), std::bind(&session::on_body, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
+            if (content_length > bytes_transferred) // the buffer may contain additional bytes beyond the delimiter
+                boost::asio::async_read(socket, buffer, boost::asio::transfer_exactly(content_length - bytes_transferred), std::bind(&session::on_body, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
+            else
+                on_body(ec, bytes_transferred);
         }
         else
             srv.handle_request(request(shared_from_this(), v, std::move(target), std::move(version), std::move(headers)));
