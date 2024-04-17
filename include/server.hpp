@@ -122,11 +122,17 @@ namespace network
 
   public:
     server(const std::string &address = "0.0.0.0", unsigned short port = 8080, std::size_t concurrency_hint = std::thread::hardware_concurrency());
+    ~server();
 
     /**
      * @brief Start the server.
      */
     void start();
+
+    /**
+     * @brief Stop the server.
+     */
+    void stop();
 
   private:
     void do_accept();
