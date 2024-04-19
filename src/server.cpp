@@ -4,7 +4,11 @@
 namespace network
 {
     server::server(const std::string &address, unsigned short port, std::size_t concurrency_hint) : io_ctx(concurrency_hint), endpoint(boost::asio::ip::make_address(address), port), acceptor(boost::asio::make_strand(io_ctx)) { threads.reserve(concurrency_hint); }
-    server::~server() { stop(); }
+    server::~server()
+    {
+        if (running)
+            stop();
+    }
 
     void server::start()
     {
@@ -36,6 +40,7 @@ namespace network
             return;
         }
 
+        running = true;
         do_accept();
 
         for (auto i = threads.capacity(); i > 0; --i)
@@ -51,6 +56,7 @@ namespace network
         io_ctx.stop();
         for (auto &thread : threads)
             thread.join();
+        running = false;
     }
 
     void server::do_accept() { acceptor.async_accept(io_ctx, std::bind(&server::on_accept, this, std::placeholders::_1, std::placeholders::_2)); }

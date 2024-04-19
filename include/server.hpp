@@ -29,6 +29,7 @@ namespace network
     void handle_request(std::unique_ptr<request> req);
 
   private:
+    bool running = false;                    // The server is running
     boost::asio::io_context io_ctx;          // The io_context is required for all I/O
     std::vector<std::thread> threads;        // The thread pool
     boost::asio::ip::tcp::endpoint endpoint; // The endpoint for the server
