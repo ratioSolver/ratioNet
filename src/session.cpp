@@ -6,7 +6,7 @@ namespace network
 {
     session::session(server &srv, boost::asio::ip::tcp::socket socket) : srv(srv), socket(std::move(socket)) {}
 
-    void session::start()
+    void session::read()
     {
         req = std::make_unique<request>();
         boost::asio::async_read_until(socket, buffer, "\r\n\r\n", std::bind(&session::on_read, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
@@ -79,6 +79,8 @@ namespace network
             return;
         }
 
+        bool keep_alive = req->headers.find("Connection") != req->headers.end() && req->headers["Connection"] == "keep-alive";
+
         if (req->headers.find("Content-Length") != req->headers.end())
         { // read body
             std::size_t content_length = std::stoul(req->headers["Content-Length"]);
@@ -89,6 +91,9 @@ namespace network
         }
         else
             srv.handle_request(std::move(req));
+
+        if (keep_alive)
+            read(); // read next request
     }
 
     void session::on_body(const boost::system::error_code &ec, std::size_t bytes_transferred)

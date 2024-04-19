@@ -58,7 +58,7 @@ namespace network
     void server::on_accept(const boost::system::error_code &ec, boost::asio::ip::tcp::socket socket)
     {
         if (!ec)
-            std::make_shared<session>(*this, std::move(socket))->start();
+            std::make_shared<session>(*this, std::move(socket))->read();
 
         do_accept();
     }
