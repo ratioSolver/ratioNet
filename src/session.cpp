@@ -12,6 +12,7 @@ namespace network
     {
         std::stringstream ss;
         ss << res;
+        LOG_DEBUG(ss.str());
         this->res.push(boost::asio::buffer(ss.str()));
         if (this->res.size() == 1)
             write();
