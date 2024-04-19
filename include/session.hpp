@@ -2,6 +2,7 @@
 
 #include <boost/asio.hpp>
 #include "request.hpp"
+#include "response.hpp"
 
 namespace network
 {

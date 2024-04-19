@@ -21,10 +21,19 @@ namespace network
     const std::string &get_version() const { return version; }
     const std::map<std::string, std::string> &get_headers() const { return headers; }
 
-    friend std::ostream &operator<<(std::ostream &os, const request &req)
+    friend std::ostream &operator<<(std::ostream &os, const request &req) { return req.write(os); }
+
+  protected:
+    /**
+     * Writes the object to the output stream.
+     *
+     * @param os The output stream to write to.
+     * @return A reference to the output stream after writing.
+     */
+    virtual std::ostream &write(std::ostream &os) const
     {
-      os << to_string(req.v) << ' ' << req.target << " " << req.version << '\n';
-      for (const auto &header : req.headers)
+      os << to_string(v) << ' ' << target << " " << version << '\n';
+      for (const auto &header : headers)
         os << header.first << ": " << header.second << '\n';
       return os;
     }
@@ -42,10 +51,11 @@ namespace network
 
     const std::string &get_body() const { return body; }
 
-    friend std::ostream &operator<<(std::ostream &os, const string_request &req)
+  private:
+    std::ostream &write(std::ostream &os) const override
     {
-      os << static_cast<const request &>(req) << '\n'
-         << req.body << '\n';
+      request::write(os) << '\n'
+                         << body << '\n';
       return os;
     }
 
@@ -60,10 +70,11 @@ namespace network
 
     const json::json &get_body() const { return body; }
 
-    friend std::ostream &operator<<(std::ostream &os, const json_request &req)
+  private:
+    std::ostream &write(std::ostream &os) const override
     {
-      os << static_cast<const request &>(req) << '\n'
-         << req.body << '\n';
+      request::write(os) << '\n'
+                         << body << '\n';
       return os;
     }
 
