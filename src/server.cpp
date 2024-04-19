@@ -69,7 +69,7 @@ namespace network
         do_accept();
     }
 
-    void server::handle_request(std::unique_ptr<request> req)
+    void server::handle_request(session &s, std::unique_ptr<request> req)
     {
         LOG_DEBUG(*req);
     }

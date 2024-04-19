@@ -26,7 +26,7 @@ namespace network
     void do_accept();
     void on_accept(const boost::system::error_code &ec, boost::asio::ip::tcp::socket socket);
 
-    void handle_request(std::unique_ptr<request> req);
+    void handle_request(session &s, std::unique_ptr<request> req);
 
   private:
     bool running = false;                    // The server is running

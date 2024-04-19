@@ -11,14 +11,20 @@ namespace network
 
   class session : public std::enable_shared_from_this<session>
   {
+    friend class server;
+
   public:
     session(server &srv, boost::asio::ip::tcp::socket socket);
 
-    void read();
-
   private:
+    void read();
+    void enqueue(const response &res);
+    void write();
+
     void on_read(const boost::system::error_code &ec, std::size_t bytes_transferred);
     void on_body(const boost::system::error_code &ec, std::size_t bytes_transferred);
+
+    void on_write(const boost::system::error_code &ec, std::size_t bytes_transferred);
 
   private:
     server &srv;

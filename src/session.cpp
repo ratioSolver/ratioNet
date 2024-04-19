@@ -12,6 +12,20 @@ namespace network
         boost::asio::async_read_until(socket, buffer, "\r\n\r\n", std::bind(&session::on_read, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
     }
 
+    void session::enqueue(const response &res)
+    {
+        std::stringstream ss;
+        ss << res;
+        this->res.push(boost::asio::buffer(ss.str()));
+        if (this->res.size() == 1)
+            write();
+    }
+    void session::write()
+    {
+        boost::asio::post(socket.get_executor(), [this]
+                          { boost::asio::async_write(socket, res.front(), std::bind(&session::on_write, shared_from_this(), std::placeholders::_1, std::placeholders::_2)); });
+    }
+
     void session::on_read(const boost::system::error_code &ec, std::size_t bytes_transferred)
     {
         if (ec)
@@ -90,7 +104,7 @@ namespace network
                 on_body(ec, bytes_transferred);
         }
         else
-            srv.handle_request(std::move(req));
+            srv.handle_request(*this, std::move(req));
 
         if (keep_alive)
             read(); // read next request
@@ -114,6 +128,19 @@ namespace network
                 body += is.get();
             req = std::make_unique<string_request>(req->v, std::move(req->target), std::move(req->version), std::move(req->headers), std::move(body));
         }
-        srv.handle_request(std::move(req));
+        srv.handle_request(*this, std::move(req));
+    }
+
+    void session::on_write(const boost::system::error_code &ec, std::size_t bytes_transferred)
+    {
+        if (ec)
+        {
+            LOG_ERR(ec.message());
+            return;
+        }
+
+        res.pop();
+        if (!res.empty())
+            write();
     }
 } // namespace network
