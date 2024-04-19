@@ -4,8 +4,8 @@
 
 namespace network
 {
-    session::session(server &srv, boost::asio::ip::tcp::socket socket) : srv(srv), socket(std::move(socket)) {}
-    session::~session() { LOG_DEBUG("Session destroyed"); }
+    session::session(server &srv, boost::asio::ip::tcp::socket socket) : srv(srv), socket(std::move(socket)) { LOG_TRACE("Session created with " << this->socket.remote_endpoint()); }
+    session::~session() { LOG_TRACE("Session destroyed"); }
 
     void session::read() { boost::asio::async_read_until(socket, buffer, "\r\n\r\n", std::bind(&session::on_read, shared_from_this(), std::placeholders::_1, std::placeholders::_2)); }
 
