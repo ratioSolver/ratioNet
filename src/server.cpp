@@ -69,8 +69,9 @@ namespace network
         do_accept();
     }
 
-    void server::handle_request(session &s, std::unique_ptr<request> req)
+    void server::handle_request(session &s, request &&req)
     {
-        LOG_DEBUG(*req);
+        LOG_DEBUG(req);
+        s.enqueue(response{});
     }
 } // namespace network

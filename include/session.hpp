@@ -30,7 +30,7 @@ namespace network
     server &srv;
     boost::asio::ip::tcp::socket socket;
     boost::asio::streambuf buffer;
-    std::unique_ptr<request> req;
+    request req;
     std::queue<boost::asio::const_buffer> res;
   };
 } // namespace network
