@@ -69,9 +69,15 @@ namespace network
         do_accept();
     }
 
-    void server::handle_request(session &s, request &&req)
+    void server::handle_request(session &s, std::unique_ptr<request> req)
     {
-        LOG_DEBUG(req);
-        s.enqueue(std::make_unique<string_response>("Hello, World!"));
+        LOG_DEBUG(*req);
+        for (const auto &[re, handler] : routes)
+            if (std::regex_match(req->get_target(), re))
+            {
+                auto res = handler(*req);
+                s.enqueue(std::move(res));
+                return;
+            }
     }
 } // namespace network

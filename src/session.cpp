@@ -7,7 +7,11 @@ namespace network
     session::session(server &srv, boost::asio::ip::tcp::socket socket) : srv(srv), socket(std::move(socket)) { LOG_TRACE("Session created with " << this->socket.remote_endpoint()); }
     session::~session() { LOG_TRACE("Session destroyed"); }
 
-    void session::read() { boost::asio::async_read_until(socket, buffer, "\r\n\r\n", std::bind(&session::on_read, shared_from_this(), std::placeholders::_1, std::placeholders::_2)); }
+    void session::read()
+    {
+        req = std::make_unique<request>();
+        boost::asio::async_read_until(socket, req->buffer, "\r\n\r\n", std::bind(&session::on_read, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
+    }
 
     void session::enqueue(std::unique_ptr<response> res)
     {
@@ -19,10 +23,7 @@ namespace network
     void session::write()
     {
         LOG_DEBUG(*res_queue.front());
-        boost::asio::streambuf sb;
-        std::ostream os(&sb);
-        os << *res_queue.front();
-        boost::asio::async_write(socket, sb, std::bind(&session::on_write, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
+        boost::asio::async_write(socket, res_queue.front()->get_buffer(), std::bind(&session::on_write, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
     }
 
     void session::on_read(const boost::system::error_code &ec, std::size_t bytes_transferred)
@@ -35,28 +36,28 @@ namespace network
             return;
         }
 
-        std::istream is(&buffer);
+        std::istream is(&req->buffer);
 
         switch (is.get())
         {
         case 'D':
             if (is.get() == 'E' && is.get() == 'L' && is.get() == 'E' && is.get() == 'T' && is.get() == 'E')
-                req.v = DELETE;
+                req->v = DELETE;
             break;
         case 'G':
             if (is.get() == 'E' && is.get() == 'T')
-                req.v = GET;
+                req->v = GET;
             break;
         case 'P':
             switch (is.get())
             {
             case 'O':
                 if (is.get() == 'S' && is.get() == 'T')
-                    req.v = POST;
+                    req->v = POST;
                 break;
             case 'U':
                 if (is.get() == 'T')
-                    req.v = PUT;
+                    req->v = PUT;
                 break;
             }
             break;
@@ -64,15 +65,14 @@ namespace network
         is.get(); // consume space
 
         while (is.peek() != ' ')
-            req.target += is.get();
+            req->target += is.get();
         is.get(); // consume space
 
         while (is.peek() != '\r')
-            req.version += is.get();
+            req->version += is.get();
         is.get(); // consume '\r'
         is.get(); // consume '\n'
 
-        req.headers.clear();
         while (is.peek() != '\r')
         {
             std::string header, value;
@@ -84,24 +84,24 @@ namespace network
                 value += is.get();
             is.get(); // consume '\r'
             is.get(); // consume '\n'
-            req.headers.emplace(std::move(header), std::move(value));
+            req->headers.emplace(std::move(header), std::move(value));
         }
         is.get(); // consume '\r'
         is.get(); // consume '\n'
 
-        if (req.headers.find("Upgrade") != req.headers.end())
+        if (req->headers.find("Upgrade") != req->headers.end())
         { // handle websocket
             LOG_DEBUG("Websocket not implemented");
             return;
         }
 
-        bool keep_alive = req.headers.find("Connection") != req.headers.end() && req.headers["Connection"] == "keep-alive";
+        bool keep_alive = req->headers.find("Connection") != req->headers.end() && req->headers["Connection"] == "keep-alive";
 
-        if (req.headers.find("Content-Length") != req.headers.end())
+        if (req->headers.find("Content-Length") != req->headers.end())
         { // read body
-            std::size_t content_length = std::stoul(req.headers["Content-Length"]);
+            std::size_t content_length = std::stoul(req->headers["Content-Length"]);
             if (content_length > bytes_transferred) // the buffer may contain additional bytes beyond the delimiter
-                boost::asio::async_read(socket, buffer, boost::asio::transfer_exactly(content_length - bytes_transferred), std::bind(&session::on_body, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
+                boost::asio::async_read(socket, req->buffer, boost::asio::transfer_exactly(content_length - bytes_transferred), std::bind(&session::on_body, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
             else // the buffer contains the entire body
                 on_body(ec, bytes_transferred);
         }
@@ -122,15 +122,15 @@ namespace network
             return;
         }
 
-        std::istream is(&buffer);
-        if (req.headers.find("Content-Type") != req.headers.end() && req.headers["Content-Type"] == "application/json")
-            req = json_request(req.v, std::move(req.target), std::move(req.version), std::move(req.headers), json::load(is));
+        std::istream is(&req->buffer);
+        if (req->headers.find("Content-Type") != req->headers.end() && req->headers["Content-Type"] == "application/json")
+            req = std::make_unique<json_request>(req->v, std::move(req->target), std::move(req->version), std::move(req->headers), json::load(is));
         else
         {
             std::string body;
             while (is.peek() != EOF)
                 body += is.get();
-            req = string_request(req.v, std::move(req.target), std::move(req.version), std::move(req.headers), std::move(body));
+            req = std::make_unique<string_request>(req->v, std::move(req->target), std::move(req->version), std::move(req->headers), std::move(body));
         }
         srv.handle_request(*this, std::move(req));
     }

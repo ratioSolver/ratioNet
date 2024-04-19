@@ -1,5 +1,6 @@
 #pragma once
 
+#include <boost/asio.hpp>
 #include <fstream>
 #include "status_code.hpp"
 #include "mime_types.hpp"
@@ -17,6 +18,13 @@ namespace network
     const std::string &get_version() const { return version; }
 
     friend std::ostream &operator<<(std::ostream &os, const response &res) { return res.write(os); }
+
+    boost::asio::streambuf &get_buffer()
+    {
+      std::ostream os(&buffer);
+      write(os); // Write the response to the buffer
+      return buffer;
+    }
 
   protected:
     /**
@@ -41,6 +49,7 @@ namespace network
 
   private:
     std::string version;
+    boost::asio::streambuf buffer;
   };
 
   class string_response : public response
@@ -127,7 +136,7 @@ namespace network
     json_response(json::json &&b, status_code code = status_code::ok, std::map<std::string, std::string> &&hdrs = {}, std::string &&ver = "HTTP/1.1") : response(code, std::move(hdrs), std::move(ver)), body(b.to_string())
     {
       headers["Content-Type"] = "application/json";
-      headers["Content-Length"] = body.size();
+      headers["Content-Length"] = std::to_string(body.size());
     }
 
     const std::string &get_body() const { return body; }

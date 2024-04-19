@@ -1,5 +1,6 @@
 #pragma once
 
+#include <boost/asio.hpp>
 #include "verb.hpp"
 #include "json.hpp"
 
@@ -42,6 +43,7 @@ namespace network
     verb v;
     std::string target, version;
     std::map<std::string, std::string> headers;
+    boost::asio::streambuf buffer;
   };
 
   class string_request : public request

@@ -1,6 +1,5 @@
 #pragma once
 
-#include <boost/asio.hpp>
 #include <queue>
 #include "request.hpp"
 #include "response.hpp"
@@ -30,8 +29,7 @@ namespace network
   private:
     server &srv;
     boost::asio::ip::tcp::socket socket;
-    boost::asio::streambuf buffer;
-    request req;
+    std::unique_ptr<request> req;
     std::queue<std::unique_ptr<response>> res_queue;
   };
 } // namespace network
