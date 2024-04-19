@@ -15,6 +15,7 @@ namespace network
 
   public:
     session(server &srv, boost::asio::ip::tcp::socket socket);
+    ~session();
 
   private:
     void read();
@@ -31,6 +32,6 @@ namespace network
     boost::asio::ip::tcp::socket socket;
     boost::asio::streambuf buffer;
     request req;
-    std::queue<boost::asio::const_buffer> res;
+    std::queue<std::string> res;
   };
 } // namespace network

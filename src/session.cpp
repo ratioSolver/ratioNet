@@ -5,6 +5,7 @@
 namespace network
 {
     session::session(server &srv, boost::asio::ip::tcp::socket socket) : srv(srv), socket(std::move(socket)) {}
+    session::~session() { LOG_DEBUG("Session destroyed"); }
 
     void session::read() { boost::asio::async_read_until(socket, buffer, "\r\n\r\n", std::bind(&session::on_read, shared_from_this(), std::placeholders::_1, std::placeholders::_2)); }
 
@@ -12,20 +13,22 @@ namespace network
     {
         std::stringstream ss;
         ss << res;
-        LOG_DEBUG(ss.str());
-        this->res.push(boost::asio::buffer(ss.str()));
-        if (this->res.size() == 1)
-            write();
+        boost::asio::post(socket.get_executor(), [self = shared_from_this(), data = ss.str()]
+                          { self->res.push(std::move(data));
+                            if (self->res.size() == 1)
+                                self->write(); });
     }
     void session::write()
     {
-        boost::asio::post(socket.get_executor(), [this]
-                          { boost::asio::async_write(socket, res.front(), std::bind(&session::on_write, shared_from_this(), std::placeholders::_1, std::placeholders::_2)); });
+        LOG_DEBUG(res.front());
+        boost::asio::async_write(socket, boost::asio::buffer(res.front()), std::bind(&session::on_write, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
     }
 
     void session::on_read(const boost::system::error_code &ec, std::size_t bytes_transferred)
     {
-        if (ec)
+        if (ec == boost::asio::error::eof)
+            return; // connection closed by client
+        else if (ec)
         {
             LOG_ERR(ec.message());
             return;
@@ -110,7 +113,9 @@ namespace network
 
     void session::on_body(const boost::system::error_code &ec, std::size_t bytes_transferred)
     {
-        if (ec)
+        if (ec == boost::asio::error::eof)
+            return; // connection closed by client
+        else if (ec)
         {
             LOG_ERR(ec.message());
             return;

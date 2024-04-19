@@ -25,9 +25,9 @@ namespace network
      */
     virtual std::ostream &write(std::ostream &os) const
     {
-      os << version << ' ' << to_string(code) << '\n';
+      os << version << ' ' << to_string(code) << "\r\n";
       for (const auto &header : headers)
-        os << header.first << ": " << header.second << '\n';
+        os << header.first << ": " << header.second << "\r\n";
       return os;
     }
 
@@ -55,8 +55,31 @@ namespace network
   private:
     std::ostream &write(std::ostream &os) const override
     {
-      response::write(os) << '\n'
-                          << body << '\n';
+      response::write(os) << "\r\n"
+                          << body << "\r\n";
+      return os;
+    }
+
+  private:
+    std::string body;
+  };
+
+  class html_response : public response
+  {
+  public:
+    html_response(std::string &&b, status_code code = status_code::ok, std::map<std::string, std::string> &&hdrs = {}, std::string &&ver = "HTTP/1.1") : response(code, std::move(hdrs), std::move(ver)), body(std::move(b))
+    {
+      headers["Content-Type"] = "text/html";
+      headers["Content-Length"] = std::to_string(body.size());
+    }
+
+    const std::string &get_body() const { return body; }
+
+  private:
+    std::ostream &write(std::ostream &os) const override
+    {
+      response::write(os) << "\r\n"
+                          << body << "\r\n";
       return os;
     }
 
@@ -78,8 +101,8 @@ namespace network
   private:
     std::ostream &write(std::ostream &os) const override
     {
-      response::write(os) << '\n'
-                          << body << '\n';
+      response::write(os) << "\r\n"
+                          << body << "\r\n";
       return os;
     }
 
