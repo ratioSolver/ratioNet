@@ -19,7 +19,7 @@ namespace network
 
   private:
     void read();
-    void enqueue(const response &res);
+    void enqueue(std::unique_ptr<response> res);
     void write();
 
     void on_read(const boost::system::error_code &ec, std::size_t bytes_transferred);
@@ -32,6 +32,6 @@ namespace network
     boost::asio::ip::tcp::socket socket;
     boost::asio::streambuf buffer;
     request req;
-    std::queue<std::string> res;
+    std::queue<std::unique_ptr<response>> res_queue;
   };
 } // namespace network

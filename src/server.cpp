@@ -72,6 +72,6 @@ namespace network
     void server::handle_request(session &s, request &&req)
     {
         LOG_DEBUG(req);
-        s.enqueue(string_response("Hello, World!"));
+        s.enqueue(std::make_unique<string_response>("Hello, World!"));
     }
 } // namespace network

@@ -1,6 +1,8 @@
 #pragma once
 
+#include <fstream>
 #include "status_code.hpp"
+#include "mime_types.hpp"
 #include "json.hpp"
 
 namespace network
@@ -87,16 +89,48 @@ namespace network
     std::string body;
   };
 
+  class file_response : public response
+  {
+  public:
+    file_response(std::string &&file, status_code code = status_code::ok, std::map<std::string, std::string> &&hdrs = {}, std::string &&ver = "HTTP/1.1") : response(code, std::move(hdrs), std::move(ver)), file(std::move(file))
+    {
+      std::ifstream f(file, std::ios::binary);
+      if (!f)
+        throw std::invalid_argument("Could not open file: " + file);
+
+      f.seekg(0, std::ios::end);
+      headers["Content-Length"] = std::to_string(f.tellg());
+
+      auto ext = file.substr(file.find_last_of('.') + 1);
+      headers["Content-Type"] = network::mime_types.at(ext);
+    }
+
+    const std::string &get_file() const { return file; }
+
+  private:
+    std::ostream &write(std::ostream &os) const override
+    {
+      response::write(os) << "\r\n";
+      std::ifstream
+          f(file, std::ios::binary);
+      os << f.rdbuf() << "\r\n";
+      return os;
+    }
+
+  private:
+    std::string file;
+  };
+
   class json_response : public response
   {
   public:
-    json_response(json::json &&b, status_code code = status_code::ok, std::map<std::string, std::string> &&hdrs = {}, std::string &&ver = "HTTP/1.1") : response(code, std::move(hdrs), std::move(ver)), body(std::move(b))
+    json_response(json::json &&b, status_code code = status_code::ok, std::map<std::string, std::string> &&hdrs = {}, std::string &&ver = "HTTP/1.1") : response(code, std::move(hdrs), std::move(ver)), body(b.to_string())
     {
       headers["Content-Type"] = "application/json";
-      headers["Content-Length"] = body.to_string().size();
+      headers["Content-Length"] = body.size();
     }
 
-    const json::json &get_body() const { return body; }
+    const std::string &get_body() const { return body; }
 
   private:
     std::ostream &write(std::ostream &os) const override
@@ -107,6 +141,6 @@ namespace network
     }
 
   private:
-    json::json body;
+    std::string body;
   };
 } // namespace network

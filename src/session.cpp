@@ -9,19 +9,20 @@ namespace network
 
     void session::read() { boost::asio::async_read_until(socket, buffer, "\r\n\r\n", std::bind(&session::on_read, shared_from_this(), std::placeholders::_1, std::placeholders::_2)); }
 
-    void session::enqueue(const response &res)
+    void session::enqueue(std::unique_ptr<response> res)
     {
-        std::stringstream ss;
-        ss << res;
-        boost::asio::post(socket.get_executor(), [self = shared_from_this(), data = ss.str()]
-                          { self->res.push(std::move(data));
-                            if (self->res.size() == 1)
+        boost::asio::post(socket.get_executor(), [self = shared_from_this(), r = std::move(res)]() mutable
+                          { self->res_queue.push(std::move(r));
+                            if (self->res_queue.size() == 1)
                                 self->write(); });
     }
     void session::write()
     {
-        LOG_DEBUG(res.front());
-        boost::asio::async_write(socket, boost::asio::buffer(res.front()), std::bind(&session::on_write, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
+        LOG_DEBUG(*res_queue.front());
+        boost::asio::streambuf sb;
+        std::ostream os(&sb);
+        os << *res_queue.front();
+        boost::asio::async_write(socket, sb, std::bind(&session::on_write, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
     }
 
     void session::on_read(const boost::system::error_code &ec, std::size_t bytes_transferred)
@@ -142,8 +143,8 @@ namespace network
             return;
         }
 
-        res.pop();
-        if (!res.empty())
+        res_queue.pop();
+        if (!res_queue.empty())
             write();
     }
 } // namespace network
