@@ -29,8 +29,7 @@ if(USE_SSL)
     message(STATUS "TLS version:            ${TLS_VERSION}")
 endif()
 
-
-add_library(ratioNet src/server.cpp src/session.cpp src/ws_session.cpp)
+add_library(ratioNet src/server.cpp src/session.cpp src/ws_session.cpp src/crypto.cpp)
 target_link_libraries(ratioNet PUBLIC Boost::system json)
 target_include_directories(ratioNet PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
 target_compile_definitions(ratioNet PUBLIC SERVER_HOST="${SERVER_HOST}" SERVER_PORT=${SERVER_PORT})

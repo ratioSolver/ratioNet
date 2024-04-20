@@ -1,5 +1,5 @@
-#include <boost/compute/detail/sha1.hpp>
 #include "session.hpp"
+#include "crypto.hpp"
 #include "ws_session.hpp"
 #include "server.hpp"
 #include "logging.hpp"
@@ -37,8 +37,8 @@ namespace network
             return;
         }
 
-        // the handshake response, the key is concatenated with the GUID and hashed with SHA-1
-        auto res = std::make_unique<response>(status_code::websocket_switching_protocols, std::map<std::string, std::string>{{"Upgrade", "websocket"}, {"Connection", "Upgrade"}, {"Sec-WebSocket-Accept", static_cast<std::string>(boost::compute::detail::sha1(key_it->second + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"))}});
+        // the handshake response, the key is concatenated with the GUID and hashed with SHA-1 and then base64 encoded
+        auto res = std::make_unique<response>(status_code::websocket_switching_protocols, std::map<std::string, std::string>{{"Upgrade", "websocket"}, {"Connection", "upgrade"}, {"Sec-WebSocket-Accept", base64_encode(sha1(key_it->second + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"))}});
         auto &buf = res->get_buffer();
         boost::asio::async_write(socket, buf, [self = shared_from_this(), res = std::move(res)](const boost::system::error_code &ec, std::size_t bytes_transferred)
                                  { if (ec) { LOG_ERR(ec.message()); return; } std::make_shared<ws_session>(self->srv, self->req->target, std::move(self->socket))->read(); });
