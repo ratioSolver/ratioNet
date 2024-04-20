@@ -1,4 +1,5 @@
 #include "session.hpp"
+#include "ws_session.hpp"
 #include "server.hpp"
 #include "logging.hpp"
 
@@ -24,6 +25,12 @@ namespace network
     {
         LOG_DEBUG(*res_queue.front());
         boost::asio::async_write(socket, res_queue.front()->get_buffer(), std::bind(&session::on_write, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
+    }
+
+    void session::upgrade()
+    {
+        enqueue(std::make_unique<response>(status_code::websocket_switching_protocols, std::map<std::string, std::string>{{"Upgrade", "websocket"}, {"Connection", "Upgrade"}}));
+        std::make_shared<ws_session>(srv, std::move(socket))->read();
     }
 
     void session::on_read(const boost::system::error_code &ec, std::size_t bytes_transferred)
@@ -89,11 +96,8 @@ namespace network
         is.get(); // consume '\r'
         is.get(); // consume '\n'
 
-        if (req->headers.find("Upgrade") != req->headers.end())
-        { // handle websocket
-            LOG_DEBUG("Websocket not implemented");
-            return;
-        }
+        if (req->headers.find("Upgrade") != req->headers.end() && req->headers["Upgrade"] == "websocket") // handle websocket upgrade request
+            return upgrade();
 
         bool keep_alive = req->headers.find("Connection") != req->headers.end() && req->headers["Connection"] == "keep-alive";
 

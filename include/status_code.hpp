@@ -6,6 +6,7 @@ namespace network
 {
   enum status_code
   {
+    websocket_switching_protocols = 101,
     ok = 200,
     created = 201,
     accepted = 202,
@@ -28,6 +29,8 @@ namespace network
   {
     switch (code)
     {
+    case websocket_switching_protocols:
+      return "101 Web Socket Protocol Handshake";
     case ok:
       return "200 OK";
     case created:
