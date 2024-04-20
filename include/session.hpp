@@ -21,7 +21,7 @@ namespace network
     friend class server;
 
   public:
-    session(server &srv, boost::asio::ip::tcp::socket socket);
+    session(server &srv, boost::asio::ip::tcp::socket &&socket);
     ~session();
 
   private:

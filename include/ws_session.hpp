@@ -117,6 +117,14 @@ namespace network
      * @param res The response message to enqueue.
      */
     void enqueue(std::unique_ptr<message> res);
+
+    /**
+     * Sends a message over the WebSocket session.
+     *
+     * @param msg The message to be sent.
+     */
+    void send(const std::string &msg) { enqueue(std::make_unique<message>(msg)); }
+
     /**
      * Sends a ping message to the WebSocket server.
      * This function enqueues a ping message with opcode 0x89 to the WebSocket session.

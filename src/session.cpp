@@ -6,7 +6,7 @@
 
 namespace network
 {
-    session::session(server &srv, boost::asio::ip::tcp::socket socket) : srv(srv), socket(std::move(socket)) { LOG_TRACE("Session created with " << this->socket.remote_endpoint()); }
+    session::session(server &srv, boost::asio::ip::tcp::socket &&socket) : srv(srv), socket(std::move(socket)) { LOG_TRACE("Session created with " << this->socket.remote_endpoint()); }
     session::~session() { LOG_TRACE("Session destroyed"); }
 
     void session::read()
@@ -37,8 +37,11 @@ namespace network
             return;
         }
 
-        enqueue(std::make_unique<response>(status_code::websocket_switching_protocols, std::map<std::string, std::string>{{"Upgrade", "websocket"}, {"Connection", "Upgrade"}, {"Sec-WebSocket-Accept", static_cast<std::string>(boost::compute::detail::sha1(key_it->second + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"))}}));
-        std::make_shared<ws_session>(srv, req->target, std::move(socket))->read();
+        // the handshake response, the key is concatenated with the GUID and hashed with SHA-1
+        auto res = std::make_unique<response>(status_code::websocket_switching_protocols, std::map<std::string, std::string>{{"Upgrade", "websocket"}, {"Connection", "Upgrade"}, {"Sec-WebSocket-Accept", static_cast<std::string>(boost::compute::detail::sha1(key_it->second + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"))}});
+        auto &buf = res->get_buffer();
+        boost::asio::async_write(socket, buf, [self = shared_from_this(), res = std::move(res)](const boost::system::error_code &ec, std::size_t bytes_transferred)
+                                 { if (ec) { LOG_ERR(ec.message()); return; } std::make_shared<ws_session>(self->srv, self->req->target, std::move(self->socket))->read(); });
     }
 
     void session::on_read(const boost::system::error_code &ec, std::size_t bytes_transferred)
