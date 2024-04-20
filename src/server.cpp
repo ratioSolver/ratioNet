@@ -72,12 +72,36 @@ namespace network
     void server::handle_request(session &s, std::unique_ptr<request> req)
     {
         LOG_DEBUG(*req);
-        for (const auto &[re, handler] : routes)
-            if (std::regex_match(req->get_target(), re))
-            {
-                auto res = handler(*req);
-                s.enqueue(std::move(res));
-                return;
-            }
+        if (auto it = routes.find(req->get_verb()); it != routes.end())
+            for (const auto &[re, handler] : it->second)
+                if (std::regex_match(req->get_target(), re))
+                {
+                    auto res = handler(*req);
+                    s.enqueue(std::move(res));
+                    return;
+                }
+        LOG_WARN("No route for " + req->get_target());
+    }
+
+    void server::handle_message(ws_session &s, std::unique_ptr<message> msg)
+    {
+        switch (msg->get_fin_rsv_opcode() & 0x0F)
+        {
+        case 0x00: // continuation
+        case 0x01: // text
+        case 0x02: // binary
+            LOG_DEBUG(msg->get_payload());
+            break;
+        case 0x08: // close
+            s.close();
+            break;
+        case 0x09: // ping
+            s.pong();
+            break;
+        case 0x0A: // pong
+            break;
+        default:
+            LOG_ERR("Unknown opcode");
+        }
     }
 } // namespace network

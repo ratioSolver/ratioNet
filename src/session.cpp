@@ -1,3 +1,4 @@
+#include <boost/compute/detail/sha1.hpp>
 #include "session.hpp"
 #include "ws_session.hpp"
 #include "server.hpp"
@@ -29,7 +30,14 @@ namespace network
 
     void session::upgrade()
     {
-        enqueue(std::make_unique<response>(status_code::websocket_switching_protocols, std::map<std::string, std::string>{{"Upgrade", "websocket"}, {"Connection", "Upgrade"}}));
+        auto key_it = req->headers.find("Sec-WebSocket-Key");
+        if (key_it == req->headers.end())
+        {
+            LOG_ERR("WebSocket key not found");
+            return;
+        }
+
+        enqueue(std::make_unique<response>(status_code::websocket_switching_protocols, std::map<std::string, std::string>{{"Upgrade", "websocket"}, {"Connection", "Upgrade"}, {"Sec-WebSocket-Accept", static_cast<std::string>(boost::compute::detail::sha1(key_it->second + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"))}}));
         std::make_shared<ws_session>(srv, std::move(socket))->read();
     }
 
@@ -149,6 +157,6 @@ namespace network
 
         res_queue.pop();
         if (!res_queue.empty())
-            write();
+            write(); // write the next message
     }
 } // namespace network
