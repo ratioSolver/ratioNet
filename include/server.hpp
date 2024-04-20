@@ -34,6 +34,17 @@ namespace network
      */
     void add_route(verb v, const std::string &path, std::function<std::unique_ptr<response>(request &)> &&handler) noexcept { routes[v].emplace_back(std::regex(path), std::move(handler)); }
 
+    /**
+     * Adds a WebSocket route to the server.
+     *
+     * This function adds a WebSocket route to the server, allowing clients to establish WebSocket connections
+     * to the specified path.
+     *
+     * @param path The path of the WebSocket route.
+     * @return A reference to the `ws_handler` associated with the added route.
+     */
+    ws_handler &add_ws_route(const std::string &path) noexcept { return ws_routes[path]; }
+
   private:
     void do_accept();
     void on_accept(const boost::system::error_code &ec, boost::asio::ip::tcp::socket socket);
@@ -48,5 +59,6 @@ namespace network
     boost::asio::ip::tcp::endpoint endpoint;                                                                        // The endpoint for the server
     boost::asio::ip::tcp::acceptor acceptor;                                                                        // The acceptor for the server
     std::map<verb, std::vector<std::pair<std::regex, std::function<std::unique_ptr<response>(request &)>>>> routes; // The routes of the server
+    std::map<std::string, ws_handler> ws_routes;                                                                    // The WebSocket routes of the server
   };
 } // namespace network

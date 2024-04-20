@@ -90,7 +90,7 @@ namespace network
         case 0x00: // continuation
         case 0x01: // text
         case 0x02: // binary
-            LOG_DEBUG(msg->get_payload());
+            ws_routes.at(s.path).on_message_handler(s, msg->get_payload());
             break;
         case 0x08: // close
             s.close();
