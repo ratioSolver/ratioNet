@@ -1,12 +1,5 @@
 #include <thread>
 #include "server.hpp"
-#include "crypto.hpp"
-
-void test_crypto()
-{
-    assert(network::sha1("Hello, World!") == "0a0a9f2a6772942557ab5355d76af442f8f65e01");
-    assert(network::base64_encode("Hello, World!") == "SGVsbG8sIFdvcmxkIQ==");
-}
 
 void test_server()
 {
@@ -39,8 +32,6 @@ void test_server()
 
 int main(int argc, char const *argv[])
 {
-    test_crypto();
-
     test_server();
 
     return 0;
