@@ -30,7 +30,7 @@ namespace network
     switch (code)
     {
     case websocket_switching_protocols:
-      return "101 Web Socket Protocol Handshake";
+      return "101 Switching Protocols";
     case ok:
       return "200 OK";
     case created:
