@@ -67,6 +67,17 @@ namespace network
      */
     friend std::ostream &operator<<(std::ostream &os, const request &req) { return req.write(os); }
 
+    /**
+     * @brief Get the buffer containing the request.
+     * @return The buffer.
+     */
+    boost::asio::streambuf &get_buffer()
+    {
+      std::ostream os(&buffer);
+      write(os); // Write the request to the buffer
+      return buffer;
+    }
+
   protected:
     /**
      * @brief Writes the request object to the output stream.
