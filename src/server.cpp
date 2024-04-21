@@ -3,7 +3,7 @@
 
 namespace network
 {
-    server::server(const std::string &address, unsigned short port, const std::string &name, std::size_t concurrency_hint) : name(name), io_ctx(concurrency_hint), endpoint(boost::asio::ip::make_address(address), port), acceptor(boost::asio::make_strand(io_ctx)) { threads.reserve(concurrency_hint); }
+    server::server(const std::string &host, unsigned short port, const std::string &name, std::size_t concurrency_hint) : name(name), io_ctx(concurrency_hint), endpoint(boost::asio::ip::make_address(host), port), acceptor(boost::asio::make_strand(io_ctx)) { threads.reserve(concurrency_hint); }
     server::~server()
     {
         if (running)

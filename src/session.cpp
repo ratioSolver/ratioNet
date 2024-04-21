@@ -7,7 +7,7 @@
 
 namespace network
 {
-    session::session(server &srv, boost::asio::ip::tcp::socket &&socket) : srv(srv), socket(std::move(socket)) { LOG_TRACE("Session created with " << this->socket.remote_endpoint()); }
+    session::session(server &srv, boost::asio::ip::tcp::socket &&socket) : srv(srv), socket(std::move(socket)), strand(boost::asio::make_strand(srv.io_ctx)) { LOG_TRACE("Session created with " << this->socket.remote_endpoint()); }
     session::~session() { LOG_TRACE("Session destroyed"); }
 
     void session::read()
@@ -18,7 +18,7 @@ namespace network
 
     void session::enqueue(std::unique_ptr<response> res)
     {
-        boost::asio::post(socket.get_executor(), [self = shared_from_this(), r = std::move(res)]() mutable
+        boost::asio::post(strand, [self = shared_from_this(), r = std::move(res)]() mutable
                           { self->res_queue.push(std::move(r));
                             if (self->res_queue.size() == 1)
                                 self->write(); });

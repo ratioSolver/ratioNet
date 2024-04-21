@@ -11,7 +11,7 @@ void test_server()
                      { return std::make_unique<network::json_response>(json::json{{"message", "Hello, World!"}}); });
     server.add_route(network::verb::GET, "/ws", [](network::request &req)
                      { return std::make_unique<network::html_response>(R"(<html><body><script>
-                        var ws = new WebSocket("ws://localhost:8765/ws");
+                        var ws = new WebSocket("ws://localhost:8080/ws");
                         ws.onopen = function() { document.body.innerHTML += "<p>Connected!</p>"; ws.send("Hello, World!"); };
                         ws.onmessage = function(event) { document.body.innerHTML += "<p>" + event.data + "</p>"; };
                         ws.onclose = function() { document.body.innerHTML += "<p>Disconnected!</p>"; };

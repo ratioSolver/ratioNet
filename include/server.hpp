@@ -12,7 +12,7 @@ namespace network
     friend class ws_session;
 
   public:
-    server(const std::string &address = SERVER_HOST, unsigned short port = SERVER_PORT, const std::string &name = SERVER_NAME, std::size_t concurrency_hint = std::thread::hardware_concurrency());
+    server(const std::string &host = SERVER_HOST, unsigned short port = SERVER_PORT, const std::string &name = SERVER_NAME, std::size_t concurrency_hint = std::thread::hardware_concurrency());
     ~server();
 
     /**

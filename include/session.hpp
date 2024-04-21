@@ -54,9 +54,10 @@ namespace network
     void on_write(const boost::system::error_code &ec, std::size_t bytes_transferred);
 
   private:
-    server &srv;                                     // The server that created the session.
-    boost::asio::ip::tcp::socket socket;             // The socket used to communicate with the client.
-    std::unique_ptr<request> req;                    // The current request being processed.
-    std::queue<std::unique_ptr<response>> res_queue; // The queue of responses to send to the client.
+    server &srv;                                                        // The server that created the session.
+    boost::asio::ip::tcp::socket socket;                                // The socket used to communicate with the client.
+    std::unique_ptr<request> req;                                       // The current request being processed.
+    boost::asio::strand<boost::asio::io_context::executor_type> strand; // The strand used to synchronize access to the socket.
+    std::queue<std::unique_ptr<response>> res_queue;                    // The queue of responses to send to the client.
   };
 } // namespace network
