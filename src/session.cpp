@@ -44,7 +44,7 @@ namespace network
         sha1.get_digest_bytes(digest);
         std::string key = utils::base64_encode(digest, 20);
 
-        auto res = std::make_unique<response>(status_code::websocket_switching_protocols, std::map<std::string, std::string>{{"Upgrade", "websocket"}, {"Connection", "Upgrade"}, {"Server", srv.name}, {"Sec-WebSocket-Accept", key}});
+        auto res = std::make_unique<response>(status_code::websocket_switching_protocols, std::map<std::string, std::string>{{"Upgrade", "websocket"}, {"Connection", "Upgrade"}, {"Sec-WebSocket-Accept", key}});
         auto &buf = res->get_buffer();
         boost::asio::async_write(socket, buf, [self = shared_from_this(), res = std::move(res)](const boost::system::error_code &ec, std::size_t bytes_transferred)
                                  { if (ec) { LOG_ERR(ec.message()); return; } std::make_shared<ws_session>(self->srv, self->req->target, std::move(self->socket))->read(); });

@@ -12,7 +12,7 @@ namespace network
     friend class ws_session;
 
   public:
-    server(const std::string &host = SERVER_HOST, unsigned short port = SERVER_PORT, const std::string &name = SERVER_NAME, std::size_t concurrency_hint = std::thread::hardware_concurrency());
+    server(const std::string &host = SERVER_HOST, unsigned short port = SERVER_PORT, std::size_t concurrency_hint = std::thread::hardware_concurrency());
     ~server();
 
     /**
@@ -52,8 +52,6 @@ namespace network
     void handle_request(session &s, std::unique_ptr<request> req);
     void handle_message(ws_session &s, std::unique_ptr<message> msg);
 
-  private:
-    const std::string name;                                                                                         // The name of the server
     bool running = false;                                                                                           // The server is running
     boost::asio::io_context io_ctx;                                                                                 // The io_context is required for all I/O
     std::vector<std::thread> threads;                                                                               // The thread pool
