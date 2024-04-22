@@ -7,7 +7,9 @@ enable_testing()
 
 find_package(Boost REQUIRED COMPONENTS system)
 
-add_subdirectory(extern/json)
+if(NOT TARGET json)
+    add_subdirectory(extern/json)
+endif()
 
 option(USE_SSL "Use Secure Sockets Layer (SSL) for secure communication" OFF)
 set(SERVER_HOST "0.0.0.0" CACHE STRING "The address the server listens on")
@@ -26,7 +28,7 @@ if(USE_SSL)
     if(NOT TLS_VERSION IN_LIST TLS_VERSIONS)
         message(FATAL_ERROR "Invalid TLS version specified")
     endif()
-    message(STATUS "TLS version:            ${TLS_VERSION}")
+    message(STATUS "TLS version: ${TLS_VERSION}")
 endif()
 
 add_library(ratioNet src/server.cpp src/session.cpp src/ws_session.cpp src/client.cpp)
