@@ -86,9 +86,10 @@ namespace network
      */
     virtual std::ostream &write(std::ostream &os) const
     {
-      os << to_string(v) << ' ' << target << " " << version << '\n';
+      os << to_string(v) << ' ' << target << " " << version << "\r\n";
       for (const auto &header : headers)
-        os << header.first << ": " << header.second << '\n';
+        os << header.first << ": " << header.second << "\r\n";
+      os << "\r\n";
       return os;
     }
 
@@ -110,8 +111,8 @@ namespace network
   private:
     std::ostream &write(std::ostream &os) const override
     {
-      request::write(os) << '\n'
-                         << body << '\n';
+      request::write(os) << "\r\n"
+                         << body << "\r\n";
       return os;
     }
 
@@ -129,8 +130,8 @@ namespace network
   private:
     std::ostream &write(std::ostream &os) const override
     {
-      request::write(os) << '\n'
-                         << body << '\n';
+      request::write(os) << "\r\n"
+                         << body << "\r\n";
       return os;
     }
 

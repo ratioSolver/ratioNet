@@ -12,7 +12,7 @@ namespace network
 
     void server::start()
     {
-        LOG_INFO("Starting server on " + endpoint.address().to_string() + ":" + std::to_string(endpoint.port()));
+        LOG_DEBUG("Starting server on " + endpoint.address().to_string() + ":" + std::to_string(endpoint.port()));
 
         boost::system::error_code ec;
         acceptor.open(endpoint.protocol(), ec);
@@ -52,7 +52,7 @@ namespace network
 
     void server::stop()
     {
-        LOG_INFO("Stopping server");
+        LOG_DEBUG("Stopping server");
         io_ctx.stop();
         for (auto &thread : threads)
             thread.join();
@@ -71,7 +71,7 @@ namespace network
 
     void server::handle_request(session &s, std::unique_ptr<request> req)
     {
-        LOG_DEBUG(*req);
+        LOG_TRACE(*req);
         if (auto it = routes.find(req->get_verb()); it != routes.end())
             for (const auto &[re, handler] : it->second)
                 if (std::regex_match(req->get_target(), re))
@@ -90,7 +90,10 @@ namespace network
         case 0x00: // continuation
         case 0x01: // text
         case 0x02: // binary
-            ws_routes.at(s.path).on_message_handler(s, msg->get_payload());
+            if (auto it = ws_routes.find(s.path); it != ws_routes.end())
+                it->second.on_message_handler(s, msg->get_payload());
+            else
+                LOG_WARN("No route for " + s.path);
             break;
         case 0x08: // close
             s.close();

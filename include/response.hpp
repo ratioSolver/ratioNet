@@ -76,6 +76,7 @@ namespace network
       os << version << ' ' << to_string(code) << "\r\n";
       for (const auto &header : headers)
         os << header.first << ": " << header.second << "\r\n";
+      os << "\r\n";
       return os;
     }
 

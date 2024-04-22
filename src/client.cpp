@@ -15,7 +15,11 @@ namespace network
                                 write(); });
     }
 
-    void client::connect() { resolver.async_resolve(host, std::to_string(port), std::bind(&client::on_resolve, this, std::placeholders::_1, std::placeholders::_2)); }
+    void client::connect()
+    {
+        LOG_DEBUG("Connecting to host " + host + ":" + std::to_string(port));
+        resolver.async_resolve(host, std::to_string(port), std::bind(&client::on_resolve, this, std::placeholders::_1, std::placeholders::_2));
+    }
 
     void client::write()
     {

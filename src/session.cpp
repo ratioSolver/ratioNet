@@ -25,7 +25,7 @@ namespace network
     }
     void session::write()
     {
-        LOG_DEBUG(*res_queue.front());
+        LOG_TRACE(*res_queue.front());
         boost::asio::async_write(socket, res_queue.front()->get_buffer(), std::bind(&session::on_write, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
     }
 
@@ -42,10 +42,10 @@ namespace network
         utils::sha1 sha1(key_it->second + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
         uint8_t digest[20];
         sha1.get_digest_bytes(digest);
+        std::string key = utils::base64_encode(digest, 20);
 
-        auto res = std::make_unique<response>(status_code::websocket_switching_protocols, std::map<std::string, std::string>{{"Upgrade", "websocket"}, {"Connection", "Upgrade"}, {"Server", srv.name}, {"Sec-WebSocket-Accept", utils::base64_encode(digest, 20)}});
+        auto res = std::make_unique<response>(status_code::websocket_switching_protocols, std::map<std::string, std::string>{{"Upgrade", "websocket"}, {"Connection", "Upgrade"}, {"Server", srv.name}, {"Sec-WebSocket-Accept", key}});
         auto &buf = res->get_buffer();
-        LOG_DEBUG(*res);
         boost::asio::async_write(socket, buf, [self = shared_from_this(), res = std::move(res)](const boost::system::error_code &ec, std::size_t bytes_transferred)
                                  { if (ec) { LOG_ERR(ec.message()); return; } std::make_shared<ws_session>(self->srv, self->req->target, std::move(self->socket))->read(); });
     }
