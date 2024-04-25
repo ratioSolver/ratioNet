@@ -34,7 +34,7 @@ namespace network
         }
 
         std::istream is(&msg->buffer);
-        is.read(&msg->fin_rsv_opcode, 1);
+        is.read(reinterpret_cast<char *>(&msg->fin_rsv_opcode), 1);
 
         char len; // second byte of the message
         is.read(&len, 1);

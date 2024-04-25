@@ -24,7 +24,7 @@ namespace network
      *
      * @param fin_rsv_opcode The fin, rsv, and opcode of the message.
      */
-    message(char fin_rsv_opcode) : fin_rsv_opcode(fin_rsv_opcode) {}
+    message(unsigned char fin_rsv_opcode) : fin_rsv_opcode(fin_rsv_opcode) {}
 
     /**
      * @brief Constructor that sets the payload of the message.
@@ -38,7 +38,7 @@ namespace network
      *
      * @return The fin, rsv, and opcode of the message.
      */
-    char get_fin_rsv_opcode() const noexcept { return fin_rsv_opcode; }
+    unsigned char get_fin_rsv_opcode() const noexcept { return fin_rsv_opcode; }
 
     /**
      * @brief Get the payload of the message.
@@ -75,7 +75,7 @@ namespace network
     }
 
   private:
-    char fin_rsv_opcode;           // fin, rsv, and opcode for the message
+    unsigned char fin_rsv_opcode;  // fin, rsv, and opcode for the message
     boost::asio::streambuf buffer; // buffer for the message
     std::string payload;           // payload of the message
   };
