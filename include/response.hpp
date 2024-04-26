@@ -206,14 +206,14 @@ namespace network
      *
      * @throws std::invalid_argument If the file cannot be opened.
      */
-    file_response(std::string &&file, status_code code = status_code::ok, std::map<std::string, std::string> &&hdrs = {}, std::string &&ver = "HTTP/1.1") : response(code, std::move(hdrs), std::move(ver)), file(std::move(file))
+    file_response(std::string &&f, status_code code = status_code::ok, std::map<std::string, std::string> &&hdrs = {}, std::string &&ver = "HTTP/1.1") : response(code, std::move(hdrs), std::move(ver)), file(std::move(f))
     {
-      std::ifstream f(file, std::ios::binary);
-      if (!f)
+      std::ifstream fs(file, std::ios::binary);
+      if (!fs)
         throw std::invalid_argument("Could not open file: " + file);
 
-      f.seekg(0, std::ios::end);
-      headers["Content-Length"] = std::to_string(f.tellg());
+      fs.seekg(0, std::ios::end);
+      headers["Content-Length"] = std::to_string(fs.tellg());
 
       auto ext = file.substr(file.find_last_of('.') + 1);
       headers["Content-Type"] = network::mime_types.at(ext);
