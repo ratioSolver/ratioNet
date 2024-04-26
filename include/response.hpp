@@ -129,8 +129,7 @@ namespace network
      */
     std::ostream &write(std::ostream &os) const override
     {
-      response::write(os) << "\r\n"
-                          << body << "\r\n";
+      response::write(os) << body;
       return os;
     }
 
@@ -178,8 +177,7 @@ namespace network
      */
     std::ostream &write(std::ostream &os) const override
     {
-      response::write(os) << "\r\n"
-                          << body << "\r\n";
+      response::write(os) << body;
       return os;
     }
 
@@ -237,9 +235,9 @@ namespace network
      */
     std::ostream &write(std::ostream &os) const override
     {
-      response::write(os) << "\r\n";
+      response::write(os);
       std::ifstream f(file, std::ios::binary);
-      os << f.rdbuf() << "\r\n";
+      os << f.rdbuf();
       return os;
     }
 
