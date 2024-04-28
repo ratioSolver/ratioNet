@@ -80,6 +80,35 @@ namespace network
       return os;
     }
 
+    void parse()
+    {
+      std::istream is(&buffer);
+      std::string code_str;
+      do // Parse the status code
+      {
+        code_str.push_back(is.get());
+      } while (is.peek() != ' ');
+      code = static_cast<status_code>(std::stoi(code_str));
+      std::string status_line; // Parse the status line
+      std::getline(is, status_line);
+
+      while (is.peek() != '\r')
+      {
+        std::string header, value;
+        while (is.peek() != ':')
+          header += is.get();
+        is.get(); // consume ':'
+        is.get(); // consume space
+        while (is.peek() != '\r')
+          value += is.get();
+        is.get(); // consume '\r'
+        is.get(); // consume '\n'
+        headers.emplace(std::move(header), std::move(value));
+      }
+      is.get(); // consume '\r'
+      is.get(); // consume '\n'
+    }
+
   private:
     status_code code; // The status code of the response
 
