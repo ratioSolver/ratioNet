@@ -68,6 +68,22 @@ namespace network
     friend std::ostream &operator<<(std::ostream &os, const request &req) { return req.write(os); }
 
     /**
+     * Checks if the request is an upgrade request for a WebSocket connection.
+     *
+     * @return true if the request is an upgrade request for a WebSocket connection, false otherwise.
+     */
+    bool is_upgrade() const { return headers.find("Upgrade") != headers.end() && headers.at("Upgrade") == "websocket"; }
+
+    /**
+     * Checks if the request is a keep-alive request.
+     * A keep-alive request is determined by the presence of the "Connection" header
+     * with a value of "keep-alive".
+     *
+     * @return true if the request is a keep-alive request, false otherwise.
+     */
+    bool is_keep_alive() const { return headers.find("Connection") != headers.end() && headers.at("Connection") == "keep-alive"; }
+
+    /**
      * @brief Get the buffer containing the request.
      * @return The buffer.
      */
@@ -78,21 +94,12 @@ namespace network
       return buffer;
     }
 
-  protected:
     /**
-     * @brief Writes the request object to the output stream.
-     * @param os The output stream to write to.
-     * @return The output stream after writing.
+     * @brief Parses the request.
+     *
+     * This function is responsible for parsing the request.
+     * It performs the necessary operations to extract relevant information from the request.
      */
-    virtual std::ostream &write(std::ostream &os) const
-    {
-      os << to_string(v) << ' ' << target << " " << version << "\r\n";
-      for (const auto &header : headers)
-        os << header.first << ": " << header.second << "\r\n";
-      os << "\r\n";
-      return os;
-    }
-
     void parse()
     {
       std::istream is(&buffer);
@@ -146,6 +153,21 @@ namespace network
       }
       is.get(); // consume '\r'
       is.get(); // consume '\n'
+    }
+
+  protected:
+    /**
+     * @brief Writes the request object to the output stream.
+     * @param os The output stream to write to.
+     * @return The output stream after writing.
+     */
+    virtual std::ostream &write(std::ostream &os) const
+    {
+      os << to_string(v) << ' ' << target << " " << version << "\r\n";
+      for (const auto &header : headers)
+        os << header.first << ": " << header.second << "\r\n";
+      os << "\r\n";
+      return os;
     }
 
   private:

@@ -62,10 +62,10 @@ namespace network
 
         req->parse(); // parse the request line and headers
 
-        if (req->headers.find("Upgrade") != req->headers.end() && req->headers["Upgrade"] == "websocket") // handle websocket upgrade request
+        if (req->is_upgrade()) // handle websocket upgrade request
             return upgrade();
 
-        bool keep_alive = req->headers.find("Connection") != req->headers.end() && req->headers["Connection"] == "keep-alive";
+        bool keep_alive = req->is_keep_alive();
 
         if (req->headers.find("Content-Length") != req->headers.end())
         { // read body

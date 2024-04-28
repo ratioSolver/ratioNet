@@ -64,22 +64,12 @@ namespace network
       return buffer;
     }
 
-  protected:
     /**
-     * @brief Writes the response to an output stream.
+     * @brief Parses the response.
      *
-     * @param os The output stream to write to.
-     * @return A reference to the output stream after writing.
+     * This function is responsible for parsing the response.
+     * It performs the necessary operations to extract relevant information from the response.
      */
-    virtual std::ostream &write(std::ostream &os) const
-    {
-      os << version << ' ' << to_string(code) << "\r\n";
-      for (const auto &header : headers)
-        os << header.first << ": " << header.second << "\r\n";
-      os << "\r\n";
-      return os;
-    }
-
     void parse()
     {
       std::istream is(&buffer);
@@ -107,6 +97,22 @@ namespace network
       }
       is.get(); // consume '\r'
       is.get(); // consume '\n'
+    }
+
+  protected:
+    /**
+     * @brief Writes the response to an output stream.
+     *
+     * @param os The output stream to write to.
+     * @return A reference to the output stream after writing.
+     */
+    virtual std::ostream &write(std::ostream &os) const
+    {
+      os << version << ' ' << to_string(code) << "\r\n";
+      for (const auto &header : headers)
+        os << header.first << ": " << header.second << "\r\n";
+      os << "\r\n";
+      return os;
     }
 
   private:
