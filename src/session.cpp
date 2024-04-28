@@ -60,58 +60,7 @@ namespace network
             return;
         }
 
-        std::istream is(&req->buffer);
-
-        switch (is.get())
-        {
-        case 'D':
-            if (is.get() == 'E' && is.get() == 'L' && is.get() == 'E' && is.get() == 'T' && is.get() == 'E')
-                req->v = DELETE;
-            break;
-        case 'G':
-            if (is.get() == 'E' && is.get() == 'T')
-                req->v = GET;
-            break;
-        case 'P':
-            switch (is.get())
-            {
-            case 'O':
-                if (is.get() == 'S' && is.get() == 'T')
-                    req->v = POST;
-                break;
-            case 'U':
-                if (is.get() == 'T')
-                    req->v = PUT;
-                break;
-            }
-            break;
-        }
-        is.get(); // consume space
-
-        while (is.peek() != ' ')
-            req->target += is.get();
-        is.get(); // consume space
-
-        while (is.peek() != '\r')
-            req->version += is.get();
-        is.get(); // consume '\r'
-        is.get(); // consume '\n'
-
-        while (is.peek() != '\r')
-        {
-            std::string header, value;
-            while (is.peek() != ':')
-                header += is.get();
-            is.get(); // consume ':'
-            is.get(); // consume space
-            while (is.peek() != '\r')
-                value += is.get();
-            is.get(); // consume '\r'
-            is.get(); // consume '\n'
-            req->headers.emplace(std::move(header), std::move(value));
-        }
-        is.get(); // consume '\r'
-        is.get(); // consume '\n'
+        req->parse(); // parse the request line and headers
 
         if (req->headers.find("Upgrade") != req->headers.end() && req->headers["Upgrade"] == "websocket") // handle websocket upgrade request
             return upgrade();

@@ -93,6 +93,61 @@ namespace network
       return os;
     }
 
+    void parse()
+    {
+      std::istream is(&buffer);
+      switch (is.get())
+      {
+      case 'D':
+        if (is.get() == 'E' && is.get() == 'L' && is.get() == 'E' && is.get() == 'T' && is.get() == 'E')
+          v = DELETE;
+        break;
+      case 'G':
+        if (is.get() == 'E' && is.get() == 'T')
+          v = GET;
+        break;
+      case 'P':
+        switch (is.get())
+        {
+        case 'O':
+          if (is.get() == 'S' && is.get() == 'T')
+            v = POST;
+          break;
+        case 'U':
+          if (is.get() == 'T')
+            v = PUT;
+          break;
+        }
+        break;
+      }
+      is.get(); // consume space
+
+      while (is.peek() != ' ')
+        target += is.get();
+      is.get(); // consume space
+
+      while (is.peek() != '\r')
+        version += is.get();
+      is.get(); // consume '\r'
+      is.get(); // consume '\n'
+
+      while (is.peek() != '\r')
+      {
+        std::string header, value;
+        while (is.peek() != ':')
+          header += is.get();
+        is.get(); // consume ':'
+        is.get(); // consume space
+        while (is.peek() != '\r')
+          value += is.get();
+        is.get(); // consume '\r'
+        is.get(); // consume '\n'
+        headers.emplace(std::move(header), std::move(value));
+      }
+      is.get(); // consume '\r'
+      is.get(); // consume '\n'
+    }
+
   private:
     verb v;                                     // The HTTP verb of the request
     std::string target;                         // The target of the request
