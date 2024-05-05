@@ -303,6 +303,19 @@ namespace network
       headers["Content-Type"] = "application/json";
       headers["Content-Length"] = std::to_string(body.size());
     }
+    /**
+     * @brief Constructs a `json_response` object with the given JSON body, status code, headers, and version.
+     *
+     * @param b The JSON body of the response.
+     * @param code The status code of the response. Default is `status_code::ok`.
+     * @param hdrs The headers of the response. Default is an empty map.
+     * @param ver The version of the HTTP protocol. Default is "HTTP/1.1".
+     */
+    json_response(const json::json &b, status_code code = status_code::ok, std::map<std::string, std::string> &&hdrs = {}, std::string &&ver = "HTTP/1.1") : response(code, std::move(hdrs), std::move(ver)), body(b.to_string())
+    {
+      headers["Content-Type"] = "application/json";
+      headers["Content-Length"] = std::to_string(body.size());
+    }
 
     /**
      * @brief Gets the JSON body of the response.
