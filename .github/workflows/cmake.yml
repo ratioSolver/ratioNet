@@ -31,7 +31,7 @@ jobs:
       - name: Install dependencies (Windows)
         if: matrix.os == 'windows-latest'
         run: |
-          choco install boost
+          choco install boost-msvc-14.3
 
       - name: Install dependencies (macOS)
         if: matrix.os == 'macos-latest'
