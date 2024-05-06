@@ -9,8 +9,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        #os: [ubuntu-latest, windows-latest, macos-latest]
-        os: [ubuntu-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
         build_type: [Debug, Release]
         use_ssl: [ON, OFF]
 
@@ -19,22 +18,25 @@ jobs:
       USE_SSL: ${{ matrix.use_ssl }}
 
     steps:
-      - name: Install Boost
-        run: |
-          if [ "$RUNNER_OS" == "Linux" ]; then
-            sudo apt-get update
-            sudo apt-get install libboost-all-dev
-          elif [ "$RUNNER_OS" == "Windows" ]; then
-            choco install boost-msvc-14.1
-            choco info boost-msvc-14.1
-          elif [ "$RUNNER_OS" == "macOS" ]; then
-            brew install boost@1.76
-          fi
-        shell: bash
-      
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+
+      - name: Install dependencies (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libboost-all-dev
+
+      - name: Install dependencies (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          choco install boost
+
+      - name: Install dependencies (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install boost
 
       - name: Configure CMake
         run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DUSE_SSL=${{env.USE_SSL}}
