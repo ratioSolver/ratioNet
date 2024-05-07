@@ -75,17 +75,17 @@ namespace network
      *                The function should take a reference to the `ws_session` object as its parameter.
      * @return A reference to the `ws_handler` object.
      */
-    ws_handler &on_error(std::function<void(ws_session &)> &&handler) noexcept
+    ws_handler &on_error(std::function<void(ws_session &, const boost::system::error_code &)> &&handler) noexcept
     {
       on_error_handler = std::move(handler);
       return *this;
     }
 
   private:
-    std::function<void(ws_session &)> on_open_handler;                         // handler for the open event
-    std::function<void(ws_session &, const std::string &)> on_message_handler; // handler for the message event
-    std::function<void(ws_session &)> on_close_handler;                        // handler for the close event
-    std::function<void(ws_session &)> on_error_handler;                        // handler for the error event
+    std::function<void(ws_session &)> on_open_handler;                                     // handler for the open event
+    std::function<void(ws_session &, const std::string &)> on_message_handler;             // handler for the message event
+    std::function<void(ws_session &)> on_close_handler;                                    // handler for the close event
+    std::function<void(ws_session &, const boost::system::error_code &)> on_error_handler; // handler for the error event
   };
 
   /**
@@ -107,6 +107,14 @@ namespace network
   public:
     ws_session(server &srv, const std::string &path, boost::asio::ip::tcp::socket &&socket);
     ~ws_session();
+
+    /**
+     * @brief Starts the session.
+     *
+     * This function starts the session and performs any necessary initialization.
+     * It should be called before any other operations are performed on the session.
+     */
+    void start();
 
     /**
      * @brief Enqueues a response message to be sent by the WebSocket session.

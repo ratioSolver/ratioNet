@@ -7,6 +7,12 @@ namespace network
     ws_session::ws_session(server &srv, const std::string &path, boost::asio::ip::tcp::socket &&socket) : srv(srv), path(path), socket(std::move(socket)) { LOG_TRACE("WebSocket session created with " << this->socket.remote_endpoint()); }
     ws_session::~ws_session() { LOG_TRACE("WebSocket session destroyed"); }
 
+    void ws_session::start()
+    {
+        srv.on_connect(*this);
+        read();
+    }
+
     void ws_session::read()
     {
         msg = std::make_unique<message>();
@@ -26,10 +32,14 @@ namespace network
     void ws_session::on_read(const boost::system::error_code &ec, std::size_t bytes_transferred)
     { // read the first two bytes of the message (opcode and length)
         if (ec == boost::asio::error::eof)
-            return; // connection closed by client
+        { // connection closed by client
+            srv.on_disconnect(*this);
+            return;
+        }
         else if (ec)
         {
             LOG_ERR(ec.message());
+            srv.on_error(*this, ec);
             return;
         }
 
@@ -62,10 +72,14 @@ namespace network
     void ws_session::on_message(const boost::system::error_code &ec, std::size_t bytes_transferred)
     { // read the rest of the message (mask and payload)
         if (ec == boost::asio::error::eof)
-            return; // connection closed by client
+        { // connection closed by client
+            srv.on_disconnect(*this);
+            return;
+        }
         else if (ec)
         {
             LOG_ERR(ec.message());
+            srv.on_error(*this, ec);
             return;
         }
 
@@ -76,7 +90,7 @@ namespace network
             msg->payload += is.get() ^ mask[i % 4];
 
         if (msg->fin_rsv_opcode & 0x80) // fin bit is set
-            srv.handle_message(*this, std::move(msg));
+            srv.on_message(*this, std::move(msg));
 
         read(); // read the next message
     }
@@ -86,6 +100,7 @@ namespace network
         if (ec)
         {
             LOG_ERR(ec.message());
+            srv.on_error(*this, ec);
             return;
         }
 

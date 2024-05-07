@@ -83,7 +83,22 @@ namespace network
         LOG_WARN("No route for " + req->get_target());
     }
 
-    void server::handle_message(ws_session &s, std::unique_ptr<message> msg)
+    void server::on_connect(ws_session &s)
+    {
+        if (auto it = ws_routes.find(s.path); it != ws_routes.end())
+            it->second.on_open_handler(s);
+        else
+            LOG_WARN("No route for " + s.path);
+    }
+    void server::on_disconnect(ws_session &s)
+    {
+        if (auto it = ws_routes.find(s.path); it != ws_routes.end())
+            it->second.on_close_handler(s);
+        else
+            LOG_WARN("No route for " + s.path);
+    }
+
+    void server::on_message(ws_session &s, std::unique_ptr<message> msg)
     {
         switch (msg->get_fin_rsv_opcode() & 0x0F)
         {
@@ -106,5 +121,13 @@ namespace network
         default:
             LOG_ERR("Unknown opcode");
         }
+    }
+
+    void server::on_error(ws_session &s, const boost::system::error_code &ec)
+    {
+        if (auto it = ws_routes.find(s.path); it != ws_routes.end())
+            it->second.on_error_handler(s, ec);
+        else
+            LOG_WARN("No route for " + s.path);
     }
 } // namespace network

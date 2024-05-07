@@ -50,7 +50,11 @@ namespace network
     void on_accept(const boost::system::error_code &ec, boost::asio::ip::tcp::socket socket);
 
     void handle_request(session &s, std::unique_ptr<request> req);
-    void handle_message(ws_session &s, std::unique_ptr<message> msg);
+
+    void on_connect(ws_session &s);
+    void on_disconnect(ws_session &s);
+    void on_message(ws_session &s, std::unique_ptr<message> msg);
+    void on_error(ws_session &s, const boost::system::error_code &ec);
 
     bool running = false;                                                                                           // The server is running
     boost::asio::io_context io_ctx;                                                                                 // The io_context is required for all I/O
