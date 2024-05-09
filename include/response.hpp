@@ -298,7 +298,7 @@ namespace network
      * @param hdrs The headers of the response. Default is an empty map.
      * @param ver The version of the HTTP protocol. Default is "HTTP/1.1".
      */
-    json_response(json::json &&b, status_code code = status_code::ok, std::map<std::string, std::string> &&hdrs = {}, std::string &&ver = "HTTP/1.1") : response(code, std::move(hdrs), std::move(ver)), body(b.to_string())
+    json_response(json::json &&b, status_code code = status_code::ok, std::map<std::string, std::string> &&hdrs = {}, std::string &&ver = "HTTP/1.1") : response(code, std::move(hdrs), std::move(ver)), body(b.dump())
     {
       headers["Content-Type"] = "application/json";
       headers["Content-Length"] = std::to_string(body.size());
@@ -311,7 +311,7 @@ namespace network
      * @param hdrs The headers of the response. Default is an empty map.
      * @param ver The version of the HTTP protocol. Default is "HTTP/1.1".
      */
-    json_response(const json::json &b, status_code code = status_code::ok, std::map<std::string, std::string> &&hdrs = {}, std::string &&ver = "HTTP/1.1") : response(code, std::move(hdrs), std::move(ver)), body(b.to_string())
+    json_response(const json::json &b, status_code code = status_code::ok, std::map<std::string, std::string> &&hdrs = {}, std::string &&ver = "HTTP/1.1") : response(code, std::move(hdrs), std::move(ver)), body(b.dump())
     {
       headers["Content-Type"] = "application/json";
       headers["Content-Length"] = std::to_string(body.size());
