@@ -107,22 +107,22 @@ namespace network
       {
       case 'D':
         if (is.get() == 'E' && is.get() == 'L' && is.get() == 'E' && is.get() == 'T' && is.get() == 'E')
-          v = DELETE;
+          v = Delete;
         break;
       case 'G':
         if (is.get() == 'E' && is.get() == 'T')
-          v = GET;
+          v = Get;
         break;
       case 'P':
         switch (is.get())
         {
         case 'O':
           if (is.get() == 'S' && is.get() == 'T')
-            v = POST;
+            v = Post;
           break;
         case 'U':
           if (is.get() == 'T')
-            v = PUT;
+            v = Put;
           break;
         }
         break;

@@ -6,23 +6,23 @@ namespace network
 {
   enum verb
   {
-    GET,
-    POST,
-    PUT,
-    DELETE
+    Get,
+    Post,
+    Put,
+    Delete
   };
 
   inline std::string to_string(verb v)
   {
     switch (v)
     {
-    case GET:
+    case Get:
       return "GET";
-    case POST:
+    case Post:
       return "POST";
-    case PUT:
+    case Put:
       return "PUT";
-    case DELETE:
+    case Delete:
       return "DELETE";
     }
     return {};
