@@ -57,7 +57,7 @@ namespace network
       std::ostream os(&buffer);
       os.put(fin_rsv_opcode);
       if (payload.size() < 126)
-        os.put(payload.size());
+        os.put(static_cast<unsigned char>(payload.size()));
       else if (payload.size() < 65536)
       {
         os.put(126);
