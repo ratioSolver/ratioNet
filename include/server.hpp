@@ -64,4 +64,30 @@ namespace network
     std::map<verb, std::vector<std::pair<std::regex, std::function<std::unique_ptr<response>(request &)>>>> routes; // The routes of the server
     std::map<std::string, ws_handler> ws_routes;                                                                    // The WebSocket routes of the server
   };
+
+  /**
+   * Parses a query string and returns a map of key-value pairs.
+   *
+   * @param query The query string to be parsed.
+   * @return A map containing the key-value pairs extracted from the query string.
+   */
+  inline std::map<std::string, std::string> parse_query(const std::string &query)
+  {
+    std::map<std::string, std::string> params;
+
+    std::string::size_type pos = 0;
+    while (pos < query.size())
+    {
+      std::string::size_type next = query.find('&', pos);
+      std::string::size_type eq = query.find('=', pos);
+      if (eq == std::string::npos)
+        break;
+      if (next == std::string::npos)
+        next = query.size();
+      params.emplace(query.substr(pos, eq - pos), query.substr(eq + 1, next - eq - 1));
+      pos = next + 1;
+    }
+
+    return params;
+  }
 } // namespace network
