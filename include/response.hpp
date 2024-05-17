@@ -336,8 +336,7 @@ namespace network
      */
     std::ostream &write(std::ostream &os) const override
     {
-      response::write(os) << "\r\n"
-                          << body << "\r\n";
+      response::write(os) << body;
       return os;
     }
 
