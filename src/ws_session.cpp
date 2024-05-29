@@ -5,7 +5,13 @@
 namespace network
 {
     ws_session::ws_session(server &srv, const std::string &path, boost::asio::ip::tcp::socket &&socket) : srv(srv), path(path), socket(std::move(socket)) { LOG_TRACE("WebSocket session created with " << this->socket.remote_endpoint()); }
-    ws_session::~ws_session() { LOG_TRACE("WebSocket session destroyed"); }
+    ws_session::~ws_session()
+    {
+        LOG_TRACE("WebSocket session destroyed");
+        while (!res_queue.empty()) // clear the response queue
+            res_queue.pop();
+        socket.close(); // close the socket
+    }
 
     void ws_session::start()
     {
