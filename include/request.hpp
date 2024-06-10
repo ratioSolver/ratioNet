@@ -113,6 +113,10 @@ namespace network
         if (is.get() == 'E' && is.get() == 'T')
           v = Get;
         break;
+      case 'O':
+        if (is.get() == 'P' && is.get() == 'T' && is.get() == 'I' && is.get() == 'O' && is.get() == 'N' && is.get() == 'S')
+          v = Options;
+        break;
       case 'P':
         switch (is.get())
         {

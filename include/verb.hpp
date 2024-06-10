@@ -9,7 +9,8 @@ namespace network
     Get,
     Post,
     Put,
-    Delete
+    Delete,
+    Options
   };
 
   inline std::string to_string(verb v)
@@ -24,6 +25,8 @@ namespace network
       return "PUT";
     case Delete:
       return "DELETE";
+    case Options:
+      return "OPTIONS";
     }
     return {};
   }
