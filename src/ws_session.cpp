@@ -93,7 +93,7 @@ namespace network
         char mask[4]; // mask for the message
         is.read(mask, 4);
         for (size_t i = 0; i < bytes_transferred - 4; i++) // unmask the message
-            msg->payload += is.get() ^ mask[i % 4];
+            *msg->payload += is.get() ^ mask[i % 4];
 
         if (msg->fin_rsv_opcode & 0x80) // fin bit is set
             srv.on_message(*this, std::move(msg));

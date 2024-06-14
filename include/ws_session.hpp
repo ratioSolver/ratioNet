@@ -127,11 +127,18 @@ namespace network
     void enqueue(std::unique_ptr<message> res);
 
     /**
+     * Sends a payload over the WebSocket session.
+     *
+     * @param payload The payload to be sent.
+     */
+    void send(std::shared_ptr<std::string> payload) { enqueue(std::make_unique<message>(payload)); }
+
+    /**
      * Sends a message over the WebSocket session.
      *
-     * @param msg The message to be sent.
+     * @param payload The payload to be sent.
      */
-    void send(const std::string &msg) { enqueue(std::make_unique<message>(msg)); }
+    void send(const std::string &payload) { send(std::make_shared<std::string>(payload)); }
 
     /**
      * Sends a ping message to the WebSocket server.
