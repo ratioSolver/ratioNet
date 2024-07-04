@@ -23,11 +23,7 @@ namespace network
                             if (self->res_queue.size() == 1)
                                 self->write(); });
     }
-    void session::write()
-    {
-        LOG_TRACE(*res_queue.front());
-        boost::asio::async_write(socket, res_queue.front()->get_buffer(), std::bind(&session::on_write, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
-    }
+    void session::write() { boost::asio::async_write(socket, res_queue.front()->get_buffer(), std::bind(&session::on_write, shared_from_this(), std::placeholders::_1, std::placeholders::_2)); }
 
     void session::upgrade()
     {

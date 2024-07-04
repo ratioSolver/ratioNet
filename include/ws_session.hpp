@@ -158,6 +158,13 @@ namespace network
      */
     void close() { enqueue(std::make_unique<message>(0x88)); }
 
+    /**
+     * @brief Get the remote endpoint of the WebSocket session.
+     *
+     * @return The remote endpoint of the WebSocket session.
+     */
+    boost::asio::ip::tcp::endpoint remote_endpoint() const { return socket.remote_endpoint(); }
+
   private:
     void read();
     void write();

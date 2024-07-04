@@ -71,7 +71,6 @@ namespace network
 
     void server::handle_request(session &s, std::unique_ptr<request> req)
     {
-        LOG_TRACE(*req);
         if (auto it = routes.find(req->get_verb()); it != routes.end())
             for (const auto &[re, handler] : it->second)
                 if (std::regex_match(req->get_target(), re))
