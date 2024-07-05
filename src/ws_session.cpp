@@ -4,8 +4,8 @@
 
 namespace network
 {
-    ws_session::ws_session(server &srv, const std::string &path, boost::asio::ip::tcp::socket &&socket) : srv(srv), path(path), socket(std::move(socket)) { LOG_TRACE("WebSocket session created with " << this->socket.remote_endpoint()); }
-    ws_session::~ws_session() { LOG_TRACE("WebSocket session destroyed with " << socket.remote_endpoint()); }
+    ws_session::ws_session(server &srv, const std::string &path, boost::asio::ip::tcp::socket &&socket) : srv(srv), path(path), endpoint(socket.remote_endpoint()), socket(std::move(socket)) { LOG_TRACE("WebSocket session created with " << endpoint); }
+    ws_session::~ws_session() { LOG_TRACE("WebSocket session destroyed with " << endpoint); }
 
     void ws_session::start()
     {

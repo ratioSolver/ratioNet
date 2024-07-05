@@ -163,7 +163,7 @@ namespace network
      *
      * @return The remote endpoint of the WebSocket session.
      */
-    boost::asio::ip::tcp::endpoint remote_endpoint() const { return socket.remote_endpoint(); }
+    boost::asio::ip::tcp::endpoint remote_endpoint() const { return endpoint; }
 
   private:
     void read();
@@ -177,6 +177,7 @@ namespace network
   private:
     server &srv;                                    // reference to the server
     std::string path;                               // path of the WebSocket session
+    boost::asio::ip::tcp::endpoint endpoint;        // remote endpoint of the session
     boost::asio::ip::tcp::socket socket;            // socket for the session
     std::unique_ptr<message> msg;                   // message being read
     std::queue<std::unique_ptr<message>> res_queue; // queue for the responses
