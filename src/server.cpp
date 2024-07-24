@@ -75,8 +75,17 @@ namespace network
             for (const auto &[re, handler] : it->second)
                 if (std::regex_match(req->get_target(), re))
                 {
-                    auto res = handler(*req);
-                    s.enqueue(std::move(res));
+                    try
+                    {
+                        auto res = handler(*req);
+                        s.enqueue(std::move(res));
+                    }
+                    catch (const std::exception &e)
+                    {
+                        LOG_ERR(e.what());
+                        auto res = std::make_unique<string_response>("Internal Server Error", status_code::internal_server_error);
+                        s.enqueue(std::move(res));
+                    }
                     return;
                 }
         LOG_WARN("No route for " + req->get_target());

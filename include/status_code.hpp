@@ -19,6 +19,7 @@ namespace network
     unauthorized = 401,
     forbidden = 403,
     not_found = 404,
+    conflict = 409,
     internal_server_error = 500,
     not_implemented = 501,
     bad_gateway = 502,
@@ -55,6 +56,8 @@ namespace network
       return "403 Forbidden";
     case not_found:
       return "404 Not Found";
+    case conflict:
+      return "409 Conflict";
     case internal_server_error:
       return "500 Internal Server Error";
     case not_implemented:
