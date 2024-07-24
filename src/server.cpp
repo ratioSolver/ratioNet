@@ -59,7 +59,7 @@ namespace network
         running = false;
     }
 
-    void server::do_accept() { acceptor.async_accept(io_ctx, std::bind(&server::on_accept, this, std::placeholders::_1, std::placeholders::_2)); }
+    void server::do_accept() { acceptor.async_accept(boost::asio::make_strand(io_ctx), std::bind(&server::on_accept, this, std::placeholders::_1, std::placeholders::_2)); }
 
     void server::on_accept(const boost::system::error_code &ec, boost::asio::ip::tcp::socket socket)
     {
