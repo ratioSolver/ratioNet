@@ -56,26 +56,24 @@ namespace network
             return;
         }
 
+        // the buffer may contain additional bytes beyond the delimiter
+        std::size_t additional_bytes = req->buffer.size() - bytes_transferred;
+
         req->parse(); // parse the request line and headers
 
         if (req->is_upgrade()) // handle websocket upgrade request
             return upgrade();
 
-        bool keep_alive = req->is_keep_alive();
-
         if (req->headers.find("Content-Length") != req->headers.end())
         { // read body
             std::size_t content_length = std::stoul(req->headers["Content-Length"]);
-            if (content_length > bytes_transferred) // the buffer may contain additional bytes beyond the delimiter
-                boost::asio::async_read(socket, req->buffer, boost::asio::transfer_exactly(content_length - bytes_transferred), std::bind(&session::on_body, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
+            if (content_length > additional_bytes) // read the remaining body
+                boost::asio::async_read(socket, req->buffer, boost::asio::transfer_exactly(content_length - additional_bytes), std::bind(&session::on_body, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
             else // the buffer contains the entire body
                 on_body(ec, bytes_transferred);
         }
-        else
+        else // no body
             srv.handle_request(*this, std::move(req));
-
-        if (keep_alive)
-            read(); // read next request
     }
 
     void session::on_body(const boost::system::error_code &ec, std::size_t bytes_transferred)
