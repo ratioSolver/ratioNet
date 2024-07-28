@@ -64,7 +64,11 @@ namespace network
     void server::on_accept(const boost::system::error_code &ec, boost::asio::ip::tcp::socket socket)
     {
         if (!ec)
+#ifdef ENABLE_SSL
+            std::make_shared<session>(*this, boost::asio::ssl::stream<boost::asio::ip::tcp::socket>(std::move(socket), ctx))->handshake();
+#else
             std::make_shared<session>(*this, std::move(socket))->read();
+#endif
 
         do_accept();
     }

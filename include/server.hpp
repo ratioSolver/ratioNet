@@ -1,8 +1,8 @@
 #pragma once
 
-#include <regex>
 #include "session.hpp"
 #include "ws_session.hpp"
+#include <regex>
 
 namespace network
 {
@@ -45,6 +45,22 @@ namespace network
      */
     ws_handler &add_ws_route(const std::string &path) noexcept { return ws_routes[path]; }
 
+#ifdef ENABLE_SSL
+    /**
+     * @brief Load the server's certificate and private key.
+     *
+     * This function loads the server's certificate and private key from the specified files.
+     *
+     * @param cert_file The path to the certificate file.
+     * @param key_file The path to the private key file.
+     */
+    void load_certificate(const std::string &cert_file, const std::string &key_file)
+    {
+      ctx.use_certificate_chain_file(cert_file);
+      ctx.use_private_key_file(key_file, boost::asio::ssl::context::pem);
+    }
+#endif
+
   private:
     void do_accept();
     void on_accept(const boost::system::error_code &ec, boost::asio::ip::tcp::socket socket);
@@ -63,6 +79,9 @@ namespace network
     boost::asio::ip::tcp::acceptor acceptor;                                                                        // The acceptor for the server
     std::map<verb, std::vector<std::pair<std::regex, std::function<std::unique_ptr<response>(request &)>>>> routes; // The routes of the server
     std::map<std::string, ws_handler> ws_routes;                                                                    // The WebSocket routes of the server
+#ifdef ENABLE_SSL
+    boost::asio::ssl::context ctx{boost::asio::ssl::context::TLS_VERSION}; // The SSL context is required, and holds certificates
+#endif
   };
 
   /**

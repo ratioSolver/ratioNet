@@ -1,8 +1,11 @@
 #pragma once
 
-#include <queue>
 #include "request.hpp"
 #include "response.hpp"
+#ifdef ENABLE_SSL
+#include <boost/asio/ssl.hpp>
+#endif
+#include <queue>
 
 namespace network
 {
@@ -21,10 +24,47 @@ namespace network
     friend class server;
 
   public:
+#ifdef ENABLE_SSL
+    /**
+     * @brief Constructs a new session object.
+     *
+     * This constructor is used to create a new session object that will handle the communication
+     * between the client and the server.
+     *
+     * @param srv The server that created the session.
+     * @param socket The SSL socket used to communicate with the client.
+     */
+    session(server &srv, boost::asio::ssl::stream<boost::asio::ip::tcp::socket> &&socket);
+#else
+    /**
+     * @brief Constructs a new session object.
+     *
+     * This constructor is used to create a new session object that will handle the communication
+     * between the client and the server.
+     *
+     * @param srv The server that created the session.
+     * @param socket The socket used to communicate with the client.
+     */
     session(server &srv, boost::asio::ip::tcp::socket &&socket);
+#endif
     ~session();
 
   private:
+#ifdef ENABLE_SSL
+    /**
+     * @brief Performs the SSL handshake with the client.
+     */
+    void handshake();
+
+    /**
+     * @brief Handler for the SSL handshake.
+     *
+     * This function is called when the SSL handshake with the client is completed.
+     *
+     * @param ec The error code returned by the handshake operation.
+     */
+    void on_handshake(const boost::system::error_code &ec);
+#endif
     /**
      * @brief Reads a request from the client.
      */
@@ -54,8 +94,13 @@ namespace network
     void on_write(const boost::system::error_code &ec, std::size_t bytes_transferred);
 
   private:
-    server &srv;                                                        // The server that created the session.
-    boost::asio::ip::tcp::socket socket;                                // The socket used to communicate with the client.
+    server &srv;                             // The server that created the session.
+    boost::asio::ip::tcp::endpoint endpoint; // The endpoint of the client.
+#ifdef ENABLE_SSL
+    boost::asio::ssl::stream<boost::asio::ip::tcp::socket> socket; // The SSL socket used to communicate with the client.
+#else
+    boost::asio::ip::tcp::socket socket; // The socket used to communicate with the client.
+#endif
     std::unique_ptr<request> req;                                       // The current request being processed.
     boost::asio::strand<boost::asio::io_context::executor_type> strand; // The strand used to synchronize access to the queue of responses.
     std::queue<std::unique_ptr<response>> res_queue;                    // The queue of responses to send to the client.

@@ -7,8 +7,27 @@
 
 namespace network
 {
-    session::session(server &srv, boost::asio::ip::tcp::socket &&socket) : srv(srv), socket(std::move(socket)), strand(boost::asio::make_strand(srv.io_ctx)) { LOG_TRACE("Session created with " << this->socket.remote_endpoint()); }
-    session::~session() { LOG_TRACE("Session destroyed"); }
+#ifdef ENABLE_SSL
+    session::session(server &srv, boost::asio::ssl::stream<boost::asio::ip::tcp::socket> &&socket) : srv(srv), endpoint(socket.lowest_layer().remote_endpoint()), socket(std::move(socket)), strand(boost::asio::make_strand(srv.io_ctx)) { LOG_TRACE("Session created with " << this->socket.lowest_layer().remote_endpoint()); }
+#else
+    session::session(server &srv, boost::asio::ip::tcp::socket &&socket) : srv(srv), endpoint(socket.remote_endpoint()), socket(std::move(socket)), strand(boost::asio::make_strand(srv.io_ctx)) { LOG_TRACE("Session created with " << this->socket.remote_endpoint()); }
+#endif
+    session::~session() { LOG_TRACE("Session destroyed with " << endpoint); }
+
+#ifdef ENABLE_SSL
+    void session::handshake() { socket.async_handshake(boost::asio::ssl::stream_base::server, std::bind(&session::on_handshake, shared_from_this(), std::placeholders::_1)); }
+
+    void session::on_handshake(const boost::system::error_code &ec)
+    {
+        if (ec)
+        {
+            LOG_ERR(ec.message());
+            return;
+        }
+
+        read();
+    }
+#endif
 
     void session::read()
     {

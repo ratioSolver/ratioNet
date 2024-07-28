@@ -1,7 +1,10 @@
 #pragma once
 
-#include <queue>
 #include "message.hpp"
+#ifdef ENABLE_SSL
+#include <boost/asio/ssl.hpp>
+#endif
+#include <queue>
 
 namespace network
 {
@@ -105,7 +108,31 @@ namespace network
     friend class session;
 
   public:
+#ifdef ENABLE_SSL
+    /**
+     * @brief Constructs a new WebSocket session object.
+     *
+     * This constructor is used to create a new WebSocket session object that will handle the communication
+     * between the client and the server.
+     *
+     * @param srv The server that created the session.
+     * @param path The path of the WebSocket session.
+     * @param socket The SSL socket used to communicate with the client.
+     */
+    ws_session(server &srv, const std::string &path, boost::asio::ssl::stream<boost::asio::ip::tcp::socket> &&socket);
+#else
+    /**
+     * @brief Constructs a new WebSocket session object.
+     *
+     * This constructor is used to create a new WebSocket session object that will handle the communication
+     * between the client and the server.
+     *
+     * @param srv The server that created the session.
+     * @param path The path of the WebSocket session.
+     * @param socket The socket used to communicate with the client.
+     */
     ws_session(server &srv, const std::string &path, boost::asio::ip::tcp::socket &&socket);
+#endif
     ~ws_session();
 
     /**
@@ -175,11 +202,15 @@ namespace network
     void on_write(const boost::system::error_code &ec, std::size_t bytes_transferred);
 
   private:
-    server &srv;                                    // reference to the server
-    std::string path;                               // path of the WebSocket session
-    boost::asio::ip::tcp::endpoint endpoint;        // remote endpoint of the session
-    boost::asio::ip::tcp::socket socket;            // socket for the session
-    std::unique_ptr<message> msg;                   // message being read
-    std::queue<std::unique_ptr<message>> res_queue; // queue for the responses
+    server &srv;                             // The server that created the session.
+    std::string path;                        // The path of the WebSocket session.
+    boost::asio::ip::tcp::endpoint endpoint; // The remote endpoint of the WebSocket session.
+#ifdef ENABLE_SSL
+    boost::asio::ssl::stream<boost::asio::ip::tcp::socket> socket; // The SSL socket used to communicate with the client.
+#else
+    boost::asio::ip::tcp::socket socket; // The socket used to communicate with the client.
+#endif
+    std::unique_ptr<message> msg;                   // The message being read.
+    std::queue<std::unique_ptr<message>> res_queue; // The queue of outgoing messages.
   };
 } // namespace network

@@ -4,7 +4,11 @@
 
 namespace network
 {
+#ifdef ENABLE_SSL
+    ws_session::ws_session(server &srv, const std::string &path, boost::asio::ssl::stream<boost::asio::ip::tcp::socket> &&socket) : srv(srv), path(path), endpoint(socket.lowest_layer().remote_endpoint()), socket(std::move(socket)) { LOG_TRACE("WebSocket session created with " << endpoint); }
+#else
     ws_session::ws_session(server &srv, const std::string &path, boost::asio::ip::tcp::socket &&socket) : srv(srv), path(path), endpoint(socket.remote_endpoint()), socket(std::move(socket)) { LOG_TRACE("WebSocket session created with " << endpoint); }
+#endif
     ws_session::~ws_session() { LOG_TRACE("WebSocket session destroyed with " << endpoint); }
 
     void ws_session::start()

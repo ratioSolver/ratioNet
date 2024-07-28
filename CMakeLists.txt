@@ -11,15 +11,15 @@ if(NOT TARGET json)
     add_subdirectory(extern/json)
 endif()
 
-option(USE_SSL "Use Secure Sockets Layer (SSL) for secure communication" OFF)
+option(ENABLE_SSL "Enable Secure Sockets Layer (SSL) for secure communication" OFF)
 set(SERVER_HOST "0.0.0.0" CACHE STRING "The address the server listens on")
 set(SERVER_PORT "8080" CACHE STRING "The port the server listens on")
 
-message(STATUS "Use SSL: ${USE_SSL}")
+message(STATUS "Enable SSL: ${ENABLE_SSL}")
 message(STATUS "Server address: ${SERVER_HOST}")
 message(STATUS "Server port: ${SERVER_PORT}")
 
-if(USE_SSL)
+if(ENABLE_SSL)
     find_package(OpenSSL REQUIRED)
 
     set(TLS_VERSIONS tlsv11 tlsv12 tlsv13)
@@ -36,9 +36,9 @@ target_link_libraries(ratioNet PUBLIC Boost::system json)
 target_include_directories(ratioNet PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
 target_compile_definitions(ratioNet PUBLIC SERVER_HOST="${SERVER_HOST}" SERVER_PORT=${SERVER_PORT})
 
-if (USE_SSL)
+if (ENABLE_SSL)
     target_link_libraries(ratioNet PUBLIC OpenSSL::SSL OpenSSL::Crypto)
-    target_compile_definitions(ratioNet PRIVATE USE_SSL TLS_VERSION=${TLS_VERSION})
+    target_compile_definitions(ratioNet PRIVATE ENABLE_SSL TLS_VERSION=${TLS_VERSION})
 endif()
 
 if(BUILD_TESTING)
