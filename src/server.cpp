@@ -96,7 +96,10 @@ namespace network
                     }
                     return;
                 }
+
         LOG_WARN("No route for " + req->get_target());
+        auto res = std::make_unique<string_response>("Not Found", status_code::not_found);
+        s.enqueue(std::move(res));
     }
 
     void server::on_connect(ws_session &s)
