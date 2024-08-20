@@ -3,6 +3,9 @@
 #include "session.hpp"
 #include "ws_session.hpp"
 #include <regex>
+#ifdef ENABLE_AUTH
+#include <set>
+#endif
 
 namespace network
 {
@@ -72,6 +75,29 @@ namespace network
     void on_message(ws_session &s, std::unique_ptr<message> msg);
     void on_error(ws_session &s, const boost::system::error_code &ec);
 
+#ifdef ENABLE_AUTH
+    std::unique_ptr<json_response> login(const request &req);
+
+    /**
+     * Generates a token for the given username and password.
+     *
+     * @param username The username for which to generate the token.
+     * @param password The password for the given username.
+     * @return The generated token as a string.
+     */
+    virtual std::string generate_token(const std::string &username, const std::string &password) = 0;
+
+    /**
+     * @brief Checks if the given request has permission with the specified token.
+     *
+     * @param req The request to check permission for.
+     * @param token The token to use for permission checking.
+     * @return True if the request has permission, false otherwise.
+     */
+    virtual bool has_permission(const request &req, const std::string &token) = 0;
+#endif
+
+  private:
     bool running = false;                                                                                           // The server is running
     boost::asio::io_context io_ctx;                                                                                 // The io_context is required for all I/O
     std::vector<std::thread> threads;                                                                               // The thread pool
@@ -79,6 +105,10 @@ namespace network
     boost::asio::ip::tcp::acceptor acceptor;                                                                        // The acceptor for the server
     std::map<verb, std::vector<std::pair<std::regex, std::function<std::unique_ptr<response>(request &)>>>> routes; // The routes of the server
     std::map<std::string, ws_handler> ws_routes;                                                                    // The WebSocket routes of the server
+#ifdef ENABLE_AUTH
+  protected:
+    std::set<std::string> open_routes; // The routes that are open to all users
+#endif
 #ifdef ENABLE_SSL
     boost::asio::ssl::context ctx{boost::asio::ssl::context::TLS_VERSION}; // The SSL context is required, and holds certificates
 #endif

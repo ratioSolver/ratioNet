@@ -3,7 +3,14 @@
 
 namespace network
 {
-    server::server(const std::string &host, unsigned short port, std::size_t concurrency_hint) : io_ctx(concurrency_hint), endpoint(boost::asio::ip::make_address(host), port), acceptor(boost::asio::make_strand(io_ctx)) { threads.reserve(concurrency_hint); }
+    server::server(const std::string &host, unsigned short port, std::size_t concurrency_hint) : io_ctx(concurrency_hint), endpoint(boost::asio::ip::make_address(host), port), acceptor(boost::asio::make_strand(io_ctx))
+    {
+        threads.reserve(concurrency_hint);
+#ifdef ENABLE_AUTH
+        add_route(verb::Post, "^/login$", std::bind(&server::login, this, std::placeholders::_1));
+        open_routes.insert("/login");
+#endif
+    }
     server::~server()
     {
         if (running)
@@ -85,20 +92,41 @@ namespace network
                 {
                     try
                     {
+#ifdef ENABLE_AUTH
+                        if (open_routes.find(req->get_target()) == open_routes.end()) // we need to check for authorization
+                            if (auto it = req->get_headers().find("Authorization"); it != req->get_headers().end())
+                            {
+                                auto token = it->second;
+                                token.erase(0, 7); // remove "Bearer " from token
+                                if (!has_permission(*req, token))
+                                { // user has no permission
+                                    auto res = std::make_unique<json_response>(json::json{{"message", "Forbidden"}}, status_code::forbidden);
+                                    s.enqueue(std::move(res));
+                                    return;
+                                }
+                            }
+                            else
+                            { // no token provided
+                                auto res = std::make_unique<json_response>(json::json{{"message", "Unauthorized"}}, status_code::unauthorized);
+                                s.enqueue(std::move(res));
+                                return;
+                            }
+#endif
                         auto res = handler(*req);
                         s.enqueue(std::move(res));
                     }
                     catch (const std::exception &e)
                     {
                         LOG_ERR(e.what());
-                        auto res = std::make_unique<string_response>("Internal Server Error", status_code::internal_server_error);
+                        auto res = std::make_unique<json_response>(json::json{{"message", "Internal Server Error"}}, status_code::internal_server_error);
                         s.enqueue(std::move(res));
                     }
                     return;
                 }
 
         LOG_WARN("No route for " + req->get_target());
-        auto res = std::make_unique<string_response>("Not Found", status_code::not_found);
+        json::json msg = {{"message", "Not Found"}};
+        auto res = std::make_unique<json_response>(json::json(msg), status_code::not_found);
         s.enqueue(std::move(res));
     }
 
@@ -149,4 +177,17 @@ namespace network
         else
             LOG_WARN("No route for " + s.path);
     }
+
+#ifdef ENABLE_AUTH
+    std::unique_ptr<json_response> server::login(const request &req)
+    {
+        auto &body = static_cast<const json_request &>(req).get_body();
+        if (!body.contains("username") || !body.contains("password"))
+            return std::make_unique<json_response>(json::json{{"message", "Bad Request"}}, status_code::bad_request);
+        auto token = generate_token(body["username"], body["password"]);
+        if (token.empty())
+            return std::make_unique<json_response>(json::json{{"message", "Unauthorized"}}, status_code::unauthorized);
+        return std::make_unique<json_response>(json::json{{"token", token}}, status_code::ok);
+    }
+#endif
 } // namespace network
