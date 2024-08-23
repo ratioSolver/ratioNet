@@ -7,8 +7,7 @@ namespace network
     {
         threads.reserve(concurrency_hint);
 #ifdef ENABLE_AUTH
-        add_route(verb::Post, "^/login$", std::bind(&server::login, this, std::placeholders::_1));
-        open_routes.insert("/login");
+        add_route(verb::Post, "^/login$", std::bind(&server::login, this, std::placeholders::_1), true);
 #endif
     }
     server::~server()
@@ -93,7 +92,8 @@ namespace network
                     try
                     {
 #ifdef ENABLE_AUTH
-                        if (open_routes.find(req->get_target()) == open_routes.end()) // we need to check for authorization
+                        if (open_routes.find(req->get_verb()) == open_routes.end() || std::none_of(open_routes.at(req->get_verb()).begin(), open_routes.at(req->get_verb()).end(), [&req](const auto &route)
+                                                                                                   { return std::regex_match(req->get_target(), route); })) // we need to check for authorization
                             if (auto it = req->get_headers().find("Authorization"); it != req->get_headers().end())
                             {
                                 auto token = it->second;

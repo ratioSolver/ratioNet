@@ -28,6 +28,21 @@ namespace network
      */
     void stop();
 
+#ifdef ENABLE_AUTH
+    /**
+     * Adds a route to the server.
+     *
+     * @param v The HTTP verb associated with the route.
+     * @param path The path of the route.
+     * @param handler The handler function that will be called when the route is requested.
+     */
+    void add_route(verb v, const std::string &path, std::function<std::unique_ptr<response>(request &)> &&handler, bool open = false) noexcept
+    {
+      routes[v].emplace_back(std::regex(path), std::move(handler));
+      if (open)
+        open_routes[v].emplace_back(path);
+    }
+#else
     /**
      * Adds a route to the server.
      *
@@ -36,6 +51,7 @@ namespace network
      * @param handler The handler function that will be called when the route is requested.
      */
     void add_route(verb v, const std::string &path, std::function<std::unique_ptr<response>(request &)> &&handler) noexcept { routes[v].emplace_back(std::regex(path), std::move(handler)); }
+#endif
 
     /**
      * Adds a WebSocket route to the server.
@@ -106,8 +122,7 @@ namespace network
     std::map<verb, std::vector<std::pair<std::regex, std::function<std::unique_ptr<response>(request &)>>>> routes; // The routes of the server
     std::map<std::string, ws_handler> ws_routes;                                                                    // The WebSocket routes of the server
 #ifdef ENABLE_AUTH
-  protected:
-    std::set<std::string> open_routes; // The routes that are open to all users
+    std::map<verb, std::vector<std::regex>> open_routes; // The routes that are open to all users (no authentication required)
 #endif
 #ifdef ENABLE_SSL
     boost::asio::ssl::context ctx{boost::asio::ssl::context::TLS_VERSION}; // The SSL context is required, and holds certificates
