@@ -302,10 +302,10 @@ namespace network
      * @param hdrs The headers of the response. Default is an empty map.
      * @param ver The version of the HTTP protocol. Default is "HTTP/1.1".
      */
-    json_response(json::json &&b, status_code code = status_code::ok, std::map<std::string, std::string> &&hdrs = {}, std::string &&ver = "HTTP/1.1") : response(code, std::move(hdrs), std::move(ver)), body(b.dump())
+    json_response(json::json &&b, status_code code = status_code::ok, std::map<std::string, std::string> &&hdrs = {}, std::string &&ver = "HTTP/1.1") : response(code, std::move(hdrs), std::move(ver)), body(std::move(b)), str_body(body.dump())
     {
       headers["Content-Type"] = "application/json";
-      headers["Content-Length"] = std::to_string(body.size());
+      headers["Content-Length"] = std::to_string(str_body.size());
     }
     /**
      * @brief Constructs a `json_response` object with the given JSON body, status code, headers, and version.
@@ -315,18 +315,18 @@ namespace network
      * @param hdrs The headers of the response. Default is an empty map.
      * @param ver The version of the HTTP protocol. Default is "HTTP/1.1".
      */
-    json_response(const json::json &b, status_code code = status_code::ok, std::map<std::string, std::string> &&hdrs = {}, std::string &&ver = "HTTP/1.1") : response(code, std::move(hdrs), std::move(ver)), body(b.dump())
+    json_response(const json::json &b, status_code code = status_code::ok, std::map<std::string, std::string> &&hdrs = {}, std::string &&ver = "HTTP/1.1") : response(code, std::move(hdrs), std::move(ver)), body(b), str_body(body.dump())
     {
       headers["Content-Type"] = "application/json";
-      headers["Content-Length"] = std::to_string(body.size());
+      headers["Content-Length"] = std::to_string(str_body.size());
     }
 
     /**
      * @brief Gets the JSON body of the response.
      *
-     * @return A constant reference to the JSON body.
+     * @return The JSON body.
      */
-    const std::string &get_body() const { return body; }
+    const json::json &get_body() const { return body; }
 
   private:
     /**
@@ -340,11 +340,12 @@ namespace network
      */
     std::ostream &write(std::ostream &os) const override
     {
-      response::write(os) << body;
+      response::write(os) << str_body;
       return os;
     }
 
   private:
-    std::string body; // The body of the response
+    json::json body;      // The JSON body of the response
+    std::string str_body; // The body of the response
   };
 } // namespace network

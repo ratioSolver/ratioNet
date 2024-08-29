@@ -32,41 +32,41 @@ namespace network
      * Sends a POST request to the specified target with optional headers and body.
      *
      * @param target The target URL or path.
-     * @param hdrs The optional headers to include in the request.
      * @param body The body of the request.
+     * @param hdrs The optional headers to include in the request.
      * @return A unique pointer to the response object.
      */
-    std::unique_ptr<response> post(std::string &&target, std::map<std::string, std::string> &&hdrs = {}, std::string &&body = {}) { return send(std::make_unique<string_request>(verb::Post, std::move(target), "HTTP/1.1", std::move(hdrs), std::move(body))); }
+    std::unique_ptr<response> post(std::string &&target, std::string &&body, std::map<std::string, std::string> &&hdrs = {}) { return send(std::make_unique<string_request>(verb::Post, std::move(target), "HTTP/1.1", std::move(hdrs), std::move(body))); }
 
     /**
      * Sends a POST request to the specified target with optional headers and JSON body.
      *
      * @param target The target URL or path.
+     * @param body The body of the request.
      * @param hdrs The optional headers to include in the request.
-     * @param body The JSON body of the request.
      * @return A unique pointer to the response object.
      */
-    std::unique_ptr<response> post(std::string &&target, std::map<std::string, std::string> &&hdrs, json::json &&body) { return send(std::make_unique<json_request>(verb::Post, std::move(target), "HTTP/1.1", std::move(hdrs), std::move(body))); }
+    std::unique_ptr<response> post(std::string &&target, json::json &&body, std::map<std::string, std::string> &&hdrs = {}) { return send(std::make_unique<json_request>(verb::Post, std::move(target), "HTTP/1.1", std::move(hdrs), std::move(body))); }
 
     /**
      * Sends a PUT request to the specified target with optional headers and body.
      *
      * @param target The target URL or path.
-     * @param hdrs The optional headers to include in the request.
      * @param body The body of the request.
+     * @param hdrs The optional headers to include in the request.
      * @return A unique pointer to the response object.
      */
-    std::unique_ptr<response> put(std::string &&target, std::map<std::string, std::string> &&hdrs = {}, std::string &&body = {}) { return send(std::make_unique<string_request>(verb::Put, std::move(target), "HTTP/1.1", std::move(hdrs), std::move(body))); }
+    std::unique_ptr<response> put(std::string &&target, std::string &&body, std::map<std::string, std::string> &&hdrs = {}) { return send(std::make_unique<string_request>(verb::Put, std::move(target), "HTTP/1.1", std::move(hdrs), std::move(body))); }
 
     /**
      * Sends a PUT request to the specified target with optional headers and JSON body.
      *
      * @param target The target URL or path.
+     * @param body The body of the request.
      * @param hdrs The optional headers to include in the request.
-     * @param body The JSON body of the request.
      * @return A unique pointer to the response object.
      */
-    std::unique_ptr<response> put(std::string &&target, std::map<std::string, std::string> &&hdrs, json::json &&body) { return send(std::make_unique<json_request>(verb::Put, std::move(target), "HTTP/1.1", std::move(hdrs), std::move(body))); }
+    std::unique_ptr<response> put(std::string &&target, json::json &&body, std::map<std::string, std::string> &&hdrs = {}) { return send(std::make_unique<json_request>(verb::Put, std::move(target), "HTTP/1.1", std::move(hdrs), std::move(body))); }
 
     /**
      * Sends a DELETE request to the specified target with optional headers.
