@@ -60,5 +60,25 @@ int main()
 }
 ```
 
+Creating a client is just as easy:
+
+```cpp
+#include <client.hpp>
+
+int main()
+{
+    // Create the client instance
+    network::client client;
+
+    // Send an HTTP request
+    auto res = client.get("/");
+
+    // Print the response
+    std::cout << res << std::endl;
+
+    return 0;
+}
+```
+
 ## Contributing
 Contributions to the framework are welcome! If you find any bugs, have feature requests, or would like to contribute in any way, please submit issues and pull requests to the GitHub repository.
