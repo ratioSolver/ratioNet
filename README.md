@@ -2,7 +2,8 @@
 
 ![Build Status](https://github.com/ratioSolver/ratioNet/actions/workflows/cmake.yml/badge.svg)
 
-Welcome to the `ratioNet` documentation. This framework provides a powerful and flexible foundation for building networked applications using the [Boost.Beast](https://github.com/boostorg/beast) library. Whether you're developing a web server, a WebSocket application, or any other networked software, this framework will help you get started quickly and efficiently.
+Welcome to the `ratioNet` documentation. This framework provides a powerful and flexible foundation for building networked applications using the [Asio](https://think-async.com/Asio) library.
+Whether you're developing a web server, a WebSocket application, or any other networked software, this framework will help you get started quickly and efficiently.
 
 ## Features
 
@@ -19,19 +20,11 @@ Welcome to the `ratioNet` documentation. This framework provides a powerful and 
 - **Examples and Tutorials**: The repository includes examples and tutorials to help you understand how to use the framework effectively in different scenarios.
 
 ## Getting Started
-Follow these steps to get started with `ratioNet`:
 
-**Install [Boost](https://www.boost.org)**
-The framework relies on the Boost library for managing data structures and algorithms. You can install Boost on your local machine using the following command:
+To get started with `ratioNet`, you can clone the repository and build the examples:
 
 ```bash
-sudo apt-get install libboost-all-dev
-```
-
-Clone the Repository: Start by cloning this repository to your local machine:
-
-```bash
-git clone https://github.com/ratioSolver/ratioNet.git
+git clone --recursive https://github.com/ratioSolver/ratioNet.git
 ```
 
 ## Usage
