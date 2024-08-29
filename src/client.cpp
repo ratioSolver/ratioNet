@@ -10,15 +10,15 @@ namespace network
     {
         if (!socket.is_open())
             connect();
-        boost::system::error_code ec;
-        boost::asio::write(socket, req->get_buffer(), ec);
+        std::error_code ec;
+        asio::write(socket, req->get_buffer(), ec);
         if (ec)
         {
             LOG_ERR(ec.message());
             return nullptr;
         }
         auto res = std::make_unique<response>();
-        boost::asio::read_until(socket, res->get_buffer(), "\r\n\r\n", ec);
+        asio::read_until(socket, res->get_buffer(), "\r\n\r\n", ec);
         if (ec)
         {
             LOG_ERR(ec.message());
@@ -28,7 +28,7 @@ namespace network
         if (res->get_headers().find("Content-Length") != res->get_headers().end())
         {
             auto len = std::stoul(res->get_headers().at("Content-Length"));
-            boost::asio::read(socket, res->get_buffer(), boost::asio::transfer_exactly(len), ec);
+            asio::read(socket, res->get_buffer(), asio::transfer_exactly(len), ec);
             if (ec)
             {
                 LOG_ERR(ec.message());
@@ -51,8 +51,8 @@ namespace network
     void client::disconnect()
     {
         LOG_DEBUG("Disconnecting from " << host << ":" << port << "...");
-        boost::system::error_code ec;
-        socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
+        std::error_code ec;
+        socket.shutdown(asio::ip::tcp::socket::shutdown_both, ec);
         if (ec)
         {
             LOG_ERR(ec.message());
@@ -67,8 +67,8 @@ namespace network
     void client::connect()
     {
         LOG_DEBUG("Connecting to " << host << ":" << port << "...");
-        boost::system::error_code ec;
-        boost::asio::connect(socket, resolver.resolve(host, std::to_string(port)), ec);
+        std::error_code ec;
+        asio::connect(socket, resolver.resolve(host, std::to_string(port)), ec);
         if (ec)
         {
             LOG_ERR(ec.message());

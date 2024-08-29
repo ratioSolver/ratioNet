@@ -76,20 +76,20 @@ namespace network
     void load_certificate(const std::string &cert_file, const std::string &key_file)
     {
       ctx.use_certificate_chain_file(cert_file);
-      ctx.use_private_key_file(key_file, boost::asio::ssl::context::pem);
+      ctx.use_private_key_file(key_file, asio::ssl::context::pem);
     }
 #endif
 
   private:
     void do_accept();
-    void on_accept(const boost::system::error_code &ec, boost::asio::ip::tcp::socket socket);
+    void on_accept(const std::error_code &ec, asio::ip::tcp::socket socket);
 
     void handle_request(session &s, std::unique_ptr<request> req);
 
     void on_connect(ws_session &s);
     void on_disconnect(ws_session &s);
     void on_message(ws_session &s, std::unique_ptr<message> msg);
-    void on_error(ws_session &s, const boost::system::error_code &ec);
+    void on_error(ws_session &s, const std::error_code &ec);
 
 #ifdef ENABLE_AUTH
     std::unique_ptr<json_response> login(const request &req);
@@ -115,17 +115,17 @@ namespace network
 
   private:
     bool running = false;                                                                                           // The server is running
-    boost::asio::io_context io_ctx;                                                                                 // The io_context is required for all I/O
+    asio::io_context io_ctx;                                                                                        // The io_context is required for all I/O
     std::vector<std::thread> threads;                                                                               // The thread pool
-    boost::asio::ip::tcp::endpoint endpoint;                                                                        // The endpoint for the server
-    boost::asio::ip::tcp::acceptor acceptor;                                                                        // The acceptor for the server
+    asio::ip::tcp::endpoint endpoint;                                                                               // The endpoint for the server
+    asio::ip::tcp::acceptor acceptor;                                                                               // The acceptor for the server
     std::map<verb, std::vector<std::pair<std::regex, std::function<std::unique_ptr<response>(request &)>>>> routes; // The routes of the server
     std::map<std::string, ws_handler> ws_routes;                                                                    // The WebSocket routes of the server
 #ifdef ENABLE_AUTH
     std::map<verb, std::vector<std::regex>> open_routes; // The routes that are open to all users (no authentication required)
 #endif
 #ifdef ENABLE_SSL
-    boost::asio::ssl::context ctx{boost::asio::ssl::context::TLS_VERSION}; // The SSL context is required, and holds certificates
+    asio::ssl::context ctx{asio::ssl::context::TLS_VERSION}; // The SSL context is required, and holds certificates
 #endif
   };
 

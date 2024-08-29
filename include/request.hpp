@@ -1,12 +1,17 @@
 #pragma once
 
-#include <boost/asio.hpp>
+#include <asio.hpp>
 #include "verb.hpp"
 #include "json.hpp"
 
 namespace network
 {
   class session;
+
+  namespace placeholders
+  {
+    static constexpr auto &request = std::placeholders::_1;
+  }
 
   /**
    * @brief Represents an HTTP request.
@@ -87,7 +92,7 @@ namespace network
      * @brief Get the buffer containing the request.
      * @return The buffer.
      */
-    boost::asio::streambuf &get_buffer()
+    asio::streambuf &get_buffer()
     {
       std::ostream os(&buffer);
       write(os); // Write the request to the buffer
@@ -179,7 +184,7 @@ namespace network
     std::string target;                         // The target of the request
     std::string version;                        // The HTTP version of the request
     std::map<std::string, std::string> headers; // The headers of the request
-    boost::asio::streambuf buffer;              // The buffer containing the request
+    asio::streambuf buffer;                     // The buffer containing the request
   };
 
   class string_request : public request

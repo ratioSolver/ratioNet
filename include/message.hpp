@@ -1,6 +1,6 @@
 #pragma once
 
-#include <boost/asio.hpp>
+#include <asio.hpp>
 
 namespace network
 {
@@ -52,7 +52,7 @@ namespace network
      *
      * @return The buffer containing the serialized message.
      */
-    boost::asio::streambuf &get_buffer() noexcept
+    asio::streambuf &get_buffer() noexcept
     {
       std::ostream os(&buffer);
       os.put(fin_rsv_opcode);
@@ -76,7 +76,7 @@ namespace network
 
   private:
     unsigned char fin_rsv_opcode;         // fin, rsv, and opcode for the message
-    boost::asio::streambuf buffer;        // buffer for the message
+    asio::streambuf buffer;               // buffer for the message
     std::shared_ptr<std::string> payload; // payload of the message
   };
 } // namespace network

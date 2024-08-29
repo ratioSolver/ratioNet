@@ -8,16 +8,16 @@
 namespace network
 {
 #ifdef ENABLE_SSL
-    session::session(server &srv, boost::asio::ssl::stream<boost::asio::ip::tcp::socket> &&socket) : srv(srv), endpoint(socket.lowest_layer().remote_endpoint()), socket(std::move(socket)), strand(boost::asio::make_strand(srv.io_ctx)) { LOG_TRACE("Session created with " << this->socket.lowest_layer().remote_endpoint()); }
+    session::session(server &srv, asio::ssl::stream<asio::ip::tcp::socket> &&socket) : srv(srv), endpoint(socket.lowest_layer().remote_endpoint()), socket(std::move(socket)), strand(asio::make_strand(srv.io_ctx)) { LOG_TRACE("Session created with " << this->socket.lowest_layer().remote_endpoint()); }
 #else
-    session::session(server &srv, boost::asio::ip::tcp::socket &&socket) : srv(srv), endpoint(socket.remote_endpoint()), socket(std::move(socket)), strand(boost::asio::make_strand(srv.io_ctx)) { LOG_TRACE("Session created with " << this->socket.remote_endpoint()); }
+    session::session(server &srv, asio::ip::tcp::socket &&socket) : srv(srv), endpoint(socket.remote_endpoint()), socket(std::move(socket)), strand(asio::make_strand(srv.io_ctx)) { LOG_TRACE("Session created with " << this->socket.remote_endpoint()); }
 #endif
     session::~session() { LOG_TRACE("Session destroyed with " << endpoint); }
 
 #ifdef ENABLE_SSL
-    void session::handshake() { socket.async_handshake(boost::asio::ssl::stream_base::server, std::bind(&session::on_handshake, shared_from_this(), std::placeholders::_1)); }
+    void session::handshake() { socket.async_handshake(asio::ssl::stream_base::server, std::bind(&session::on_handshake, shared_from_this(), asio::placeholders::error)); }
 
-    void session::on_handshake(const boost::system::error_code &ec)
+    void session::on_handshake(const std::error_code &ec)
     {
         if (ec)
         {
@@ -32,17 +32,17 @@ namespace network
     void session::read()
     {
         req = std::make_unique<request>();
-        boost::asio::async_read_until(socket, req->buffer, "\r\n\r\n", std::bind(&session::on_read, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
+        asio::async_read_until(socket, req->buffer, "\r\n\r\n", std::bind(&session::on_read, shared_from_this(), asio::placeholders::error, asio::placeholders::bytes_transferred));
     }
 
     void session::enqueue(std::unique_ptr<response> res)
     {
-        boost::asio::post(strand, [self = shared_from_this(), r = std::move(res)]() mutable
-                          { self->res_queue.push(std::move(r));
+        asio::post(strand, [self = shared_from_this(), r = std::move(res)]() mutable
+                   { self->res_queue.push(std::move(r));
                             if (self->res_queue.size() == 1)
                                 self->write(); });
     }
-    void session::write() { boost::asio::async_write(socket, res_queue.front()->get_buffer(), std::bind(&session::on_write, shared_from_this(), std::placeholders::_1, std::placeholders::_2)); }
+    void session::write() { asio::async_write(socket, res_queue.front()->get_buffer(), std::bind(&session::on_write, shared_from_this(), asio::placeholders::error, asio::placeholders::bytes_transferred)); }
 
     void session::upgrade()
     {
@@ -61,13 +61,13 @@ namespace network
 
         auto res = std::make_unique<response>(status_code::websocket_switching_protocols, std::map<std::string, std::string>{{"Upgrade", "websocket"}, {"Connection", "Upgrade"}, {"Sec-WebSocket-Accept", key}});
         auto &buf = res->get_buffer();
-        boost::asio::async_write(socket, buf, [self = shared_from_this(), res = std::move(res)](const boost::system::error_code &ec, std::size_t bytes_transferred)
-                                 { if (ec) { LOG_ERR(ec.message()); return; } std::make_shared<ws_session>(self->srv, self->req->target, std::move(self->socket))->start(); });
+        asio::async_write(socket, buf, [self = shared_from_this(), res = std::move(res)](const std::error_code &ec, std::size_t bytes_transferred)
+                          { if (ec) { LOG_ERR(ec.message()); return; } std::make_shared<ws_session>(self->srv, self->req->target, std::move(self->socket))->start(); });
     }
 
-    void session::on_read(const boost::system::error_code &ec, std::size_t bytes_transferred)
+    void session::on_read(const std::error_code &ec, std::size_t bytes_transferred)
     {
-        if (ec == boost::asio::error::eof)
+        if (ec == asio::error::eof)
             return; // connection closed by client
         else if (ec)
         {
@@ -87,7 +87,7 @@ namespace network
         { // read body
             std::size_t content_length = std::stoul(req->headers["Content-Length"]);
             if (content_length > additional_bytes) // read the remaining body
-                boost::asio::async_read(socket, req->buffer, boost::asio::transfer_exactly(content_length - additional_bytes), std::bind(&session::on_body, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
+                asio::async_read(socket, req->buffer, asio::transfer_exactly(content_length - additional_bytes), std::bind(&session::on_body, shared_from_this(), asio::placeholders::error, asio::placeholders::bytes_transferred));
             else // the buffer contains the entire body
                 on_body(ec, bytes_transferred);
         }
@@ -95,9 +95,9 @@ namespace network
             srv.handle_request(*this, std::move(req));
     }
 
-    void session::on_body(const boost::system::error_code &ec, std::size_t bytes_transferred)
+    void session::on_body(const std::error_code &ec, std::size_t bytes_transferred)
     {
-        if (ec == boost::asio::error::eof)
+        if (ec == asio::error::eof)
             return; // connection closed by client
         else if (ec)
         {
@@ -118,7 +118,7 @@ namespace network
         srv.handle_request(*this, std::move(req));
     }
 
-    void session::on_write(const boost::system::error_code &ec, std::size_t bytes_transferred)
+    void session::on_write(const std::error_code &ec, std::size_t bytes_transferred)
     {
         if (ec)
         {

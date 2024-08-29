@@ -1,6 +1,6 @@
 #pragma once
 
-#include <boost/asio.hpp>
+#include <asio.hpp>
 #include <fstream>
 #include "status_code.hpp"
 #include "mime_types.hpp"
@@ -61,7 +61,7 @@ namespace network
      *
      * @return The buffer.
      */
-    boost::asio::streambuf &get_buffer()
+    asio::streambuf &get_buffer()
     {
       std::ostream os(&buffer);
       write(os); // Write the response to the buffer
@@ -126,8 +126,8 @@ namespace network
     std::map<std::string, std::string> headers; // The headers of the response
 
   private:
-    std::string version;           // The HTTP version of the response
-    boost::asio::streambuf buffer; // The buffer containing the response
+    std::string version;    // The HTTP version of the response
+    asio::streambuf buffer; // The buffer containing the response
   };
 
   /**

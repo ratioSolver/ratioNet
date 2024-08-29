@@ -3,7 +3,7 @@
 #include "request.hpp"
 #include "response.hpp"
 #ifdef ENABLE_SSL
-#include <boost/asio/ssl.hpp>
+#include <asio/ssl.hpp>
 #endif
 #include <queue>
 
@@ -34,7 +34,7 @@ namespace network
      * @param srv The server that created the session.
      * @param socket The SSL socket used to communicate with the client.
      */
-    session(server &srv, boost::asio::ssl::stream<boost::asio::ip::tcp::socket> &&socket);
+    session(server &srv, asio::ssl::stream<asio::ip::tcp::socket> &&socket);
 #else
     /**
      * @brief Constructs a new session object.
@@ -45,7 +45,7 @@ namespace network
      * @param srv The server that created the session.
      * @param socket The socket used to communicate with the client.
      */
-    session(server &srv, boost::asio::ip::tcp::socket &&socket);
+    session(server &srv, asio::ip::tcp::socket &&socket);
 #endif
     ~session();
 
@@ -63,7 +63,7 @@ namespace network
      *
      * @param ec The error code returned by the handshake operation.
      */
-    void on_handshake(const boost::system::error_code &ec);
+    void on_handshake(const std::error_code &ec);
 #endif
     /**
      * @brief Reads a request from the client.
@@ -88,21 +88,21 @@ namespace network
      */
     void upgrade();
 
-    void on_read(const boost::system::error_code &ec, std::size_t bytes_transferred);
-    void on_body(const boost::system::error_code &ec, std::size_t bytes_transferred);
+    void on_read(const std::error_code &ec, std::size_t bytes_transferred);
+    void on_body(const std::error_code &ec, std::size_t bytes_transferred);
 
-    void on_write(const boost::system::error_code &ec, std::size_t bytes_transferred);
+    void on_write(const std::error_code &ec, std::size_t bytes_transferred);
 
   private:
-    server &srv;                             // The server that created the session.
-    boost::asio::ip::tcp::endpoint endpoint; // The endpoint of the client.
+    server &srv;                      // The server that created the session.
+    asio::ip::tcp::endpoint endpoint; // The endpoint of the client.
 #ifdef ENABLE_SSL
-    boost::asio::ssl::stream<boost::asio::ip::tcp::socket> socket; // The SSL socket used to communicate with the client.
+    asio::ssl::stream<asio::ip::tcp::socket> socket; // The SSL socket used to communicate with the client.
 #else
-    boost::asio::ip::tcp::socket socket; // The socket used to communicate with the client.
+    asio::ip::tcp::socket socket; // The socket used to communicate with the client.
 #endif
-    std::unique_ptr<request> req;                                       // The current request being processed.
-    boost::asio::strand<boost::asio::io_context::executor_type> strand; // The strand used to synchronize access to the queue of responses.
-    std::queue<std::unique_ptr<response>> res_queue;                    // The queue of responses to send to the client.
+    std::unique_ptr<request> req;                         // The current request being processed.
+    asio::strand<asio::io_context::executor_type> strand; // The strand used to synchronize access to the queue of responses.
+    std::queue<std::unique_ptr<response>> res_queue;      // The queue of responses to send to the client.
   };
 } // namespace network

@@ -3,11 +3,11 @@
 
 namespace network
 {
-    server::server(const std::string &host, unsigned short port, std::size_t concurrency_hint) : io_ctx(concurrency_hint), endpoint(boost::asio::ip::make_address(host), port), acceptor(boost::asio::make_strand(io_ctx))
+    server::server(const std::string &host, unsigned short port, std::size_t concurrency_hint) : io_ctx(concurrency_hint), endpoint(asio::ip::make_address(host), port), acceptor(asio::make_strand(io_ctx))
     {
         threads.reserve(concurrency_hint);
 #ifdef ENABLE_AUTH
-        add_route(verb::Post, "^/login$", std::bind(&server::login, this, std::placeholders::_1), true);
+        add_route(verb::Post, "^/login$", std::bind(&server::login, this, placeholders::request), true);
 #endif
     }
     server::~server()
@@ -20,14 +20,14 @@ namespace network
     {
         LOG_DEBUG("Starting server on " + endpoint.address().to_string() + ":" + std::to_string(endpoint.port()));
 
-        boost::system::error_code ec;
+        std::error_code ec;
         acceptor.open(endpoint.protocol(), ec);
         if (ec)
         {
             LOG_ERR(ec.message());
             return;
         }
-        acceptor.set_option(boost::asio::socket_base::reuse_address(true), ec);
+        acceptor.set_option(asio::socket_base::reuse_address(true), ec);
         if (ec)
         {
             LOG_ERR(ec.message());
@@ -39,7 +39,7 @@ namespace network
             LOG_ERR(ec.message());
             return;
         }
-        acceptor.listen(boost::asio::socket_base::max_listen_connections, ec);
+        acceptor.listen(asio::socket_base::max_listen_connections, ec);
         if (ec)
         {
             LOG_ERR(ec.message());
@@ -65,13 +65,13 @@ namespace network
         running = false;
     }
 
-    void server::do_accept() { acceptor.async_accept(boost::asio::make_strand(io_ctx), std::bind(&server::on_accept, this, std::placeholders::_1, std::placeholders::_2)); }
+    void server::do_accept() { acceptor.async_accept(asio::make_strand(io_ctx), std::bind(&server::on_accept, this, asio::placeholders::error, std::placeholders::_2)); }
 
-    void server::on_accept(const boost::system::error_code &ec, boost::asio::ip::tcp::socket socket)
+    void server::on_accept(const std::error_code &ec, asio::ip::tcp::socket socket)
     {
         if (!ec)
 #ifdef ENABLE_SSL
-            std::make_shared<session>(*this, boost::asio::ssl::stream<boost::asio::ip::tcp::socket>(std::move(socket), ctx))->handshake();
+            std::make_shared<session>(*this, asio::ssl::stream<asio::ip::tcp::socket>(std::move(socket), ctx))->handshake();
 #else
             std::make_shared<session>(*this, std::move(socket))->read();
 #endif
@@ -170,7 +170,7 @@ namespace network
         }
     }
 
-    void server::on_error(ws_session &s, const boost::system::error_code &ec)
+    void server::on_error(ws_session &s, const std::error_code &ec)
     {
         if (auto it = ws_routes.find(s.path); it != ws_routes.end())
             it->second.on_error_handler(s, ec);

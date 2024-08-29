@@ -1,8 +1,8 @@
 #pragma once
 
-#include <queue>
 #include "request.hpp"
 #include "response.hpp"
+#include <queue>
 
 namespace network
 {
@@ -88,8 +88,8 @@ namespace network
   private:
     const std::string host;                  // The host name of the server.
     const unsigned short port;               // The port number of the server.
-    boost::asio::io_context io_ctx;          // The I/O context used for asynchronous operations.
-    boost::asio::ip::tcp::resolver resolver; // The resolver used to resolve host names.
-    boost::asio::ip::tcp::socket socket;     // The socket used to communicate with the server.
+    asio::io_context io_ctx;          // The I/O context used for asynchronous operations.
+    asio::ip::tcp::resolver resolver; // The resolver used to resolve host names.
+    asio::ip::tcp::socket socket;     // The socket used to communicate with the server.
   };
 } // namespace network

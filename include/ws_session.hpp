@@ -2,7 +2,7 @@
 
 #include "message.hpp"
 #ifdef ENABLE_SSL
-#include <boost/asio/ssl.hpp>
+#include <asio/ssl.hpp>
 #endif
 #include <queue>
 
@@ -78,17 +78,17 @@ namespace network
      *                The function should take a reference to the `ws_session` object as its parameter.
      * @return A reference to the `ws_handler` object.
      */
-    ws_handler &on_error(std::function<void(ws_session &, const boost::system::error_code &)> &&handler) noexcept
+    ws_handler &on_error(std::function<void(ws_session &, const std::error_code &)> &&handler) noexcept
     {
       on_error_handler = std::move(handler);
       return *this;
     }
 
   private:
-    std::function<void(ws_session &)> on_open_handler;                                     // handler for the open event
-    std::function<void(ws_session &, const std::string &)> on_message_handler;             // handler for the message event
-    std::function<void(ws_session &)> on_close_handler;                                    // handler for the close event
-    std::function<void(ws_session &, const boost::system::error_code &)> on_error_handler; // handler for the error event
+    std::function<void(ws_session &)> on_open_handler;                           // handler for the open event
+    std::function<void(ws_session &, const std::string &)> on_message_handler;   // handler for the message event
+    std::function<void(ws_session &)> on_close_handler;                          // handler for the close event
+    std::function<void(ws_session &, const std::error_code &)> on_error_handler; // handler for the error event
   };
 
   /**
@@ -119,7 +119,7 @@ namespace network
      * @param path The path of the WebSocket session.
      * @param socket The SSL socket used to communicate with the client.
      */
-    ws_session(server &srv, const std::string &path, boost::asio::ssl::stream<boost::asio::ip::tcp::socket> &&socket);
+    ws_session(server &srv, const std::string &path, asio::ssl::stream<asio::ip::tcp::socket> &&socket);
 #else
     /**
      * @brief Constructs a new WebSocket session object.
@@ -131,7 +131,7 @@ namespace network
      * @param path The path of the WebSocket session.
      * @param socket The socket used to communicate with the client.
      */
-    ws_session(server &srv, const std::string &path, boost::asio::ip::tcp::socket &&socket);
+    ws_session(server &srv, const std::string &path, asio::ip::tcp::socket &&socket);
 #endif
     ~ws_session();
 
@@ -190,25 +190,25 @@ namespace network
      *
      * @return The remote endpoint of the WebSocket session.
      */
-    boost::asio::ip::tcp::endpoint remote_endpoint() const { return endpoint; }
+    asio::ip::tcp::endpoint remote_endpoint() const { return endpoint; }
 
   private:
     void read();
     void write();
 
-    void on_read(const boost::system::error_code &ec, std::size_t bytes_transferred);
-    void on_message(const boost::system::error_code &ec, std::size_t bytes_transferred);
+    void on_read(const std::error_code &ec, std::size_t bytes_transferred);
+    void on_message(const std::error_code &ec, std::size_t bytes_transferred);
 
-    void on_write(const boost::system::error_code &ec, std::size_t bytes_transferred);
+    void on_write(const std::error_code &ec, std::size_t bytes_transferred);
 
   private:
-    server &srv;                             // The server that created the session.
-    std::string path;                        // The path of the WebSocket session.
-    boost::asio::ip::tcp::endpoint endpoint; // The remote endpoint of the WebSocket session.
+    server &srv;                      // The server that created the session.
+    std::string path;                 // The path of the WebSocket session.
+    asio::ip::tcp::endpoint endpoint; // The remote endpoint of the WebSocket session.
 #ifdef ENABLE_SSL
-    boost::asio::ssl::stream<boost::asio::ip::tcp::socket> socket; // The SSL socket used to communicate with the client.
+    asio::ssl::stream<asio::ip::tcp::socket> socket; // The SSL socket used to communicate with the client.
 #else
-    boost::asio::ip::tcp::socket socket; // The socket used to communicate with the client.
+    asio::ip::tcp::socket socket; // The socket used to communicate with the client.
 #endif
     std::unique_ptr<message> msg;                   // The message being read.
     std::queue<std::unique_ptr<message>> res_queue; // The queue of outgoing messages.

@@ -5,7 +5,13 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=undefined")
 include(CTest)
 enable_testing()
 
-find_package(Boost REQUIRED COMPONENTS system)
+include(FetchContent)
+FetchContent_Declare(
+  asio
+  GIT_REPOSITORY https://github.com/chriskohlhoff/asio.git
+  GIT_TAG        asio-1-31-0
+)
+FetchContent_MakeAvailable(asio)
 
 if(NOT TARGET json)
     add_subdirectory(extern/json)
@@ -34,8 +40,8 @@ if(ENABLE_SSL)
 endif()
 
 add_library(ratioNet src/server.cpp src/session.cpp src/ws_session.cpp src/client.cpp src/ws_client.cpp)
-target_link_libraries(ratioNet PUBLIC Boost::system json)
-target_include_directories(ratioNet PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
+target_link_libraries(ratioNet PUBLIC json)
+target_include_directories(ratioNet PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> ${asio_SOURCE_DIR}/asio/include)
 target_compile_definitions(ratioNet PUBLIC SERVER_HOST="${SERVER_HOST}" SERVER_PORT=${SERVER_PORT})
 
 if (ENABLE_SSL)
