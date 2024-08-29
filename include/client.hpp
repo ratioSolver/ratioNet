@@ -11,28 +11,85 @@ namespace network
   public:
     client(const std::string &host = SERVER_HOST, unsigned short port = SERVER_PORT);
 
-    void enqueue(std::unique_ptr<request> req);
+    /**
+     * Sends a request and returns the response.
+     *
+     * @param req The request to be sent.
+     * @return The response received.
+     */
+    std::unique_ptr<response> send(std::unique_ptr<request> req);
+
+    /**
+     * Sends a GET request to the specified target with optional headers.
+     *
+     * @param target The target URL or path.
+     * @param hdrs The optional headers to include in the request.
+     * @return A unique pointer to the response object.
+     */
+    std::unique_ptr<response> get(std::string &&target, std::map<std::string, std::string> &&hdrs = {}) { return send(std::make_unique<request>(verb::Get, std::move(target), "HTTP/1.1", std::move(hdrs))); }
+
+    /**
+     * Sends a POST request to the specified target with optional headers and body.
+     *
+     * @param target The target URL or path.
+     * @param hdrs The optional headers to include in the request.
+     * @param body The body of the request.
+     * @return A unique pointer to the response object.
+     */
+    std::unique_ptr<response> post(std::string &&target, std::map<std::string, std::string> &&hdrs = {}, std::string &&body = {}) { return send(std::make_unique<string_request>(verb::Post, std::move(target), "HTTP/1.1", std::move(hdrs), std::move(body))); }
+
+    /**
+     * Sends a POST request to the specified target with optional headers and JSON body.
+     *
+     * @param target The target URL or path.
+     * @param hdrs The optional headers to include in the request.
+     * @param body The JSON body of the request.
+     * @return A unique pointer to the response object.
+     */
+    std::unique_ptr<response> post(std::string &&target, std::map<std::string, std::string> &&hdrs, json::json &&body) { return send(std::make_unique<json_request>(verb::Post, std::move(target), "HTTP/1.1", std::move(hdrs), std::move(body))); }
+
+    /**
+     * Sends a PUT request to the specified target with optional headers and body.
+     *
+     * @param target The target URL or path.
+     * @param hdrs The optional headers to include in the request.
+     * @param body The body of the request.
+     * @return A unique pointer to the response object.
+     */
+    std::unique_ptr<response> put(std::string &&target, std::map<std::string, std::string> &&hdrs = {}, std::string &&body = {}) { return send(std::make_unique<string_request>(verb::Put, std::move(target), "HTTP/1.1", std::move(hdrs), std::move(body))); }
+
+    /**
+     * Sends a PUT request to the specified target with optional headers and JSON body.
+     *
+     * @param target The target URL or path.
+     * @param hdrs The optional headers to include in the request.
+     * @param body The JSON body of the request.
+     * @return A unique pointer to the response object.
+     */
+    std::unique_ptr<response> put(std::string &&target, std::map<std::string, std::string> &&hdrs, json::json &&body) { return send(std::make_unique<json_request>(verb::Put, std::move(target), "HTTP/1.1", std::move(hdrs), std::move(body))); }
+
+    /**
+     * Sends a DELETE request to the specified target with optional headers.
+     *
+     * @param target The target URL or path.
+     * @param hdrs The optional headers to include in the request.
+     * @return A unique pointer to the response object.
+     */
+    std::unique_ptr<response> del(std::string &&target, std::map<std::string, std::string> &&hdrs = {}) { return send(std::make_unique<request>(verb::Delete, std::move(target), "HTTP/1.1", std::move(hdrs))); }
+
+    /**
+     * @brief Disconnects the client from the server.
+     */
+    void disconnect();
 
   private:
     void connect();
 
-    void write();
-
-    void on_resolve(const boost::system::error_code &ec, boost::asio::ip::tcp::resolver::results_type results);
-    void on_connect(const boost::system::error_code &ec);
-
-    void on_write(const boost::system::error_code &ec, std::size_t bytes_transferred);
-
-    void on_read(const boost::system::error_code &ec, std::size_t bytes_transferred);
-
   private:
-    const std::string host;                                             // The host name of the server.
-    const unsigned short port;                                          // The port number of the server.
-    boost::asio::io_context io_ctx;                                     // The I/O context used for asynchronous operations.
-    boost::asio::ip::tcp::resolver resolver;                            // The resolver used to resolve host names.
-    boost::asio::ip::tcp::socket socket;                                // The socket used to communicate with the server.
-    boost::asio::strand<boost::asio::io_context::executor_type> strand; // The strand used to synchronize access to the queue of requests.
-    std::queue<std::unique_ptr<request>> req_queue;                     // The queue of requests to send to the server.
-    std::unique_ptr<response> res;                                      // The current response being processed.
+    const std::string host;                  // The host name of the server.
+    const unsigned short port;               // The port number of the server.
+    boost::asio::io_context io_ctx;          // The I/O context used for asynchronous operations.
+    boost::asio::ip::tcp::resolver resolver; // The resolver used to resolve host names.
+    boost::asio::ip::tcp::socket socket;     // The socket used to communicate with the server.
   };
 } // namespace network

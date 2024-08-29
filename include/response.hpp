@@ -8,11 +8,15 @@
 
 namespace network
 {
+  class client;
+
   /**
    * @brief Represents an HTTP response.
    */
   class response
   {
+    friend class client;
+
   public:
     /**
      * @brief Constructs a response object.

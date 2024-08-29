@@ -1,77 +1,79 @@
 #include "client.hpp"
+#include "verb.hpp"
 #include "logging.hpp"
 
 namespace network
 {
-    client::client(const std::string &host, unsigned short port) : host(host), port(port), resolver(io_ctx), socket(io_ctx), strand(boost::asio::make_strand(io_ctx)) { connect(); }
+    client::client(const std::string &host, unsigned short port) : host(host), port(port), resolver(io_ctx), socket(io_ctx) { connect(); }
 
-    void client::enqueue(std::unique_ptr<request> req)
+    std::unique_ptr<response> client::send(std::unique_ptr<request> req)
     {
-        boost::asio::post(strand, [this, r = std::move(req)]() mutable
-                          { req_queue.push(std::move(r));
-                            if (!socket.is_open())
-                                connect();
-                            else if (req_queue.size() == 1)
-                                write(); });
-    }
-
-    void client::connect()
-    {
-        LOG_DEBUG("Connecting to host " + host + ":" + std::to_string(port));
-        resolver.async_resolve(host, std::to_string(port), std::bind(&client::on_resolve, this, std::placeholders::_1, std::placeholders::_2));
-    }
-
-    void client::write()
-    {
-        LOG_DEBUG(*req_queue.front());
-        boost::asio::async_write(socket, req_queue.front()->get_buffer(), std::bind(&client::on_write, this, std::placeholders::_1, std::placeholders::_2));
-    }
-
-    void client::on_resolve(const boost::system::error_code &ec, boost::asio::ip::tcp::resolver::results_type results)
-    {
+        if (!socket.is_open())
+            connect();
+        boost::system::error_code ec;
+        boost::asio::write(socket, req->get_buffer(), ec);
         if (ec)
         {
-            LOG_ERR("Failed to resolve host: " + ec.message());
-            return;
+            LOG_ERR(ec.message());
+            return nullptr;
         }
-
-        boost::asio::async_connect(socket, results, std::bind(&client::on_connect, this, std::placeholders::_1));
-    }
-
-    void client::on_connect(const boost::system::error_code &ec)
-    {
+        auto res = std::make_unique<response>();
+        boost::asio::read_until(socket, res->get_buffer(), "\r\n\r\n", ec);
         if (ec)
         {
-            LOG_ERR("Failed to connect to host: " + ec.message());
-            return;
+            LOG_ERR(ec.message());
+            return nullptr;
         }
-
-        LOG_INFO("Connected to host");
-        if (!req_queue.empty())
-            write();
-    }
-
-    void client::on_write(const boost::system::error_code &ec, std::size_t bytes_transferred)
-    {
-        if (ec)
+        res->parse();
+        if (res->get_headers().find("Content-Length") != res->get_headers().end())
         {
-            LOG_ERR("Failed to write to host: " + ec.message());
-            return;
+            auto len = std::stoul(res->get_headers().at("Content-Length"));
+            boost::asio::read(socket, res->get_buffer(), boost::asio::transfer_exactly(len), ec);
+            if (ec)
+            {
+                LOG_ERR(ec.message());
+                return nullptr;
+            }
+            std::istream is(&res->buffer);
+            if (res->get_headers().find("Content-Type") != res->get_headers().end() && res->get_headers().at("Content-Type") == "application/json")
+                res = std::make_unique<json_response>(json::load(is), res->get_status_code(), std::move(res->headers));
+            else
+            {
+                std::string body;
+                while (is.peek() != EOF)
+                    body += is.get();
+                res = std::make_unique<string_response>(std::move(body), res->get_status_code(), std::move(res->headers));
+            }
         }
-
-        req_queue.pop();
-        if (!req_queue.empty())
-            write();
+        return res;
     }
 
-    void client::on_read(const boost::system::error_code &ec, std::size_t bytes_transferred)
+    void client::disconnect()
     {
-        if (ec == boost::asio::error::eof)
-            return; // connection closed by server
-        else if (ec)
+        LOG_DEBUG("Disconnecting from " << host << ":" << port << "...");
+        boost::system::error_code ec;
+        socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
+        if (ec)
         {
             LOG_ERR(ec.message());
             return;
         }
+        socket.close(ec);
+        if (ec)
+            LOG_ERR(ec.message());
+        LOG_DEBUG("Disconnected from " << host << ":" << port);
+    }
+
+    void client::connect()
+    {
+        LOG_DEBUG("Connecting to " << host << ":" << port << "...");
+        boost::system::error_code ec;
+        boost::asio::connect(socket, resolver.resolve(host, std::to_string(port)), ec);
+        if (ec)
+        {
+            LOG_ERR(ec.message());
+            return;
+        }
+        LOG_DEBUG("Connected to " << host << ":" << port);
     }
 } // namespace network
