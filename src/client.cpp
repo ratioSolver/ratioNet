@@ -4,11 +4,20 @@
 
 namespace network
 {
+
+#ifdef ENABLE_SSL
+    client::client(const std::string &host, unsigned short port) : host(host), port(port), resolver(io_ctx), socket(io_ctx, ssl_ctx) { connect(); }
+#else
     client::client(const std::string &host, unsigned short port) : host(host), port(port), resolver(io_ctx), socket(io_ctx) { connect(); }
+#endif
 
     std::unique_ptr<response> client::send(std::unique_ptr<request> req)
     {
+#ifdef ENABLE_SSL
+        if (!socket.lowest_layer().is_open())
+#else
         if (!socket.is_open())
+#endif
             connect();
         LOG_DEBUG("Sending request to " << host << ":" << port << "...");
         LOG_DEBUG(*req);
@@ -65,13 +74,21 @@ namespace network
     {
         LOG_DEBUG("Disconnecting from " << host << ":" << port << "...");
         std::error_code ec;
+#ifdef ENABLE_SSL
+        socket.lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both, ec);
+#else
         socket.shutdown(asio::ip::tcp::socket::shutdown_both, ec);
+#endif
         if (ec)
         {
             LOG_ERR(ec.message());
             return;
         }
+#ifdef ENABLE_SSL
+        socket.lowest_layer().close(ec);
+#else
         socket.close(ec);
+#endif
         if (ec)
             LOG_ERR(ec.message());
         LOG_DEBUG("Disconnected from " << host << ":" << port);
@@ -81,7 +98,18 @@ namespace network
     {
         LOG_DEBUG("Connecting to " << host << ":" << port << "...");
         std::error_code ec;
+#ifdef ENABLE_SSL
+        asio::connect(socket.lowest_layer(), resolver.resolve(host, std::to_string(port)), ec);
+        if (ec)
+        {
+            LOG_ERR(ec.message());
+            return;
+        }
+        SSL_set_tlsext_host_name(socket.native_handle(), host.c_str());
+        socket.handshake(asio::ssl::stream_base::client, ec);
+#else
         asio::connect(socket, resolver.resolve(host, std::to_string(port)), ec);
+#endif
         if (ec)
         {
             LOG_ERR(ec.message());

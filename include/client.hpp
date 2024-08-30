@@ -3,6 +3,9 @@
 #include "request.hpp"
 #include "response.hpp"
 #include <queue>
+#ifdef ENABLE_SSL
+#include <asio/ssl.hpp>
+#endif
 
 namespace network
 {
@@ -110,10 +113,17 @@ namespace network
     void connect();
 
   private:
-    const std::string host;           // The host name of the server.
-    const unsigned short port;        // The port number of the server.
-    asio::io_context io_ctx;          // The I/O context used for asynchronous operations.
+    const std::string host;    // The host name of the server.
+    const unsigned short port; // The port number of the server.
+    asio::io_context io_ctx;   // The I/O context used for asynchronous operations.
+#ifdef ENABLE_SSL
+    asio::ssl::context ssl_ctx{asio::ssl::context::tlsv12_client}; // The SSL context used for secure communication.
+#endif
     asio::ip::tcp::resolver resolver; // The resolver used to resolve host names.
-    asio::ip::tcp::socket socket;     // The socket used to communicate with the server.
+#ifdef ENABLE_SSL
+    asio::ssl::stream<asio::ip::tcp::socket> socket; // The SSL socket used to communicate with the server.
+#else
+    asio::ip::tcp::socket socket; // The socket used to communicate with the server.
+#endif
   };
 } // namespace network
