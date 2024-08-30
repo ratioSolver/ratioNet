@@ -27,6 +27,12 @@ namespace network
     service_unavailable = 503
   };
 
+  /**
+   * Converts a status code to its corresponding string representation.
+   *
+   * @param code The status code to convert.
+   * @return The string representation of the status code.
+   */
   inline std::string to_string(status_code code)
   {
     switch (code)

@@ -94,8 +94,8 @@ namespace network
     void on_write(const std::error_code &ec, std::size_t bytes_transferred);
 
   private:
-    server &srv;                      // The server that created the session.
-    asio::ip::tcp::endpoint endpoint; // The endpoint of the client.
+    server &srv;                            // The server that created the session.
+    const asio::ip::tcp::endpoint endpoint; // The endpoint of the client.
 #ifdef ENABLE_SSL
     asio::ssl::stream<asio::ip::tcp::socket> socket; // The SSL socket used to communicate with the client.
 #else

@@ -202,9 +202,9 @@ namespace network
     void on_write(const std::error_code &ec, std::size_t bytes_transferred);
 
   private:
-    server &srv;                      // The server that created the session.
-    std::string path;                 // The path of the WebSocket session.
-    asio::ip::tcp::endpoint endpoint; // The remote endpoint of the WebSocket session.
+    server &srv;                            // The server that created the session.
+    std::string path;                       // The path of the WebSocket session.
+    const asio::ip::tcp::endpoint endpoint; // The remote endpoint of the WebSocket session.
 #ifdef ENABLE_SSL
     asio::ssl::stream<asio::ip::tcp::socket> socket; // The SSL socket used to communicate with the client.
 #else

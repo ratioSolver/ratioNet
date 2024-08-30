@@ -10,6 +10,8 @@ namespace network
     {
         if (!socket.is_open())
             connect();
+        LOG_DEBUG("Sending request to " << host << ":" << port << "...");
+        LOG_DEBUG(*req);
         std::error_code ec;
         asio::write(socket, req->get_buffer(), ec);
         if (ec)
@@ -18,21 +20,30 @@ namespace network
             return nullptr;
         }
         auto res = std::make_unique<response>();
-        asio::read_until(socket, res->get_buffer(), "\r\n\r\n", ec);
+        std::size_t bytes_transferred = asio::read_until(socket, res->buffer, "\r\n\r\n", ec);
+        LOG_DEBUG("Bytes transferred: " << bytes_transferred);
         if (ec)
         {
             LOG_ERR(ec.message());
             return nullptr;
         }
+        // the buffer may contain additional bytes beyond the delimiter
+        std::size_t additional_bytes = res->buffer.size() - bytes_transferred;
+        LOG_DEBUG("Additional bytes: " << additional_bytes);
+
         res->parse();
+
         if (res->get_headers().find("Content-Length") != res->get_headers().end())
         {
             auto len = std::stoul(res->get_headers().at("Content-Length"));
-            asio::read(socket, res->get_buffer(), asio::transfer_exactly(len), ec);
-            if (ec)
+            if (len > additional_bytes)
             {
-                LOG_ERR(ec.message());
-                return nullptr;
+                asio::read(socket, res->buffer, asio::transfer_exactly(len - additional_bytes), ec);
+                if (ec)
+                {
+                    LOG_ERR(ec.message());
+                    return nullptr;
+                }
             }
             std::istream is(&res->buffer);
             if (res->get_headers().find("Content-Type") != res->get_headers().end() && res->get_headers().at("Content-Type") == "application/json")
@@ -45,6 +56,8 @@ namespace network
                 res = std::make_unique<string_response>(std::move(body), res->get_status_code(), std::move(res->headers));
             }
         }
+        if (res->get_headers().find("Connection") != res->get_headers().end() && res->get_headers().at("Connection") == "close")
+            disconnect(); // close the connection
         return res;
     }
 

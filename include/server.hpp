@@ -117,7 +117,7 @@ namespace network
     bool running = false;                                                                                           // The server is running
     asio::io_context io_ctx;                                                                                        // The io_context is required for all I/O
     std::vector<std::thread> threads;                                                                               // The thread pool
-    asio::ip::tcp::endpoint endpoint;                                                                               // The endpoint for the server
+    const asio::ip::tcp::endpoint endpoint;                                                                         // The endpoint for the server
     asio::ip::tcp::acceptor acceptor;                                                                               // The acceptor for the server
     std::map<verb, std::vector<std::pair<std::regex, std::function<std::unique_ptr<response>(request &)>>>> routes; // The routes of the server
     std::map<std::string, ws_handler> ws_routes;                                                                    // The WebSocket routes of the server

@@ -26,7 +26,11 @@ namespace network
      * @param hdrs The optional headers to include in the request.
      * @return A unique pointer to the response object.
      */
-    std::unique_ptr<response> get(std::string &&target, std::map<std::string, std::string> &&hdrs = {}) { return send(std::make_unique<request>(verb::Get, std::move(target), "HTTP/1.1", std::move(hdrs))); }
+    std::unique_ptr<response> get(std::string &&target, std::map<std::string, std::string> &&hdrs = {})
+    {
+      hdrs["Host"] = host;
+      return send(std::make_unique<request>(verb::Get, std::move(target), "HTTP/1.1", std::move(hdrs)));
+    }
 
     /**
      * Sends a POST request to the specified target with optional headers and body.
@@ -36,7 +40,11 @@ namespace network
      * @param hdrs The optional headers to include in the request.
      * @return A unique pointer to the response object.
      */
-    std::unique_ptr<response> post(std::string &&target, std::string &&body, std::map<std::string, std::string> &&hdrs = {}) { return send(std::make_unique<string_request>(verb::Post, std::move(target), "HTTP/1.1", std::move(hdrs), std::move(body))); }
+    std::unique_ptr<response> post(std::string &&target, std::string &&body, std::map<std::string, std::string> &&hdrs = {})
+    {
+      hdrs["Host"] = host;
+      return send(std::make_unique<string_request>(verb::Post, std::move(target), "HTTP/1.1", std::move(hdrs), std::move(body)));
+    }
 
     /**
      * Sends a POST request to the specified target with optional headers and JSON body.
@@ -46,7 +54,11 @@ namespace network
      * @param hdrs The optional headers to include in the request.
      * @return A unique pointer to the response object.
      */
-    std::unique_ptr<response> post(std::string &&target, json::json &&body, std::map<std::string, std::string> &&hdrs = {}) { return send(std::make_unique<json_request>(verb::Post, std::move(target), "HTTP/1.1", std::move(hdrs), std::move(body))); }
+    std::unique_ptr<response> post(std::string &&target, json::json &&body, std::map<std::string, std::string> &&hdrs = {})
+    {
+      hdrs["Host"] = host;
+      return send(std::make_unique<json_request>(verb::Post, std::move(target), "HTTP/1.1", std::move(hdrs), std::move(body)));
+    }
 
     /**
      * Sends a PUT request to the specified target with optional headers and body.
@@ -56,7 +68,11 @@ namespace network
      * @param hdrs The optional headers to include in the request.
      * @return A unique pointer to the response object.
      */
-    std::unique_ptr<response> put(std::string &&target, std::string &&body, std::map<std::string, std::string> &&hdrs = {}) { return send(std::make_unique<string_request>(verb::Put, std::move(target), "HTTP/1.1", std::move(hdrs), std::move(body))); }
+    std::unique_ptr<response> put(std::string &&target, std::string &&body, std::map<std::string, std::string> &&hdrs = {})
+    {
+      hdrs["Host"] = host;
+      return send(std::make_unique<string_request>(verb::Put, std::move(target), "HTTP/1.1", std::move(hdrs), std::move(body)));
+    }
 
     /**
      * Sends a PUT request to the specified target with optional headers and JSON body.
@@ -66,7 +82,11 @@ namespace network
      * @param hdrs The optional headers to include in the request.
      * @return A unique pointer to the response object.
      */
-    std::unique_ptr<response> put(std::string &&target, json::json &&body, std::map<std::string, std::string> &&hdrs = {}) { return send(std::make_unique<json_request>(verb::Put, std::move(target), "HTTP/1.1", std::move(hdrs), std::move(body))); }
+    std::unique_ptr<response> put(std::string &&target, json::json &&body, std::map<std::string, std::string> &&hdrs = {})
+    {
+      hdrs["Host"] = host;
+      return send(std::make_unique<json_request>(verb::Put, std::move(target), "HTTP/1.1", std::move(hdrs), std::move(body)));
+    }
 
     /**
      * Sends a DELETE request to the specified target with optional headers.
@@ -75,7 +95,11 @@ namespace network
      * @param hdrs The optional headers to include in the request.
      * @return A unique pointer to the response object.
      */
-    std::unique_ptr<response> del(std::string &&target, std::map<std::string, std::string> &&hdrs = {}) { return send(std::make_unique<request>(verb::Delete, std::move(target), "HTTP/1.1", std::move(hdrs))); }
+    std::unique_ptr<response> del(std::string &&target, std::map<std::string, std::string> &&hdrs = {})
+    {
+      hdrs["Host"] = host;
+      return send(std::make_unique<request>(verb::Delete, std::move(target), "HTTP/1.1", std::move(hdrs)));
+    }
 
     /**
      * @brief Disconnects the client from the server.
@@ -86,8 +110,8 @@ namespace network
     void connect();
 
   private:
-    const std::string host;                  // The host name of the server.
-    const unsigned short port;               // The port number of the server.
+    const std::string host;           // The host name of the server.
+    const unsigned short port;        // The port number of the server.
     asio::io_context io_ctx;          // The I/O context used for asynchronous operations.
     asio::ip::tcp::resolver resolver; // The resolver used to resolve host names.
     asio::ip::tcp::socket socket;     // The socket used to communicate with the server.

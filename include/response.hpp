@@ -77,14 +77,25 @@ namespace network
     void parse()
     {
       std::istream is(&buffer);
-      std::string code_str;
-      do // Parse the status code
+
+      std::string c_version;
+      while (is.peek() != ' ')
+        c_version += is.get();
+      version = std::move(c_version);
+      is.get(); // consume ' '
+      std::string c_code;
+      while (is.peek() != ' ' && is.peek() != '\r')
+        c_code += is.get();
+      code = static_cast<status_code>(std::stoi(c_code));
+      if (is.peek() == ' ')
       {
-        code_str.push_back(is.get());
-      } while (is.peek() != ' ');
-      code = static_cast<status_code>(std::stoi(code_str));
-      std::string status_line; // Parse the status line
-      std::getline(is, status_line);
+        is.get(); // consume ' '
+        std::string c_reason;
+        while (is.peek() != '\r')
+          c_reason += is.get();
+      }
+      is.get(); // consume '\r'
+      is.get(); // consume '\n'
 
       while (is.peek() != '\r')
       {
