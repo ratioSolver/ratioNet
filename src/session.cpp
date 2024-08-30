@@ -95,7 +95,7 @@ namespace network
             srv.handle_request(*this, std::move(req));
     }
 
-    void session::on_body(const std::error_code &ec, std::size_t bytes_transferred)
+    void session::on_body(const std::error_code &ec, std::size_t)
     {
         if (ec == asio::error::eof)
             return; // connection closed by client
@@ -118,7 +118,7 @@ namespace network
         srv.handle_request(*this, std::move(req));
     }
 
-    void session::on_write(const std::error_code &ec, std::size_t bytes_transferred)
+    void session::on_write(const std::error_code &ec, std::size_t)
     {
         if (ec)
         {
