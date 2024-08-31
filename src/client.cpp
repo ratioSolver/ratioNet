@@ -65,7 +65,8 @@ namespace network
             {
                 std::string body;
                 body.reserve(len);
-                body.append(asio::buffers_begin(res->buffer.data()), asio::buffers_begin(res->buffer.data()) + len);
+                while (is.peek() != EOF)
+                    body += is.get();
                 res = std::make_unique<string_response>(std::move(body), res->get_status_code(), std::move(res->headers));
             }
         }
@@ -127,8 +128,9 @@ namespace network
                     }
                 }
                 body.reserve(body.size() + size);
-                body.append(asio::buffers_begin(res->buffer.data()), asio::buffers_begin(res->buffer.data()) + size);
-                res->buffer.consume(size + 2); // consume chunk and '\r\n'
+                while (size--)
+                    body += is.get();
+                res->buffer.consume(2); // consume chunk and '\r\n'
             }
             if (res->get_headers().find("Content-Type") != res->get_headers().end() && res->get_headers().at("Content-Type") == "application/json")
                 res = std::make_unique<json_response>(json::load(body), res->get_status_code(), std::move(res->headers));
