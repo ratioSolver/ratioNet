@@ -4,12 +4,19 @@
 
 namespace network
 {
-
 #ifdef ENABLE_SSL
-    client::client(const std::string &host, unsigned short port) : host(host), port(port), resolver(io_ctx), socket(io_ctx, ssl_ctx) { connect(); }
+    client::client(const std::string &host, unsigned short port) : host(host), port(port), resolver(io_ctx), socket(io_ctx, ssl_ctx)
+    {
+        ssl_ctx.set_default_verify_paths();
+        connect();
+    }
 #else
     client::client(const std::string &host, unsigned short port) : host(host), port(port), resolver(io_ctx), socket(io_ctx) { connect(); }
 #endif
+    client::~client()
+    {
+        disconnect();
+    }
 
     std::unique_ptr<response> client::send(std::unique_ptr<request> req)
     {
@@ -150,7 +157,12 @@ namespace network
 #else
         socket.shutdown(asio::ip::tcp::socket::shutdown_both, ec);
 #endif
-        if (ec)
+        if (ec == asio::error::eof)
+        { // connection closed by server
+            ec.clear();
+            LOG_DEBUG("Connection closed by server");
+        }
+        else if (ec)
         {
             LOG_ERR(ec.message());
             return;
@@ -176,7 +188,8 @@ namespace network
             LOG_ERR(ec.message());
             return;
         }
-        SSL_set_tlsext_host_name(socket.native_handle(), host.c_str());
+        socket.set_verify_mode(asio::ssl::verify_peer);
+        socket.set_verify_callback(asio::ssl::host_name_verification(host));
         socket.handshake(asio::ssl::stream_base::client, ec);
 #else
         asio::connect(socket, resolver.resolve(host, std::to_string(port)), ec);

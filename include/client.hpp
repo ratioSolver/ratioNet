@@ -13,6 +13,7 @@ namespace network
   {
   public:
     client(const std::string &host = SERVER_HOST, unsigned short port = SERVER_PORT);
+    ~client();
 
     /**
      * Sends a request and returns the response.
