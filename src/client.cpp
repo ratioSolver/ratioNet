@@ -64,7 +64,7 @@ namespace network
         }
         else if (res->get_headers().find("Transfer-Encoding") != res->get_headers().end() && res->get_headers().at("Transfer-Encoding") == "chunked")
         {
-            asio::mutable_buffer body_buffer;
+            std::string body;
             while (true)
             {
                 bytes_transferred = asio::read_until(socket, res->buffer, "\r\n", ec); // read the chunk size
@@ -118,7 +118,8 @@ namespace network
                         return nullptr;
                     }
                 }
-                asio::buffer_copy(body_buffer, res->buffer.data(), size);
+                while (size-- > 0)
+                    body += is.get();
                 res->buffer.consume(size);
                 // read the trailing CRLF
                 asio::read_until(socket, res->buffer, "\r\n", ec);
@@ -129,6 +130,10 @@ namespace network
                 }
                 res->buffer.consume(2); // consume '\r\n'
             }
+            if (res->get_headers().find("Content-Type") != res->get_headers().end() && res->get_headers().at("Content-Type") == "application/json")
+                res = std::make_unique<json_response>(json::load(body), res->get_status_code(), std::move(res->headers));
+            else
+                res = std::make_unique<string_response>(std::move(body), res->get_status_code(), std::move(res->headers));
         }
 
         if (res->get_headers().find("Connection") != res->get_headers().end() && res->get_headers().at("Connection") == "close")
