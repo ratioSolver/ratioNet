@@ -7,9 +7,8 @@ void test_weather_client()
     network::client client("api.open-meteo.com", 443);
     auto response = client.get("/v1/forecast?latitude=52.52&longitude=13.41");
     if (response)
-    {
         std::cout << *response << std::endl;
-    }
+    std::cout << "Done" << std::endl;
 }
 
 int main(int argc, char const *argv[])

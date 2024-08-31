@@ -62,6 +62,74 @@ namespace network
                 res = std::make_unique<string_response>(std::move(body), res->get_status_code(), std::move(res->headers));
             }
         }
+        else if (res->get_headers().find("Transfer-Encoding") != res->get_headers().end() && res->get_headers().at("Transfer-Encoding") == "chunked")
+        {
+            asio::mutable_buffer body_buffer;
+            while (true)
+            {
+                bytes_transferred = asio::read_until(socket, res->buffer, "\r\n", ec); // read the chunk size
+                if (ec)
+                {
+                    LOG_ERR(ec.message());
+                    return nullptr;
+                }
+                // the buffer may contain additional bytes beyond the delimiter
+                additional_bytes = res->buffer.size() - bytes_transferred;
+
+                std::string chunk_size;
+                std::vector<std::string> extensions;
+                std::istream is(&res->buffer);
+                while (is.peek() != '\r' && is.peek() != ';')
+                    chunk_size += is.get();
+                if (is.peek() == ';')
+                {
+                    is.get(); // consume ';'
+                    while (is.peek() != '\r')
+                    {
+                        std::string extension;
+                        while (is.peek() != ';' && is.peek() != '\r')
+                            extension += is.get();
+                        extensions.push_back(std::move(extension));
+                        if (is.peek() == ';')
+                            is.get(); // consume ';'
+                    }
+                }
+                is.get(); // consume '\r'
+                is.get(); // consume '\n'
+
+                std::size_t size = std::stoul(chunk_size, nullptr, 16);
+                if (size == 0)
+                {
+                    // read the trailing CRLF
+                    asio::read_until(socket, res->buffer, "\r\n", ec);
+                    if (ec)
+                    {
+                        LOG_ERR(ec.message());
+                        return nullptr;
+                    }
+                    break;
+                }
+                else if (size > additional_bytes)
+                { // read the remaining chunk
+                    asio::read(socket, res->buffer, asio::transfer_exactly(size - additional_bytes), ec);
+                    if (ec)
+                    {
+                        LOG_ERR(ec.message());
+                        return nullptr;
+                    }
+                }
+                asio::buffer_copy(body_buffer, res->buffer.data(), size);
+                res->buffer.consume(size);
+                // read the trailing CRLF
+                asio::read_until(socket, res->buffer, "\r\n", ec);
+                if (ec)
+                {
+                    LOG_ERR(ec.message());
+                    return nullptr;
+                }
+                res->buffer.consume(2); // consume '\r\n'
+            }
+        }
 
         if (res->get_headers().find("Connection") != res->get_headers().end() && res->get_headers().at("Connection") == "close")
             disconnect(); // close the connection
