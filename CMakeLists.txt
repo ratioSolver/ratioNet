@@ -46,11 +46,11 @@ target_compile_definitions(ratioNet PUBLIC SERVER_HOST="${SERVER_HOST}" SERVER_P
 
 if (ENABLE_SSL)
     target_link_libraries(ratioNet PUBLIC OpenSSL::SSL OpenSSL::Crypto)
-    target_compile_definitions(ratioNet PRIVATE ENABLE_SSL TLS_VERSION=${TLS_VERSION})
+    target_compile_definitions(ratioNet PUBLIC ENABLE_SSL TLS_VERSION=${TLS_VERSION})
 endif()
 
 if(ENABLE_AUTH)
-    target_compile_definitions(ratioNet PRIVATE ENABLE_AUTH)
+    target_compile_definitions(ratioNet PUBLIC ENABLE_AUTH)
 endif()
 
 if(BUILD_TESTING)

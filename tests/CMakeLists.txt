@@ -1,7 +1,9 @@
 add_executable(server_tests test_server.cpp)
+add_dependencies(server_tests ratioNet)
 target_link_libraries(server_tests PRIVATE ratioNet)
 
 add_executable(client_tests test_client.cpp)
+add_dependencies(client_tests ratioNet)
 target_link_libraries(client_tests PRIVATE ratioNet)
 
 add_test(NAME serverTest00 COMMAND server_tests WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})

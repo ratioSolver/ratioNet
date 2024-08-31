@@ -64,8 +64,8 @@ namespace network
             else
             {
                 std::string body;
-                while (is.peek() != EOF)
-                    body += is.get();
+                body.reserve(len);
+                body.append(asio::buffers_begin(res->buffer.data()), asio::buffers_begin(res->buffer.data()) + len);
                 res = std::make_unique<string_response>(std::move(body), res->get_status_code(), std::move(res->headers));
             }
         }
@@ -114,28 +114,21 @@ namespace network
                         LOG_ERR(ec.message());
                         return nullptr;
                     }
+                    res->buffer.consume(2); // consume '\r\n'
                     break;
                 }
                 else if (size > additional_bytes)
                 { // read the remaining chunk
-                    asio::read(socket, res->buffer, asio::transfer_exactly(size - additional_bytes), ec);
+                    asio::read(socket, res->buffer, asio::transfer_exactly((size - additional_bytes) + 2), ec);
                     if (ec)
                     {
                         LOG_ERR(ec.message());
                         return nullptr;
                     }
                 }
-                while (size-- > 0)
-                    body += is.get();
-                res->buffer.consume(size);
-                // read the trailing CRLF
-                asio::read_until(socket, res->buffer, "\r\n", ec);
-                if (ec)
-                {
-                    LOG_ERR(ec.message());
-                    return nullptr;
-                }
-                res->buffer.consume(2); // consume '\r\n'
+                body.reserve(body.size() + size);
+                body.append(asio::buffers_begin(res->buffer.data()), asio::buffers_begin(res->buffer.data()) + size);
+                res->buffer.consume(size + 2); // consume chunk and '\r\n'
             }
             if (res->get_headers().find("Content-Type") != res->get_headers().end() && res->get_headers().at("Content-Type") == "application/json")
                 res = std::make_unique<json_response>(json::load(body), res->get_status_code(), std::move(res->headers));
