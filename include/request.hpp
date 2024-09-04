@@ -209,8 +209,7 @@ namespace network
   private:
     std::ostream &write(std::ostream &os) const override
     {
-      request::write(os) << "\r\n"
-                         << body << "\r\n";
+      request::write(os) << body;
       return os;
     }
 
@@ -232,8 +231,7 @@ namespace network
   private:
     std::ostream &write(std::ostream &os) const override
     {
-      request::write(os) << "\r\n"
-                         << str_body << "\r\n";
+      request::write(os) << str_body;
       return os;
     }
 

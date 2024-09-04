@@ -128,9 +128,8 @@ namespace network
                     }
                 }
                 body.reserve(body.size() + size);
-                while (size--)
-                    body += is.get();
-                res->buffer.consume(2); // consume chunk and '\r\n'
+                body.append(asio::buffers_begin(res->buffer.data()), asio::buffers_end(res->buffer.data()));
+                res->buffer.consume(size + 2); // consume chunk and '\r\n'
             }
             if (res->get_headers().find("content-type") != res->get_headers().end() && res->get_headers().at("content-type") == "application/json")
                 res = std::make_unique<json_response>(json::load(body), res->get_status_code(), std::move(res->headers));
