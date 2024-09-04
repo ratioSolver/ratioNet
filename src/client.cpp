@@ -35,12 +35,32 @@ namespace network
             return nullptr;
         }
         auto res = std::make_unique<response>();
-        std::size_t bytes_transferred = asio::read_until(socket, res->buffer, "\r\n\r\n", ec);
-        if (ec)
+
+        std::size_t bytes_transferred = 0;
+        while (true)
         {
-            LOG_ERR(ec.message());
-            return nullptr;
+            bytes_transferred = asio::read_until(socket, res->buffer, "\r\n\r\n", ec);
+            if (ec == asio::error::eof)
+            { // connection closed by server
+                LOG_DEBUG("Connection closed by server");
+                connect();
+                ec.clear();
+                asio::write(socket, req->get_buffer(), ec);
+                if (ec)
+                {
+                    LOG_ERR(ec.message());
+                    return nullptr;
+                }
+                continue; // retry the request
+            }
+            else if (ec)
+            {
+                LOG_ERR(ec.message());
+                return nullptr;
+            }
+            break;
         }
+
         // the buffer may contain additional bytes beyond the delimiter
         std::size_t additional_bytes = res->buffer.size() - bytes_transferred;
 
