@@ -44,6 +44,73 @@ namespace network
     }
     void session::write() { asio::async_write(socket, res_queue.front()->get_buffer(), std::bind(&session::on_write, shared_from_this(), asio::placeholders::error, asio::placeholders::bytes_transferred)); }
 
+    void session::read_chunk()
+    {
+        asio::async_read_until(socket, req->buffer, "\r\n", [self = shared_from_this()](const std::error_code &ec, std::size_t bytes_transferred)
+                               {
+            if (ec)
+            {
+                LOG_ERR(ec.message());
+                return;
+            }
+
+            // the buffer may contain additional bytes beyond the delimiter
+            std::size_t additional_bytes = self->req->buffer.size() - bytes_transferred;
+
+            std::string chunk_size;
+            std::vector<std::string> extensions;
+            std::istream is(&self->req->buffer);
+            while (is.peek() != '\r' && is.peek() != ';')
+                chunk_size += is.get();
+            if (is.peek() == ';')
+            {
+                is.get(); // consume ';'
+                while (is.peek() != '\r')
+                {
+                    std::string extension;
+                    while (is.peek() != ';' && is.peek() != '\r')
+                        extension += is.get();
+                    extensions.push_back(std::move(extension));
+                    if (is.peek() == ';')
+                        is.get(); // consume ';'
+                }
+            }
+            is.get(); // consume '\r'
+            is.get(); // consume '\n'
+
+            std::size_t size = std::stoul(chunk_size, nullptr, 16);
+            if (size == 0) // read the trailing CRLF
+                asio::async_read_until(self->socket, self->req->buffer, "\r\n", [self](const std::error_code &ec, std::size_t bytes_transferred) {
+                    if (ec)
+                    {
+                        LOG_ERR(ec.message());
+                        return;
+                    }
+
+                    self->req->buffer.consume(2); // consume '\r\n'
+                    self->on_body(ec, bytes_transferred);
+                });
+            else if (size > additional_bytes) // read the remaining chunk
+                asio::async_read(self->socket, self->req->buffer, asio::transfer_exactly((size - additional_bytes) + 2), [self, size](const std::error_code &ec, std::size_t bytes_transferred) {
+                    if (ec)
+                    {
+                        LOG_ERR(ec.message());
+                        return;
+                    }
+
+                    self->chunked_body.reserve(self->chunked_body.size() + size);
+                    self->chunked_body.append(asio::buffers_begin(self->req->buffer.data()), asio::buffers_begin(self->req->buffer.data()) + size);
+                    self->read_chunk();
+                });
+            else
+            { // the buffer contains the entire chunk
+                self->chunked_body.reserve(self->chunked_body.size() + size);
+                self->chunked_body.append(asio::buffers_begin(self->req->buffer.data()), asio::buffers_begin(self->req->buffer.data()) + size);
+                self->req->buffer.consume(size + 2); // consume chunk and '\r\n'
+                self->read_chunk();
+            } });
+    }
+
     void session::upgrade()
     {
         auto key_it = req->headers.find("Sec-WebSocket-Key");
@@ -91,6 +158,8 @@ namespace network
             else // the buffer contains the entire body
                 on_body(ec, bytes_transferred);
         }
+        else if (req->headers.find("transfer-encoding") != req->headers.end() && req->headers.at("transfer-encoding") == "chunked")
+            read_chunk();
         else // no body
             srv.handle_request(*this, std::move(req));
     }
@@ -111,8 +180,8 @@ namespace network
         else
         {
             std::string body;
-            while (is.peek() != EOF)
-                body += is.get();
+            body.reserve(req->buffer.size());
+            body.assign(asio::buffers_begin(req->buffer.data()), asio::buffers_end(req->buffer.data()));
             req = std::make_unique<string_request>(req->v, std::move(req->target), std::move(req->version), std::move(req->headers), std::move(body));
         }
         srv.handle_request(*this, std::move(req));

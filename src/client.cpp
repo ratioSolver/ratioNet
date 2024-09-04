@@ -128,7 +128,7 @@ namespace network
                     }
                 }
                 body.reserve(body.size() + size);
-                body.append(asio::buffers_begin(res->buffer.data()), asio::buffers_end(res->buffer.data()));
+                body.append(asio::buffers_begin(res->buffer.data()), asio::buffers_begin(res->buffer.data()) + size);
                 res->buffer.consume(size + 2); // consume chunk and '\r\n'
             }
             if (res->get_headers().find("content-type") != res->get_headers().end() && res->get_headers().at("content-type") == "application/json")

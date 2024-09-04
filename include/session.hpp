@@ -83,6 +83,8 @@ namespace network
      */
     void write();
 
+    void read_chunk();
+
     /**
      * @brief Upgrades the session to a WebSocket connection.
      */
@@ -102,6 +104,7 @@ namespace network
     asio::ip::tcp::socket socket; // The socket used to communicate with the client.
 #endif
     std::unique_ptr<request> req;                         // The current request being processed.
+    std::string chunked_body;                             // The body of the request when using chunked transfer encoding.
     asio::strand<asio::io_context::executor_type> strand; // The strand used to synchronize access to the queue of responses.
     std::queue<std::unique_ptr<response>> res_queue;      // The queue of responses to send to the client.
   };
