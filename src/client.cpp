@@ -46,9 +46,9 @@ namespace network
 
         res->parse();
 
-        if (res->get_headers().find("Content-Length") != res->get_headers().end())
+        if (res->get_headers().find("content-length") != res->get_headers().end())
         {
-            auto len = std::stoul(res->get_headers().at("Content-Length"));
+            auto len = std::stoul(res->get_headers().at("content-length"));
             if (len > additional_bytes)
             { // read the remaining body
                 asio::read(socket, res->buffer, asio::transfer_exactly(len - additional_bytes), ec);
@@ -59,7 +59,7 @@ namespace network
                 }
             }
             std::istream is(&res->buffer);
-            if (res->get_headers().find("Content-Type") != res->get_headers().end() && res->get_headers().at("Content-Type") == "application/json")
+            if (res->get_headers().find("content-type") != res->get_headers().end() && res->get_headers().at("content-type") == "application/json")
                 res = std::make_unique<json_response>(json::load(is), res->get_status_code(), std::move(res->headers));
             else
             {
@@ -70,7 +70,7 @@ namespace network
                 res = std::make_unique<string_response>(std::move(body), res->get_status_code(), std::move(res->headers));
             }
         }
-        else if (res->get_headers().find("Transfer-Encoding") != res->get_headers().end() && res->get_headers().at("Transfer-Encoding") == "chunked")
+        else if (res->get_headers().find("transfer-encoding") != res->get_headers().end() && res->get_headers().at("transfer-encoding") == "chunked")
         {
             std::string body;
             while (true)
@@ -132,13 +132,13 @@ namespace network
                     body += is.get();
                 res->buffer.consume(2); // consume chunk and '\r\n'
             }
-            if (res->get_headers().find("Content-Type") != res->get_headers().end() && res->get_headers().at("Content-Type") == "application/json")
+            if (res->get_headers().find("content-type") != res->get_headers().end() && res->get_headers().at("content-type") == "application/json")
                 res = std::make_unique<json_response>(json::load(body), res->get_status_code(), std::move(res->headers));
             else
                 res = std::make_unique<string_response>(std::move(body), res->get_status_code(), std::move(res->headers));
         }
 
-        if (res->get_headers().find("Connection") != res->get_headers().end() && res->get_headers().at("Connection") == "close")
+        if (res->get_headers().find("connection") != res->get_headers().end() && res->get_headers().at("connection") == "close")
             disconnect(); // close the connection
         return res;
     }

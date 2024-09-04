@@ -94,7 +94,7 @@ namespace network
 #ifdef ENABLE_AUTH
                         if (open_routes.find(req->get_verb()) == open_routes.end() || std::none_of(open_routes.at(req->get_verb()).begin(), open_routes.at(req->get_verb()).end(), [&req](const auto &route)
                                                                                                    { return std::regex_match(req->get_target(), route); })) // we need to check for authorization
-                            if (auto it = req->get_headers().find("Authorization"); it != req->get_headers().end())
+                            if (auto it = req->get_headers().find("authorization"); it != req->get_headers().end())
                             {
                                 auto token = it->second;
                                 token.erase(0, 7); // remove "Bearer " from token

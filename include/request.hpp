@@ -158,6 +158,12 @@ namespace network
           value += is.get();
         is.get(); // consume '\r'
         is.get(); // consume '\n'
+
+        // convert header to lowercase
+        std::transform(header.begin(), header.end(), header.begin(), [](unsigned char c)
+                       { return std::tolower(c); });
+
+        // add header to the map
         headers.emplace(std::move(header), std::move(value));
       }
       is.get(); // consume '\r'
@@ -179,6 +185,8 @@ namespace network
       return os;
     }
 
+    void add_header(std::string &&header, std::string &&value) { headers.emplace(std::move(header), std::move(value)); }
+
   private:
     verb v;                                     // The HTTP verb of the request
     std::string target;                         // The target of the request
@@ -190,7 +198,11 @@ namespace network
   class string_request : public request
   {
   public:
-    string_request(verb v, std::string &&trgt, std::string &&ver, std::map<std::string, std::string> &&hdrs, std::string &&b) : request(v, std::move(trgt), std::move(ver), std::move(hdrs)), body(std::move(b)) {}
+    string_request(verb v, std::string &&trgt, std::string &&ver, std::map<std::string, std::string> &&hdrs, std::string &&b) : request(v, std::move(trgt), std::move(ver), std::move(hdrs)), body(std::move(b))
+    {
+      add_header("content-type", "text/plain");
+      add_header("content-length", std::to_string(body.size()));
+    }
 
     const std::string &get_body() const { return body; }
 
@@ -209,7 +221,11 @@ namespace network
   class json_request : public request
   {
   public:
-    json_request(verb v, std::string &&trgt, std::string &&ver, std::map<std::string, std::string> &&hdrs, json::json &&b) : request(v, std::move(trgt), std::move(ver), std::move(hdrs)), body(std::move(b)) {}
+    json_request(verb v, std::string &&trgt, std::string &&ver, std::map<std::string, std::string> &&hdrs, json::json &&b) : request(v, std::move(trgt), std::move(ver), std::move(hdrs)), body(b), str_body(body.dump())
+    {
+      add_header("content-type", "application/json");
+      add_header("content-length", std::to_string(str_body.size()));
+    }
 
     const json::json &get_body() const { return body; }
 
@@ -217,11 +233,12 @@ namespace network
     std::ostream &write(std::ostream &os) const override
     {
       request::write(os) << "\r\n"
-                         << body << "\r\n";
+                         << str_body << "\r\n";
       return os;
     }
 
   private:
-    json::json body;
+    json::json body;      // The JSON body of the request
+    std::string str_body; // The body of the request
   };
 } // namespace network

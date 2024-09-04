@@ -108,6 +108,12 @@ namespace network
           value += is.get();
         is.get(); // consume '\r'
         is.get(); // consume '\n'
+
+        // convert header to lowercase
+        std::transform(header.begin(), header.end(), header.begin(), [](unsigned char c)
+                       { return std::tolower(c); });
+
+        // add header to the map
         headers.emplace(std::move(header), std::move(value));
       }
       is.get(); // consume '\r'
@@ -159,8 +165,8 @@ namespace network
      */
     string_response(std::string &&b, status_code code = status_code::ok, std::map<std::string, std::string> &&hdrs = {}, std::string &&ver = "HTTP/1.1") : response(code, std::move(hdrs), std::move(ver)), body(std::move(b))
     {
-      headers["Content-Type"] = "text/plain";
-      headers["Content-Length"] = std::to_string(body.size());
+      headers["content-type"] = "text/plain";
+      headers["content-length"] = std::to_string(body.size());
     }
 
     /**
@@ -205,8 +211,8 @@ namespace network
      */
     html_response(std::string &&b, status_code code = status_code::ok, std::map<std::string, std::string> &&hdrs = {}, std::string &&ver = "HTTP/1.1") : response(code, std::move(hdrs), std::move(ver)), body(std::move(b))
     {
-      headers["Content-Type"] = "text/html";
-      headers["Content-Length"] = std::to_string(body.size());
+      headers["content-type"] = "text/html";
+      headers["content-length"] = std::to_string(body.size());
     }
 
     /**
@@ -239,7 +245,7 @@ namespace network
    * @brief Represents a response that sends a file to the client.
    *
    * The `file_response` class is a derived class of the `response` class. It represents a response that sends a file to the client.
-   * It takes the path to the file as a parameter and automatically sets the appropriate headers, such as Content-Length and Content-Type.
+   * It takes the path to the file as a parameter and automatically sets the appropriate headers, such as content-length and content-type.
    */
   class file_response : public response
   {
@@ -261,10 +267,10 @@ namespace network
         throw std::invalid_argument("Could not open file: " + file);
 
       fs.seekg(0, std::ios::end);
-      headers["Content-Length"] = std::to_string(fs.tellg());
+      headers["content-length"] = std::to_string(fs.tellg());
 
       auto ext = file.substr(file.find_last_of('.') + 1);
-      headers["Content-Type"] = network::mime_types.at(ext);
+      headers["content-type"] = network::mime_types.at(ext);
     }
 
     /**
@@ -315,8 +321,8 @@ namespace network
      */
     json_response(json::json &&b, status_code code = status_code::ok, std::map<std::string, std::string> &&hdrs = {}, std::string &&ver = "HTTP/1.1") : response(code, std::move(hdrs), std::move(ver)), body(std::move(b)), str_body(body.dump())
     {
-      headers["Content-Type"] = "application/json";
-      headers["Content-Length"] = std::to_string(str_body.size());
+      headers["content-type"] = "application/json";
+      headers["content-length"] = std::to_string(str_body.size());
     }
     /**
      * @brief Constructs a `json_response` object with the given JSON body, status code, headers, and version.
@@ -328,8 +334,8 @@ namespace network
      */
     json_response(const json::json &b, status_code code = status_code::ok, std::map<std::string, std::string> &&hdrs = {}, std::string &&ver = "HTTP/1.1") : response(code, std::move(hdrs), std::move(ver)), body(b), str_body(body.dump())
     {
-      headers["Content-Type"] = "application/json";
-      headers["Content-Length"] = std::to_string(str_body.size());
+      headers["content-type"] = "application/json";
+      headers["content-length"] = std::to_string(str_body.size());
     }
 
     /**

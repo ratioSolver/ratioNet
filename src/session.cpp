@@ -83,9 +83,9 @@ namespace network
         if (req->is_upgrade()) // handle websocket upgrade request
             return upgrade();
 
-        if (req->headers.find("Content-Length") != req->headers.end())
+        if (req->headers.find("content-length") != req->headers.end())
         { // read body
-            std::size_t content_length = std::stoul(req->headers["Content-Length"]);
+            std::size_t content_length = std::stoul(req->headers["content-length"]);
             if (content_length > additional_bytes) // read the remaining body
                 asio::async_read(socket, req->buffer, asio::transfer_exactly(content_length - additional_bytes), std::bind(&session::on_body, shared_from_this(), asio::placeholders::error, asio::placeholders::bytes_transferred));
             else // the buffer contains the entire body
@@ -106,7 +106,7 @@ namespace network
         }
 
         std::istream is(&req->buffer);
-        if (req->headers.find("Content-Type") != req->headers.end() && req->headers["Content-Type"] == "application/json")
+        if (req->headers.find("content-type") != req->headers.end() && req->headers["content-type"] == "application/json")
             req = std::make_unique<json_request>(req->v, std::move(req->target), std::move(req->version), std::move(req->headers), json::load(is));
         else
         {

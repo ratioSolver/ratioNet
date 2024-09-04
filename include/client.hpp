@@ -32,7 +32,7 @@ namespace network
      */
     std::unique_ptr<response> get(std::string &&target, std::map<std::string, std::string> &&hdrs = {})
     {
-      hdrs["Host"] = host;
+      hdrs["Host"] = host + ":" + std::to_string(port);
       return send(std::make_unique<request>(verb::Get, std::move(target), "HTTP/1.1", std::move(hdrs)));
     }
 
@@ -46,7 +46,7 @@ namespace network
      */
     std::unique_ptr<response> post(std::string &&target, std::string &&body, std::map<std::string, std::string> &&hdrs = {})
     {
-      hdrs["Host"] = host;
+      hdrs["Host"] = host + ":" + std::to_string(port);
       return send(std::make_unique<string_request>(verb::Post, std::move(target), "HTTP/1.1", std::move(hdrs), std::move(body)));
     }
 
@@ -60,7 +60,7 @@ namespace network
      */
     std::unique_ptr<response> post(std::string &&target, json::json &&body, std::map<std::string, std::string> &&hdrs = {})
     {
-      hdrs["Host"] = host;
+      hdrs["Host"] = host + ":" + std::to_string(port);
       return send(std::make_unique<json_request>(verb::Post, std::move(target), "HTTP/1.1", std::move(hdrs), std::move(body)));
     }
 
@@ -74,7 +74,7 @@ namespace network
      */
     std::unique_ptr<response> put(std::string &&target, std::string &&body, std::map<std::string, std::string> &&hdrs = {})
     {
-      hdrs["Host"] = host;
+      hdrs["Host"] = host + ":" + std::to_string(port);
       return send(std::make_unique<string_request>(verb::Put, std::move(target), "HTTP/1.1", std::move(hdrs), std::move(body)));
     }
 
@@ -88,7 +88,7 @@ namespace network
      */
     std::unique_ptr<response> put(std::string &&target, json::json &&body, std::map<std::string, std::string> &&hdrs = {})
     {
-      hdrs["Host"] = host;
+      hdrs["Host"] = host + ":" + std::to_string(port);
       return send(std::make_unique<json_request>(verb::Put, std::move(target), "HTTP/1.1", std::move(hdrs), std::move(body)));
     }
 
@@ -101,7 +101,7 @@ namespace network
      */
     std::unique_ptr<response> del(std::string &&target, std::map<std::string, std::string> &&hdrs = {})
     {
-      hdrs["Host"] = host;
+      hdrs["Host"] = host + ":" + std::to_string(port);
       return send(std::make_unique<request>(verb::Delete, std::move(target), "HTTP/1.1", std::move(hdrs)));
     }
 
