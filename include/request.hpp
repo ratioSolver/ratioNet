@@ -77,7 +77,7 @@ namespace network
      *
      * @return true if the request is an upgrade request for a WebSocket connection, false otherwise.
      */
-    bool is_upgrade() const { return headers.find("Upgrade") != headers.end() && headers.at("Upgrade") == "websocket"; }
+    bool is_upgrade() const { return headers.find("upgrade") != headers.end() && headers.at("upgrade") == "websocket"; }
 
     /**
      * Checks if the request is a keep-alive request.
@@ -86,7 +86,7 @@ namespace network
      *
      * @return true if the request is a keep-alive request, false otherwise.
      */
-    bool is_keep_alive() const { return headers.find("Connection") != headers.end() && headers.at("Connection") == "keep-alive"; }
+    bool is_keep_alive() const { return headers.find("connection") != headers.end() && headers.at("connection") == "keep-alive"; }
 
     /**
      * @brief Get the buffer containing the request.

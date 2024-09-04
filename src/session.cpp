@@ -113,7 +113,7 @@ namespace network
 
     void session::upgrade()
     {
-        auto key_it = req->headers.find("Sec-WebSocket-Key");
+        auto key_it = req->headers.find("sec-websocket-key");
         if (key_it == req->headers.end())
         {
             LOG_ERR("WebSocket key not found");
