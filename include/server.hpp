@@ -116,6 +116,7 @@ namespace network
   private:
     bool running = false;                                                                                           // The server is running
     asio::io_context io_ctx;                                                                                        // The io_context is required for all I/O
+    asio::signal_set signals;                                                                                       // The signal_set is used to handle signals
     std::vector<std::thread> threads;                                                                               // The thread pool
     const asio::ip::tcp::endpoint endpoint;                                                                         // The endpoint for the server
     asio::ip::tcp::acceptor acceptor;                                                                               // The acceptor for the server

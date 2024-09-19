@@ -3,9 +3,16 @@
 
 namespace network
 {
-    server::server(const std::string &host, unsigned short port, std::size_t concurrency_hint) : io_ctx(concurrency_hint), endpoint(asio::ip::make_address(host), port), acceptor(asio::make_strand(io_ctx))
+    server::server(const std::string &host, unsigned short port, std::size_t concurrency_hint) : io_ctx(concurrency_hint), signals(io_ctx, SIGINT, SIGTERM, SIGQUIT), endpoint(asio::ip::make_address(host), port), acceptor(asio::make_strand(io_ctx))
     {
         threads.reserve(concurrency_hint);
+        signals.async_wait([this](const std::error_code &ec, int signal)
+                           {
+                               if (!ec)
+                               {
+                                   LOG_DEBUG("Received signal " + std::to_string(signal));
+                                   stop();
+                               } });
 #ifdef ENABLE_AUTH
         add_route(verb::Post, "^/login$", std::bind(&server::login, this, placeholders::request), true);
 #endif
