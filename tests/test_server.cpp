@@ -1,9 +1,18 @@
 #include <thread>
 #include "server.hpp"
 
-void test_server()
+class test_server : public network::server
 {
-    network::server server;
+#ifdef ENABLE_AUTH
+    std::string generate_token(const std::string &username, const std::string &password) { return ""; }
+
+    bool has_permission(const network::request &req, const std::string &token) { return true; }
+#endif
+};
+
+void test_rest_server()
+{
+    test_server server;
 
     server.add_route(network::verb::Get, "/", [](network::request &req)
                      { return std::make_unique<network::html_response>("<html><body><h1>Hello, World!</h1></body></html>"); });
@@ -32,7 +41,7 @@ void test_server()
 
 int main(int argc, char const *argv[])
 {
-    test_server();
+    test_rest_server();
 
     return 0;
 }
