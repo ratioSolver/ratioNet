@@ -19,7 +19,9 @@ namespace network
 
     void session::on_handshake(const std::error_code &ec)
     {
-        if (ec)
+        if (ec == asio::ssl::error::stream_truncated)
+            return; // connection closed by client
+        else if (ec)
         {
             LOG_ERR(ec.message());
             return;
@@ -136,6 +138,10 @@ namespace network
     {
         if (ec == asio::error::eof)
             return; // connection closed by client
+#ifdef ENABLE_SSL
+        else if (ec == asio::ssl::error::stream_truncated)
+            return; // connection closed by client
+#endif
         else if (ec)
         {
             LOG_ERR(ec.message());
