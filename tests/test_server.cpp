@@ -14,6 +14,10 @@ void test_rest_server()
 {
     test_server server;
 
+#ifdef ENABLE_SSL
+    server.load_certificate("cert.pem", "key.pem");
+#endif
+
     server.add_route(network::verb::Get, "/", [](network::request &req)
                      { return std::make_unique<network::html_response>("<html><body><h1>Hello, World!</h1></body></html>"); });
     server.add_route(network::verb::Get, "/json", [](network::request &req)
