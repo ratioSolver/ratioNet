@@ -1,5 +1,9 @@
 #include "server.hpp"
 #include "logging.hpp"
+#ifdef _WIN32
+// Windows-specific code
+#define SIGQUIT 3 // Define a dummy value for SIGQUIT on Windows if necessary
+#endif
 #include <csignal>
 
 namespace network
