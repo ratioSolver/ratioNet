@@ -1,5 +1,6 @@
 #include "server.hpp"
 #include "logging.hpp"
+#include <csignal>
 
 namespace network
 {
