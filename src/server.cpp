@@ -18,9 +18,6 @@ namespace network
                                    LOG_DEBUG("Received signal " + std::to_string(signal));
                                    stop();
                                } });
-#ifdef ENABLE_AUTH
-        add_route(verb::Post, "^/login$", std::bind(&server::login, this, placeholders::request), true);
-#endif
     }
     server::~server()
     {
@@ -98,20 +95,27 @@ namespace network
             s.read(); // read next request
 
         if (auto it = routes.find(req->get_verb()); it != routes.end())
-            for (const auto &[re, handler] : it->second)
-                if (std::regex_match(req->get_target(), re))
+            for (const auto &r : it->second)
+                if (std::regex_match(req->get_target(), r.get_path()))
                 {
                     try
                     {
 #ifdef ENABLE_AUTH
-                        if (open_routes.find(req->get_verb()) == open_routes.end() || std::none_of(open_routes.at(req->get_verb()).begin(), open_routes.at(req->get_verb()).end(), [&req](const auto &route)
-                                                                                                   { return std::regex_match(req->get_target(), route); })) // we need to check for authorization
+                        if (!r.get_roles().empty()) // route requires authentication
                             if (auto it = req->get_headers().find("authorization"); it != req->get_headers().end())
                             {
                                 auto token = it->second;
+                                if (token.size() < 7 || token.substr(0, 7) != "Bearer ")
+                                { // invalid token
+                                    auto res = std::make_unique<json_response>(json::json{{"message", "Unauthorized"}}, status_code::unauthorized);
+                                    s.enqueue(std::move(res));
+                                    return;
+                                }
                                 token.erase(0, 7); // remove "Bearer " from token
-                                if (!has_permission(*req, token))
-                                { // user has no permission
+                                const auto roles = get_roles(token);
+                                if (std::none_of(r.get_roles().begin(), r.get_roles().end(), [&roles](int role)
+                                                 { return roles.find(role) != roles.end(); }))
+                                { // user does not have required role
                                     auto res = std::make_unique<json_response>(json::json{{"message", "Forbidden"}}, status_code::forbidden);
                                     s.enqueue(std::move(res));
                                     return;
@@ -124,7 +128,8 @@ namespace network
                                 return;
                             }
 #endif
-                        auto res = handler(*req);
+                        // call the route handler
+                        auto res = r.get_handler()(*req);
                         s.enqueue(std::move(res));
                     }
                     catch (const std::exception &e)
@@ -189,17 +194,4 @@ namespace network
         else
             LOG_WARN("No route for " + s.path);
     }
-
-#ifdef ENABLE_AUTH
-    std::unique_ptr<json_response> server::login(const request &req)
-    {
-        auto &body = static_cast<const json_request &>(req).get_body();
-        if (!body.contains("username") || !body.contains("password"))
-            return std::make_unique<json_response>(json::json{{"message", "Bad Request"}}, status_code::bad_request);
-        auto token = generate_token(body["username"], body["password"]);
-        if (token.empty())
-            return std::make_unique<json_response>(json::json{{"message", "Unauthorized"}}, status_code::unauthorized);
-        return std::make_unique<json_response>(json::json{{"token", token}}, status_code::ok);
-    }
-#endif
 } // namespace network

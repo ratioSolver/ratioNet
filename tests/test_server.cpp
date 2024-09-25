@@ -1,18 +1,9 @@
-#include <thread>
 #include "server.hpp"
-
-class test_server : public network::server
-{
-#ifdef ENABLE_AUTH
-    std::string generate_token(const std::string &username, const std::string &password) { return ""; }
-
-    bool has_permission(const network::request &req, const std::string &token) { return true; }
-#endif
-};
+#include <thread>
 
 void test_rest_server()
 {
-    test_server server;
+    network::server server;
 
 #ifdef ENABLE_SSL
     server.load_certificate("cert.pem", "key.pem");

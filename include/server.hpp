@@ -2,10 +2,7 @@
 
 #include "session.hpp"
 #include "ws_session.hpp"
-#include <regex>
-#ifdef ENABLE_AUTH
-#include <set>
-#endif
+#include "route.hpp"
 
 namespace network
 {
@@ -35,13 +32,9 @@ namespace network
      * @param v The HTTP verb associated with the route.
      * @param path The path of the route.
      * @param handler The handler function that will be called when the route is requested.
+     * @param roles The roles that have permission to access the route.
      */
-    void add_route(verb v, const std::string &path, std::function<std::unique_ptr<response>(request &)> &&handler, bool open = false) noexcept
-    {
-      routes[v].emplace_back(std::regex(path), std::move(handler));
-      if (open)
-        open_routes[v].emplace_back(path);
-    }
+    void add_route(verb v, const std::string &path, std::function<std::unique_ptr<response>(request &)> &&handler, const std::set<int> &roles = {}) noexcept { routes[v].emplace_back(std::regex(path), std::move(handler), roles); }
 #else
     /**
      * Adds a route to the server.
@@ -92,39 +85,28 @@ namespace network
     void on_error(ws_session &s, const std::error_code &ec);
 
 #ifdef ENABLE_AUTH
-    std::unique_ptr<json_response> login(const request &req);
-
     /**
-     * Generates a token for the given username and password.
+     * @brief Retrieves the set of roles associated with a given token.
      *
-     * @param username The username for which to generate the token.
-     * @param password The password for the given username.
-     * @return The generated token as a string.
-     */
-    virtual std::string generate_token(const std::string &username, const std::string &password) = 0;
-
-    /**
-     * @brief Checks if the given request has permission with the specified token.
+     * This function takes a token as input and returns a set of integers
+     * representing the roles associated with that token. By default, it
+     * returns an empty set.
      *
-     * @param req The request to check permission for.
-     * @param token The token to use for permission checking.
-     * @return True if the request has permission, false otherwise.
+     * @param token A string representing the token for which roles are to be retrieved.
+     * @return std::set<int> A set of integers representing the roles associated with the token.
      */
-    virtual bool has_permission(const request &req, const std::string &token) = 0;
+    virtual std::set<int> get_roles([[maybe_unused]] const std::string &token) { return {}; }
 #endif
 
   private:
-    bool running = false;                                                                                           // The server is running
-    asio::io_context io_ctx;                                                                                        // The io_context is required for all I/O
-    asio::signal_set signals;                                                                                       // The signal_set is used to handle signals
-    std::vector<std::thread> threads;                                                                               // The thread pool
-    const asio::ip::tcp::endpoint endpoint;                                                                         // The endpoint for the server
-    asio::ip::tcp::acceptor acceptor;                                                                               // The acceptor for the server
-    std::map<verb, std::vector<std::pair<std::regex, std::function<std::unique_ptr<response>(request &)>>>> routes; // The routes of the server
-    std::map<std::string, ws_handler> ws_routes;                                                                    // The WebSocket routes of the server
-#ifdef ENABLE_AUTH
-    std::map<verb, std::vector<std::regex>> open_routes; // The routes that are open to all users (no authentication required)
-#endif
+    bool running = false;                        // The server is running
+    asio::io_context io_ctx;                     // The io_context is required for all I/O
+    asio::signal_set signals;                    // The signal_set is used to handle signals
+    std::vector<std::thread> threads;            // The thread pool
+    const asio::ip::tcp::endpoint endpoint;      // The endpoint for the server
+    asio::ip::tcp::acceptor acceptor;            // The acceptor for the server
+    std::map<verb, std::vector<route>> routes;   // The routes of the server
+    std::map<std::string, ws_handler> ws_routes; // The WebSocket routes of the server
 #ifdef ENABLE_SSL
     asio::ssl::context ctx{asio::ssl::context::TLS_VERSION}; // The SSL context is required, and holds certificates
 #endif
