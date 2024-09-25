@@ -101,32 +101,11 @@ namespace network
                     try
                     {
 #ifdef ENABLE_AUTH
-                        if (!r.get_roles().empty()) // route requires authentication
-                            if (auto it = req->get_headers().find("authorization"); it != req->get_headers().end())
-                            {
-                                auto token = it->second;
-                                if (token.size() < 7 || token.substr(0, 7) != "Bearer ")
-                                { // invalid token
-                                    auto res = std::make_unique<json_response>(json::json{{"message", "Unauthorized"}}, status_code::unauthorized);
-                                    s.enqueue(std::move(res));
-                                    return;
-                                }
-                                token.erase(0, 7); // remove "Bearer " from token
-                                const auto roles = get_roles(token);
-                                if (std::none_of(r.get_roles().begin(), r.get_roles().end(), [&roles](int role)
-                                                 { return roles.find(role) != roles.end(); }))
-                                { // user does not have required role
-                                    auto res = std::make_unique<json_response>(json::json{{"message", "Forbidden"}}, status_code::forbidden);
-                                    s.enqueue(std::move(res));
-                                    return;
-                                }
-                            }
-                            else
-                            { // no token provided
-                                auto res = std::make_unique<json_response>(json::json{{"message", "Unauthorized"}}, status_code::unauthorized);
-                                s.enqueue(std::move(res));
-                                return;
-                            }
+                        if (auto res = authorize(*req, r); res)
+                        {
+                            s.enqueue(std::move(res));
+                            return;
+                        }
 #endif
                         // call the route handler
                         auto res = r.get_handler()(*req);

@@ -86,16 +86,16 @@ namespace network
 
 #ifdef ENABLE_AUTH
     /**
-     * @brief Retrieves the set of roles associated with a given token.
+     * @brief Authorizes a request based on the provided route.
      *
-     * This function takes a token as input and returns a set of integers
-     * representing the roles associated with that token. By default, it
-     * returns an empty set.
+     * This virtual function is intended to be overridden by derived classes to implement
+     * specific authorization logic.
      *
-     * @param token A string representing the token for which roles are to be retrieved.
-     * @return std::set<int> A set of integers representing the roles associated with the token.
+     * @param req The request object containing details of the incoming request.
+     * @param r The route object representing the route being accessed.
+     * @return std::unique_ptr<response> A unique pointer to a response object if the request is not authorized, or nullptr if the request is authorized.
      */
-    virtual std::set<int> get_roles([[maybe_unused]] const std::string &token) { return {}; }
+    virtual std::unique_ptr<response> authorize([[maybe_unused]] const request &req, [[maybe_unused]] const route &r) { return nullptr; }
 #endif
 
   private:
