@@ -25,7 +25,6 @@ namespace network
      */
     void stop();
 
-#ifdef ENABLE_AUTH
     /**
      * Adds a route to the server.
      *
@@ -35,16 +34,6 @@ namespace network
      * @param roles The roles that have permission to access the route.
      */
     void add_route(verb v, const std::string &path, std::function<std::unique_ptr<response>(request &)> &&handler, const std::set<int> &roles = {}) noexcept { routes[v].emplace_back(std::regex(path), std::move(handler), roles); }
-#else
-    /**
-     * Adds a route to the server.
-     *
-     * @param v The HTTP verb associated with the route.
-     * @param path The path of the route.
-     * @param handler The handler function that will be called when the route is requested.
-     */
-    void add_route(verb v, const std::string &path, std::function<std::unique_ptr<response>(request &)> &&handler) noexcept { routes[v].emplace_back(std::regex(path), std::move(handler)); }
-#endif
 
     /**
      * Adds a WebSocket route to the server.
@@ -83,20 +72,6 @@ namespace network
     void on_disconnect(ws_session &s);
     void on_message(ws_session &s, std::unique_ptr<message> msg);
     void on_error(ws_session &s, const std::error_code &ec);
-
-#ifdef ENABLE_AUTH
-    /**
-     * @brief Authorizes a request based on the provided route.
-     *
-     * This virtual function is intended to be overridden by derived classes to implement
-     * specific authorization logic.
-     *
-     * @param req The request object containing details of the incoming request.
-     * @param r The route object representing the route being accessed.
-     * @return std::unique_ptr<response> A unique pointer to a response object if the request is not authorized, or nullptr if the request is authorized.
-     */
-    virtual std::unique_ptr<response> authorize([[maybe_unused]] const request &req, [[maybe_unused]] const route &r) { return nullptr; }
-#endif
 
   private:
     bool running = false;                        // The server is running

@@ -18,12 +18,10 @@ if(NOT TARGET json)
 endif()
 
 option(ENABLE_SSL "Enable Secure Sockets Layer (SSL) for secure communication" OFF)
-option(ENABLE_AUTH "Enable authentication for clients" OFF)
 set(SERVER_HOST "0.0.0.0" CACHE STRING "The address the server listens on")
 set(SERVER_PORT "8080" CACHE STRING "The port the server listens on")
 
 message(STATUS "Enable SSL: ${ENABLE_SSL}")
-message(STATUS "Enable authentication: ${ENABLE_AUTH}")
 message(STATUS "Server address: ${SERVER_HOST}")
 message(STATUS "Server port: ${SERVER_PORT}")
 
@@ -47,10 +45,6 @@ target_compile_definitions(ratioNet PUBLIC SERVER_HOST="${SERVER_HOST}" SERVER_P
 if (ENABLE_SSL)
     target_link_libraries(ratioNet PUBLIC OpenSSL::SSL OpenSSL::Crypto)
     target_compile_definitions(ratioNet PUBLIC ENABLE_SSL TLS_VERSION=${TLS_VERSION})
-endif()
-
-if(ENABLE_AUTH)
-    target_compile_definitions(ratioNet PUBLIC ENABLE_AUTH)
 endif()
 
 if(BUILD_TESTING)

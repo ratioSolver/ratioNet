@@ -100,13 +100,6 @@ namespace network
                 {
                     try
                     {
-#ifdef ENABLE_AUTH
-                        if (auto res = authorize(*req, r); res)
-                        {
-                            s.enqueue(std::move(res));
-                            return;
-                        }
-#endif
                         // call the route handler
                         auto res = r.get_handler()(*req);
                         s.enqueue(std::move(res));
