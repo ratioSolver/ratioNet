@@ -31,9 +31,8 @@ namespace network
      * @param v The HTTP verb associated with the route.
      * @param path The path of the route.
      * @param handler The handler function that will be called when the route is requested.
-     * @param roles The roles that have permission to access the route.
      */
-    void add_route(verb v, const std::string &path, std::function<std::unique_ptr<response>(request &)> &&handler, const std::set<int> &roles = {}) noexcept { routes[v].emplace_back(std::regex(path), std::move(handler), roles); }
+    void add_route(verb v, const std::string &path, std::function<std::unique_ptr<response>(request &)> &&handler) noexcept { routes[v].emplace_back(std::regex(path), std::move(handler)); }
 
     /**
      * Adds a WebSocket route to the server.

@@ -12,19 +12,18 @@ namespace network
   /**
    * @brief Represents a route in the server.
    *
-   * This class represents a route in the server. A route consists of a path, a handler function, and a set of roles that are allowed to access the route.
+   * This class represents a route in the server. A route consists of a path and a handler function.
    */
   class route
   {
   public:
     /**
-     * @brief Constructs a route object with the specified path, handler, and roles.
+     * @brief Constructs a route object with the specified path and handler function.
      *
      * @param path A regular expression representing the path for the route.
      * @param handler A function that takes a request reference and returns a unique pointer to a response.
-     * @param roles A set of integers representing roles that are allowed to access this route. Defaults to an empty set.
      */
-    route(const std::regex &path, std::function<std::unique_ptr<response>(request &)> &&handler, const std::set<int> &roles = {}) noexcept : path(path), handler(std::move(handler)), roles(roles) {}
+    route(const std::regex &path, std::function<std::unique_ptr<response>(request &)> &&handler) noexcept : path(path), handler(std::move(handler)) {}
 
     /**
      * @brief Retrieves the path as a constant reference to a regex object.
@@ -46,18 +45,8 @@ namespace network
      */
     const std::function<std::unique_ptr<response>(request &)> &get_handler() const noexcept { return handler; }
 
-    /**
-     * @brief Retrieves the set of roles.
-     *
-     * This function returns a constant reference to a set containing role identifiers.
-     *
-     * @return const std::set<int>& A constant reference to the set of roles.
-     */
-    const std::set<int> &get_roles() const noexcept { return roles; }
-
   private:
     std::regex path;                                             // path of the route
     std::function<std::unique_ptr<response>(request &)> handler; // handler function for the route
-    std::set<int> roles;                                         // roles that have permission to access the route
   };
 } // namespace network
