@@ -74,6 +74,16 @@ namespace network
         running = false;
     }
 
+#ifdef ENABLE_SSL
+    void server::load_certificate(const std::string &cert_file, const std::string &key_file)
+    {
+      LOG_DEBUG("Loading certificate: " + cert_file);
+      ctx.use_certificate_chain_file(cert_file);
+      LOG_DEBUG("Loading private key: " + key_file);
+      ctx.use_private_key_file(key_file, asio::ssl::context::pem);
+    }
+#endif
+
     void server::do_accept() { acceptor.async_accept(asio::make_strand(io_ctx), std::bind(&server::on_accept, this, asio::placeholders::error, std::placeholders::_2)); }
 
     void server::on_accept(const std::error_code &ec, asio::ip::tcp::socket socket)

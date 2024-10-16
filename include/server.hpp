@@ -54,11 +54,7 @@ namespace network
      * @param cert_file The path to the certificate file.
      * @param key_file The path to the private key file.
      */
-    void load_certificate(const std::string &cert_file, const std::string &key_file)
-    {
-      ctx.use_certificate_chain_file(cert_file);
-      ctx.use_private_key_file(key_file, asio::ssl::context::pem);
-    }
+    void load_certificate(const std::string &cert_file, const std::string &key_file);
 #endif
 
   private:
