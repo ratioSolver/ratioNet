@@ -1,6 +1,22 @@
 #include "server.hpp"
 #include <thread>
 
+/**
+ * @brief Test function to set up and run a REST server with various routes.
+ *
+ * This function initializes a network server and sets up several routes:
+ * - A root route ("/") that returns an HTML response with "Hello, World!".
+ * - A JSON route ("/json") that returns a JSON response with a message "Hello, World!".
+ * - A WebSocket route ("/ws") that returns an HTML page with a WebSocket client script.
+ *
+ * If SSL is enabled (ENABLE_SSL), the server loads the SSL certificate and key.
+ *
+ * The WebSocket route ("/ws") also sets up handlers for WebSocket events:
+ * - on_open: Sends "Hello, World!" when a WebSocket connection is opened.
+ * - on_message: Echoes back any received message.
+ *
+ * The server runs in a separate thread for 100 seconds before stopping.
+ */
 void test_rest_server()
 {
     network::server server;
@@ -34,9 +50,51 @@ void test_rest_server()
     t.join();
 }
 
+/**
+ * @brief Tests the CORS (Cross-Origin Resource Sharing) functionality of the server.
+ *
+ * This function sets up a server with three routes:
+ * - A GET route at "/json" that returns a JSON response with a "Hello, World!" message and allows CORS from any origin.
+ * - A POST route at "/json" that returns a JSON response with a "Hello, World!" message and allows CORS from any origin.
+ * - An OPTIONS route at "/json" that returns the allowed methods (GET, POST, OPTIONS) and allowed headers (Content-Type) for CORS.
+ *
+ * The server runs in a separate thread for 100 seconds before stopping.
+ */
+void test_cors_server()
+{
+    network::server server;
+    server.add_route(network::verb::Get, "/json", [](network::request &req)
+                     {
+                        std::map<std::string, std::string> headers;
+                        headers["Access-Control-Allow-Origin"] = "*";
+                        return std::make_unique<network::json_response>(json::json{{"message", "Hello, World!"}}, network::ok, std::move(headers)); });
+
+    server.add_route(network::verb::Post, "/json", [](network::request &req)
+                     {
+                        std::map<std::string, std::string> headers;
+                        headers["Access-Control-Allow-Origin"] = "*";
+                        return std::make_unique<network::json_response>(json::json{{"message", "Hello, World!"}}, network::ok, std::move(headers)); });
+
+    server.add_route(network::verb::Options, "/json", [](network::request &req)
+                     {
+                        std::map<std::string, std::string> headers;
+                        headers["Access-Control-Allow-Origin"] = "*";
+                        headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS";
+                        headers["Access-Control-Allow-Headers"] = "Content-Type";
+                        return std::make_unique<network::response>(network::ok, std::move(headers)); });
+
+    std::thread t{[&server]
+                  { server.start(); }};
+    std::this_thread::sleep_for(std::chrono::seconds(100));
+    server.stop();
+    t.join();
+}
+
 int main(int argc, char const *argv[])
 {
-    test_rest_server();
+    // test_rest_server();
+
+    test_cors_server();
 
     return 0;
 }

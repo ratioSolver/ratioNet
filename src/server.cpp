@@ -77,10 +77,10 @@ namespace network
 #ifdef ENABLE_SSL
     void server::load_certificate(const std::string &cert_file, const std::string &key_file)
     {
-      LOG_DEBUG("Loading certificate: " + cert_file);
-      ctx.use_certificate_chain_file(cert_file);
-      LOG_DEBUG("Loading private key: " + key_file);
-      ctx.use_private_key_file(key_file, asio::ssl::context::pem);
+        LOG_DEBUG("Loading certificate: " + cert_file);
+        ctx.use_certificate_chain_file(cert_file);
+        LOG_DEBUG("Loading private key: " + key_file);
+        ctx.use_private_key_file(key_file, asio::ssl::context::pem);
     }
 #endif
 
