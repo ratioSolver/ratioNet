@@ -32,7 +32,7 @@ namespace network
      * @param path The path of the route.
      * @param handler The handler function that will be called when the route is requested.
      */
-    void add_route(verb v, const std::string &path, std::function<std::unique_ptr<response>(request &)> &&handler) noexcept { routes[v].emplace_back(std::regex(path), std::move(handler)); }
+    void add_route(verb v, const std::string &path, std::function<std::unique_ptr<response>(request &)> &&handler) noexcept;
 
     /**
      * Adds a WebSocket route to the server.
@@ -67,6 +67,10 @@ namespace network
     void on_disconnect(ws_session &s);
     void on_message(ws_session &s, std::unique_ptr<message> msg);
     void on_error(ws_session &s, const std::error_code &ec);
+
+#ifdef ENABLE_CORS
+    std::unique_ptr<response> cors(const request &req);
+#endif
 
   private:
     bool running = false;                        // The server is running

@@ -17,6 +17,7 @@ if(NOT TARGET json)
     add_subdirectory(extern/json)
 endif()
 
+option(ENABLE_CORS "Enable Cross-Origin Resource Sharing (CORS)" OFF)
 option(ENABLE_SSL "Enable Secure Sockets Layer (SSL) for secure communication" OFF)
 set(SERVER_HOST "0.0.0.0" CACHE STRING "The address the server listens on")
 set(SERVER_PORT "8080" CACHE STRING "The port the server listens on")
@@ -41,6 +42,10 @@ add_library(ratioNet src/server.cpp src/session.cpp src/ws_session.cpp src/clien
 target_link_libraries(ratioNet PUBLIC json)
 target_include_directories(ratioNet PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> ${asio_SOURCE_DIR}/asio/include)
 target_compile_definitions(ratioNet PUBLIC SERVER_HOST="${SERVER_HOST}" SERVER_PORT=${SERVER_PORT})
+
+if (ENABLE_CORS)
+    target_compile_definitions(ratioNet PUBLIC ENABLE_CORS)
+endif()
 
 if (ENABLE_SSL)
     target_link_libraries(ratioNet PUBLIC OpenSSL::SSL OpenSSL::Crypto)

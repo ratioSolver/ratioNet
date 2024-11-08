@@ -92,7 +92,7 @@ void test_cors_server()
 
 int main(int argc, char const *argv[])
 {
-    // test_rest_server();
+    test_rest_server();
 
     test_cors_server();
 

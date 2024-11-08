@@ -74,6 +74,15 @@ namespace network
         running = false;
     }
 
+    void server::add_route(verb v, const std::string &path, std::function<std::unique_ptr<response>(request &)> &&handler) noexcept
+    {
+        routes[v].emplace_back(std::regex(path), std::move(handler));
+#ifdef ENABLE_CORS
+        if (v != verb::Get && v != verb::Options)
+            routes[verb::Options].emplace_back(std::regex(path), std::bind(&server::cors, this, placeholders::request));
+#endif
+    }
+
 #ifdef ENABLE_SSL
     void server::load_certificate(const std::string &cert_file, const std::string &key_file)
     {
@@ -112,6 +121,9 @@ namespace network
                     {
                         // call the route handler
                         auto res = r.get_handler()(*req);
+#ifdef ENABLE_CORS
+                        res->headers["Access-Control-Allow-Origin"] = "*";
+#endif
                         s.enqueue(std::move(res));
                     }
                     catch (const std::exception &e)
@@ -176,4 +188,16 @@ namespace network
         else
             LOG_WARN("No route for " + s.path);
     }
+
+#ifdef ENABLE_CORS
+    std::unique_ptr<response> server::cors(const request &req)
+    {
+        std::map<std::string, std::string> headers;
+        headers["Access-Control-Allow-Origin"] = "*";
+        headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS";
+        headers["Access-Control-Allow-Headers"] = "Content-Type";
+        headers["Access-Control-Max-Age"] = "86400";
+        return std::make_unique<response>(status_code::ok, std::move(headers));
+    }
+#endif
 } // namespace network

@@ -8,6 +8,7 @@
 
 namespace network
 {
+  class server;
   class client;
 
   /**
@@ -15,6 +16,7 @@ namespace network
    */
   class response
   {
+    friend class server;
     friend class client;
 
   public:
