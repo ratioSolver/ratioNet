@@ -195,7 +195,7 @@ namespace network
         std::map<std::string, std::string> headers;
         headers["Access-Control-Allow-Origin"] = "*";
         headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS";
-        headers["Access-Control-Allow-Headers"] = "Content-Type";
+        headers["Access-Control-Allow-Headers"] = "*";
         headers["Access-Control-Max-Age"] = "86400";
         return std::make_unique<response>(status_code::ok, std::move(headers));
     }
