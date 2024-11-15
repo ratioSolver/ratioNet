@@ -1,3 +1,4 @@
 [submodule "extern/json"]
 	path = extern/json
 	url = https://github.com/ratioSolver/json
+	branch = memory
