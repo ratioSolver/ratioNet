@@ -78,7 +78,7 @@ namespace network
     {
         routes[v].emplace_back(std::regex(path), std::move(handler));
 #ifdef ENABLE_CORS
-        if (v != verb::Get && v != verb::Options)
+        if (v != verb::Options)
             routes[verb::Options].emplace_back(std::regex(path), std::bind(&server::cors, this, placeholders::request));
 #endif
     }
