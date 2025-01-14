@@ -12,7 +12,7 @@ void test_weather_client()
 }
 #endif
 
-int main(int argc, char const *argv[])
+int main()
 {
 #ifdef ENABLE_SSL
     test_weather_client();
