@@ -11,7 +11,7 @@ namespace network
     server::server(const std::string &host, unsigned short port, std::size_t concurrency_hint) : io_ctx(concurrency_hint), signals(io_ctx, SIGINT, SIGTERM, SIGQUIT), endpoint(asio::ip::make_address(host), port), acceptor(asio::make_strand(io_ctx))
     {
         threads.reserve(concurrency_hint);
-        signals.async_wait([this](const std::error_code &ec, int signal)
+        signals.async_wait([this](const std::error_code &ec, [[maybe_unused]] int signal)
                            {
                                if (!ec)
                                {

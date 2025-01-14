@@ -93,7 +93,7 @@ namespace network
                     self->on_body(ec, bytes_transferred);
                 });
             else if (size > additional_bytes) // read the remaining chunk
-                asio::async_read(self->socket, self->req->buffer, asio::transfer_exactly((size - additional_bytes) + 2), [self, size](const std::error_code &ec, std::size_t bytes_transferred) {
+                asio::async_read(self->socket, self->req->buffer, asio::transfer_exactly((size - additional_bytes) + 2), [self, size](const std::error_code &ec, std::size_t ) {
                     if (ec)
                     {
                         LOG_ERR(ec.message());
@@ -130,7 +130,7 @@ namespace network
 
         auto res = std::make_unique<response>(status_code::websocket_switching_protocols, std::map<std::string, std::string>{{"Upgrade", "websocket"}, {"Connection", "Upgrade"}, {"Sec-WebSocket-Accept", key}});
         auto &buf = res->get_buffer();
-        asio::async_write(socket, buf, [self = shared_from_this(), res = std::move(res)](const std::error_code &ec, std::size_t bytes_transferred)
+        asio::async_write(socket, buf, [self = shared_from_this(), res = std::move(res)](const std::error_code &ec, std::size_t)
                           { if (ec) { LOG_ERR(ec.message()); return; } std::make_shared<ws_session>(self->srv, self->req->target, std::move(self->socket))->start(); });
     }
 
