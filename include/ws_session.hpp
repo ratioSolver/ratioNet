@@ -47,7 +47,7 @@ namespace network
      *
      * @param handler The handler function to be called. It takes a reference to the `ws_session` object and a constant reference to the received message.
      */
-    ws_handler &on_message(std::function<void(ws_session &, const std::string &)> &&handler) noexcept
+    ws_handler &on_message(std::function<void(ws_session &, std::string_view)> &&handler) noexcept
     {
       on_message_handler = std::move(handler);
       return *this;
@@ -86,7 +86,7 @@ namespace network
 
   private:
     std::function<void(ws_session &)> on_open_handler;                           // handler for the open event
-    std::function<void(ws_session &, const std::string &)> on_message_handler;   // handler for the message event
+    std::function<void(ws_session &, std::string_view)> on_message_handler;      // handler for the message event
     std::function<void(ws_session &)> on_close_handler;                          // handler for the close event
     std::function<void(ws_session &, const std::error_code &)> on_error_handler; // handler for the error event
   };
@@ -119,7 +119,7 @@ namespace network
      * @param path The path of the WebSocket session.
      * @param socket The SSL socket used to communicate with the client.
      */
-    ws_session(server &srv, const std::string &path, asio::ssl::stream<asio::ip::tcp::socket> &&socket);
+    ws_session(server &srv, std::string_view path, asio::ssl::stream<asio::ip::tcp::socket> &&socket);
 #else
     /**
      * @brief Constructs a new WebSocket session object.
@@ -131,7 +131,7 @@ namespace network
      * @param path The path of the WebSocket session.
      * @param socket The socket used to communicate with the client.
      */
-    ws_session(server &srv, const std::string &path, asio::ip::tcp::socket &&socket);
+    ws_session(server &srv, std::string_view path, asio::ip::tcp::socket &&socket);
 #endif
     ~ws_session();
 
@@ -165,7 +165,7 @@ namespace network
      *
      * @param payload The payload to be sent.
      */
-    void send(const std::string &payload) { send(std::make_shared<std::string>(payload)); }
+    void send(std::string_view payload) { send(std::make_shared<std::string>(payload)); }
 
     /**
      * Sends a ping message to the WebSocket server.

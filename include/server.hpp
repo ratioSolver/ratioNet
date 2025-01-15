@@ -12,7 +12,7 @@ namespace network
     friend class ws_session;
 
   public:
-    server(const std::string &host = SERVER_HOST, unsigned short port = SERVER_PORT, std::size_t concurrency_hint = std::thread::hardware_concurrency());
+    server(std::string_view host = SERVER_HOST, unsigned short port = SERVER_PORT, std::size_t concurrency_hint = std::thread::hardware_concurrency());
     ~server();
 
     /**
@@ -32,7 +32,7 @@ namespace network
      * @param path The path of the route.
      * @param handler The handler function that will be called when the route is requested.
      */
-    void add_route(verb v, const std::string &path, std::function<std::unique_ptr<response>(request &)> &&handler) noexcept;
+    void add_route(verb v, std::string_view path, std::function<std::unique_ptr<response>(request &)> &&handler) noexcept;
 
     /**
      * Adds a WebSocket route to the server.
@@ -43,7 +43,7 @@ namespace network
      * @param path The path of the WebSocket route.
      * @return A reference to the `ws_handler` associated with the added route.
      */
-    ws_handler &add_ws_route(const std::string &path) noexcept { return ws_routes[path]; }
+    ws_handler &add_ws_route(std::string_view path) noexcept { return ws_routes[path.data()]; }
 
 #ifdef ENABLE_SSL
     /**
@@ -54,7 +54,7 @@ namespace network
      * @param cert_file The path to the certificate file.
      * @param key_file The path to the private key file.
      */
-    void load_certificate(const std::string &cert_file, const std::string &key_file);
+    void load_certificate(std::string_view cert_file, std::string_view key_file);
 #endif
 
   private:
@@ -92,7 +92,7 @@ namespace network
    * @param query The query string to be parsed.
    * @return A map containing the key-value pairs extracted from the query string.
    */
-  inline std::map<std::string, std::string> parse_query(const std::string &query)
+  inline std::map<std::string, std::string> parse_query(std::string_view query)
   {
     std::map<std::string, std::string> params;
 

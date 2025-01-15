@@ -8,7 +8,7 @@
 
 namespace network
 {
-    server::server(const std::string &host, unsigned short port, std::size_t concurrency_hint) : io_ctx(concurrency_hint), signals(io_ctx, SIGINT, SIGTERM, SIGQUIT), endpoint(asio::ip::make_address(host), port), acceptor(asio::make_strand(io_ctx))
+    server::server(std::string_view host, unsigned short port, std::size_t concurrency_hint) : io_ctx(concurrency_hint), signals(io_ctx, SIGINT, SIGTERM, SIGQUIT), endpoint(asio::ip::make_address(host), port), acceptor(asio::make_strand(io_ctx))
     {
         threads.reserve(concurrency_hint);
         signals.async_wait([this](const std::error_code &ec, [[maybe_unused]] int signal)
@@ -74,9 +74,9 @@ namespace network
         running = false;
     }
 
-    void server::add_route(verb v, const std::string &path, std::function<std::unique_ptr<response>(request &)> &&handler) noexcept
+    void server::add_route(verb v, std::string_view path, std::function<std::unique_ptr<response>(request &)> &&handler) noexcept
     {
-        routes[v].emplace_back(std::regex(path), std::move(handler));
+        routes[v].emplace_back(std::regex(path.data()), std::move(handler));
 #ifdef ENABLE_CORS
         if (v != verb::Options)
             routes[verb::Options].emplace_back(std::regex(path), std::bind(&server::cors, this, placeholders::request));
@@ -84,7 +84,7 @@ namespace network
     }
 
 #ifdef ENABLE_SSL
-    void server::load_certificate(const std::string &cert_file, const std::string &key_file)
+    void server::load_certificate(std::string_view cert_file, std::string_view key_file)
     {
         LOG_DEBUG("Loading certificate: " + cert_file);
         ctx.use_certificate_chain_file(cert_file);
