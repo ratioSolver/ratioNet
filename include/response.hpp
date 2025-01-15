@@ -28,6 +28,7 @@ namespace network
      * @param ver The HTTP version of the response.
      */
     response(status_code code = status_code::ok, std::map<std::string, std::string> &&hdrs = {}, std::string &&ver = "HTTP/1.1") : code(code), headers(hdrs), version(ver) {}
+    virtual ~response() = default;
 
     /**
      * @brief Gets the status code of the response.
@@ -154,7 +155,7 @@ namespace network
    *
    * This class inherits from the base class response and provides functionality to handle string responses.
    */
-  class string_response : public response
+  class string_response final : public response
   {
   public:
     /**
@@ -200,7 +201,7 @@ namespace network
    *
    * This class inherits from the base response class and provides functionality to handle HTML responses.
    */
-  class html_response : public response
+  class html_response final : public response
   {
   public:
     /**
@@ -249,7 +250,7 @@ namespace network
    * The `file_response` class is a derived class of the `response` class. It represents a response that sends a file to the client.
    * It takes the path to the file as a parameter and automatically sets the appropriate headers, such as content-length and content-type.
    */
-  class file_response : public response
+  class file_response final : public response
   {
   public:
     /**
@@ -310,7 +311,7 @@ namespace network
    * a JSON response in an HTTP server. It contains the JSON body of the response and provides
    * methods to retrieve the body and write the response to an output stream.
    */
-  class json_response : public response
+  class json_response final : public response
   {
   public:
     /**
