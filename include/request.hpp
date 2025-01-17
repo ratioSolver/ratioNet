@@ -139,11 +139,11 @@ namespace network
       is.get(); // consume space
 
       while (is.peek() != ' ')
-        target += is.get();
+        target += static_cast<char>(is.get());
       is.get(); // consume space
 
       while (is.peek() != '\r')
-        version += is.get();
+        version += static_cast<char>(is.get());
       is.get(); // consume '\r'
       is.get(); // consume '\n'
 
@@ -151,11 +151,11 @@ namespace network
       {
         std::string header, value;
         while (is.peek() != ':')
-          header += is.get();
+          header += static_cast<char>(is.get());
         is.get(); // consume ':'
         is.get(); // consume space
         while (is.peek() != '\r')
-          value += is.get();
+          value += static_cast<char>(is.get());
         is.get(); // consume '\r'
         is.get(); // consume '\n'
 

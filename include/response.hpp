@@ -83,19 +83,19 @@ namespace network
 
       std::string c_version;
       while (is.peek() != ' ')
-        c_version += is.get();
+        c_version += static_cast<char>(is.get());
       version = std::move(c_version);
       is.get(); // consume ' '
       std::string c_code;
       while (is.peek() != ' ' && is.peek() != '\r')
-        c_code += is.get();
+        c_code += static_cast<char>(is.get());
       code = static_cast<status_code>(std::stoi(c_code));
       if (is.peek() == ' ')
       {
         is.get(); // consume ' '
         std::string c_reason;
         while (is.peek() != '\r')
-          c_reason += is.get();
+          c_reason += static_cast<char>(is.get());
       }
       is.get(); // consume '\r'
       is.get(); // consume '\n'
@@ -104,11 +104,11 @@ namespace network
       {
         std::string header, value;
         while (is.peek() != ':')
-          header += is.get();
+          header += static_cast<char>(is.get());
         is.get(); // consume ':'
         is.get(); // consume space
         while (is.peek() != '\r')
-          value += is.get();
+          value += static_cast<char>(is.get());
         is.get(); // consume '\r'
         is.get(); // consume '\n'
 
