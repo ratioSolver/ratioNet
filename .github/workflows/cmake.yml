@@ -8,7 +8,7 @@ jobs:
 
     strategy:
       matrix:
-        USE_SSL: [ON, OFF]
+        ENABLE_SSL: [ON, OFF]
 
     steps:
       - uses: actions/checkout@v4
@@ -21,7 +21,7 @@ jobs:
           sudo apt-get install -y cmake lcov
 
       - name: Configure CMake
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DENABLE_ASAN=ON -DENABLE_UBSAN=ON -DENABLE_COV=ON -DUSE_SSL=${{env.USE_SSL}}
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DENABLE_ASAN=ON -DENABLE_UBSAN=ON -DENABLE_COV=ON -DENABLE_SSL=${{env.ENABLE_SSL}}
 
       - name: Build
         run: cmake --build build --config Debug
@@ -46,7 +46,7 @@ jobs:
 
     strategy:
       matrix:
-        USE_SSL: [ON, OFF]
+        ENABLE_SSL: [ON, OFF]
 
     steps:
       - uses: actions/checkout@v4
@@ -59,7 +59,7 @@ jobs:
           sudo apt-get install -y cmake valgrind
 
       - name: Configure CMake
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DUSE_SSL=${{env.USE_SSL}}
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DENABLE_SSL=${{env.ENABLE_SSL}}
 
       - name: Build
         run: cmake --build build --config Debug
@@ -73,7 +73,7 @@ jobs:
 
     strategy:
       matrix:
-        USE_SSL: [ON, OFF]
+        ENABLE_SSL: [ON, OFF]
 
     steps:
       - uses: actions/checkout@v4
@@ -85,7 +85,7 @@ jobs:
           choco install cmake
 
       - name: Configure CMake
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DUSE_SSL=${{env.USE_SSL}}
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DENABLE_SSL=${{env.ENABLE_SSL}}
 
       - name: Build
         run: cmake --build build --config Debug
@@ -99,7 +99,7 @@ jobs:
 
     strategy:
       matrix:
-        USE_SSL: [ON, OFF]
+        ENABLE_SSL: [ON, OFF]
 
     steps:
       - uses: actions/checkout@v4
@@ -111,7 +111,7 @@ jobs:
           brew install cmake
 
       - name: Configure CMake
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DENABLE_ASAN=ON -DENABLE_UBSAN=ON -DUSE_SSL=${{env.USE_SSL}}
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DENABLE_ASAN=ON -DENABLE_UBSAN=ON -DENABLE_SSL=${{env.ENABLE_SSL}}
 
       - name: Build
         run: cmake --build build --config Debug
@@ -125,7 +125,7 @@ jobs:
 
     strategy:
       matrix:
-        USE_SSL: [ON, OFF]
+        ENABLE_SSL: [ON, OFF]
 
     steps:
       - uses: actions/checkout@v4
@@ -138,7 +138,7 @@ jobs:
           sudo apt-get install -y cmake
 
       - name: Configure CMake
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DUSE_SSL=${{env.USE_SSL}}
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_SSL=${{env.ENABLE_SSL}}
 
       - name: Build
         run: cmake --build build --config Release
@@ -152,7 +152,7 @@ jobs:
 
     strategy:
       matrix:
-        USE_SSL: [ON, OFF]
+        ENABLE_SSL: [ON, OFF]
 
     steps:
       - uses: actions/checkout@v4
@@ -164,7 +164,7 @@ jobs:
           choco install cmake
 
       - name: Configure CMake
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DUSE_SSL=${{env.USE_SSL}}
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_SSL=${{env.ENABLE_SSL}}
 
       - name: Build
         run: cmake --build build --config Release
@@ -178,7 +178,7 @@ jobs:
 
     strategy:
       matrix:
-        USE_SSL: [ON, OFF]
+        ENABLE_SSL: [ON, OFF]
 
     steps:
       - uses: actions/checkout@v4
@@ -190,7 +190,7 @@ jobs:
           brew install cmake
 
       - name: Configure CMake
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DUSE_SSL=${{env.USE_SSL}}
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_SSL=${{env.ENABLE_SSL}}
 
       - name: Build
         run: cmake --build build --config Release
