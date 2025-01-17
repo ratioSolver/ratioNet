@@ -3,31 +3,198 @@ name: CMake
 on: [push, pull_request]
 
 jobs:
-  build:
-    runs-on: ${{ matrix.os }}
+  ubuntu-address-undefined-coverage:
+    runs-on: ubuntu-latest
 
     strategy:
-      fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        build_type: [Debug, Release]
         use_ssl: [ON, OFF]
-
-    env:
-      BUILD_TYPE: ${{ matrix.build_type }}
-      USE_SSL: ${{ matrix.use_ssl }}
 
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
 
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake lcov
+
       - name: Configure CMake
-        run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DUSE_SSL=${{env.USE_SSL}}
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DENABLE_ASAN=ON -DENABLE_UBASAN=ON -DENABLE_COV=ON -DUSE_SSL=${{env.USE_SSL}}
 
       - name: Build
-        run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
+        run: cmake --build build --config Debug
+
+      - name: Test with address sanitizer, undefined behavior sanitizer and coverage
+        working-directory: build
+        run: ctest -C Debug --rerun-failed --output-on-failure -T Test -T Coverage
+
+      - name: Make coverage report
+        run: |
+          lcov --capture --directory build --output-file coverage.info
+          lcov --remove coverage.info '/usr/*' --output-file coverage.info
+          lcov --list coverage.info
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v4.0.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  ubuntu-memcheck:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        use_ssl: [ON, OFF]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake valgrind
+
+      - name: Configure CMake
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DUSE_SSL=${{env.USE_SSL}}
+
+      - name: Build
+        run: cmake --build build --config Debug
+
+      - name: Test with memory checker
+        working-directory: build
+        run: ctest -C Debug --rerun-failed --output-on-failure -T Test -T MemCheck
+
+  windows-debug:
+    runs-on: windows-latest
+
+    strategy:
+      matrix:
+        use_ssl: [ON, OFF]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          choco install cmake
+
+      - name: Configure CMake
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DUSE_SSL=${{env.USE_SSL}}
+
+      - name: Build
+        run: cmake --build build --config Debug
+
+      - name: Test with address sanitizer
+        working-directory: build
+        run: ctest -C Debug --rerun-failed --output-on-failure -T Test
+
+  macos-address-undefined:
+    runs-on: macos-latest
+
+    strategy:
+      matrix:
+        use_ssl: [ON, OFF]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          brew install cmake
+
+      - name: Configure CMake
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DENABLE_ASAN=ON -DENABLE_UBSAN=ON -DUSE_SSL=${{env.USE_SSL}}
+
+      - name: Build
+        run: cmake --build build --config Debug
+
+      - name: Test with address sanitizer and undefined behavior sanitizer
+        working-directory: build
+        run: ctest -C Debug --rerun-failed --output-on-failure -T Test
+
+  ubuntu-release:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        use_ssl: [ON, OFF]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake
+
+      - name: Configure CMake
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DUSE_SSL=${{env.USE_SSL}}
+
+      - name: Build
+        run: cmake --build build --config Release
 
       - name: Test
-        working-directory: ${{github.workspace}}/build
-        run: ctest -C ${{env.BUILD_TYPE}} --rerun-failed --output-on-failure
+        working-directory: build
+        run: ctest -C Release --rerun-failed --output-on-failure -T Test
+
+  windows-release:
+    runs-on: windows-latest
+
+    strategy:
+      matrix:
+        use_ssl: [ON, OFF]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          choco install cmake
+
+      - name: Configure CMake
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DUSE_SSL=${{env.USE_SSL}}
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Test
+        working-directory: build
+        run: ctest -C Release --rerun-failed --output-on-failure -T Test
+
+  macos-release:
+    runs-on: macos-latest
+
+    strategy:
+      matrix:
+        use_ssl: [ON, OFF]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          brew install cmake
+
+      - name: Configure CMake
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DUSE_SSL=${{env.USE_SSL}}
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Test
+        working-directory: build
+        run: ctest -C Release --rerun-failed --output-on-failure -T Test
