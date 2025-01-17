@@ -21,7 +21,7 @@ jobs:
           sudo apt-get install -y cmake lcov
 
       - name: Configure CMake
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DENABLE_ASAN=ON -DENABLE_UBSAN=ON -DENABLE_COV=ON -DENABLE_SSL=${{env.ENABLE_SSL}}
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DENABLE_ASAN=ON -DENABLE_UBSAN=ON -DENABLE_COV=ON -DENABLE_SSL=${{matrix.ENABLE_SSL}}
 
       - name: Build
         run: cmake --build build --config Debug
@@ -59,7 +59,7 @@ jobs:
           sudo apt-get install -y cmake valgrind
 
       - name: Configure CMake
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DENABLE_SSL=${{env.ENABLE_SSL}}
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DENABLE_SSL=${{matrix.ENABLE_SSL}}
 
       - name: Build
         run: cmake --build build --config Debug
@@ -85,7 +85,7 @@ jobs:
           choco install cmake
 
       - name: Configure CMake
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DENABLE_SSL=${{env.ENABLE_SSL}}
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DENABLE_SSL=${{matrix.ENABLE_SSL}}
 
       - name: Build
         run: cmake --build build --config Debug
@@ -111,7 +111,7 @@ jobs:
           brew install cmake
 
       - name: Configure CMake
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DENABLE_ASAN=ON -DENABLE_UBSAN=ON -DENABLE_SSL=${{env.ENABLE_SSL}}
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DENABLE_ASAN=ON -DENABLE_UBSAN=ON -DENABLE_SSL=${{matrix.ENABLE_SSL}}
 
       - name: Build
         run: cmake --build build --config Debug
@@ -138,7 +138,7 @@ jobs:
           sudo apt-get install -y cmake
 
       - name: Configure CMake
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_SSL=${{env.ENABLE_SSL}}
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_SSL=${{matrix.ENABLE_SSL}}
 
       - name: Build
         run: cmake --build build --config Release
@@ -164,7 +164,7 @@ jobs:
           choco install cmake
 
       - name: Configure CMake
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_SSL=${{env.ENABLE_SSL}}
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_SSL=${{matrix.ENABLE_SSL}}
 
       - name: Build
         run: cmake --build build --config Release
@@ -190,7 +190,7 @@ jobs:
           brew install cmake
 
       - name: Configure CMake
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_SSL=${{env.ENABLE_SSL}}
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_SSL=${{matrix.ENABLE_SSL}}
 
       - name: Build
         run: cmake --build build --config Release
