@@ -15,7 +15,7 @@
  * - on_open: Sends "Hello, World!" when a WebSocket connection is opened.
  * - on_message: Echoes back any received message.
  *
- * The server runs in a separate thread for 100 seconds before stopping.
+ * The server runs in a separate thread for 5 seconds before stopping.
  */
 void test_rest_server()
 {
@@ -45,7 +45,7 @@ void test_rest_server()
 
     std::thread t{[&server]
                   { server.start(); }};
-    std::this_thread::sleep_for(std::chrono::seconds(100));
+    std::this_thread::sleep_for(std::chrono::seconds(5));
     server.stop();
     t.join();
 }
@@ -58,7 +58,7 @@ void test_rest_server()
  * - A POST route at "/json" that returns a JSON response with a "Hello, World!" message and allows CORS from any origin.
  * - An OPTIONS route at "/json" that returns the allowed methods (GET, POST, OPTIONS) and allowed headers (Content-Type) for CORS.
  *
- * The server runs in a separate thread for 100 seconds before stopping.
+ * The server runs in a separate thread for 5 seconds before stopping.
  */
 void test_cors_server()
 {
@@ -85,7 +85,7 @@ void test_cors_server()
 
     std::thread t{[&server]
                   { server.start(); }};
-    std::this_thread::sleep_for(std::chrono::seconds(100));
+    std::this_thread::sleep_for(std::chrono::seconds(5));
     server.stop();
     t.join();
 }

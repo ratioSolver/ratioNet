@@ -8,7 +8,7 @@ jobs:
 
     strategy:
       matrix:
-        use_ssl: [ON, OFF]
+        USE_SSL: [ON, OFF]
 
     steps:
       - uses: actions/checkout@v4
@@ -21,7 +21,7 @@ jobs:
           sudo apt-get install -y cmake lcov
 
       - name: Configure CMake
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DENABLE_ASAN=ON -DENABLE_UBASAN=ON -DENABLE_COV=ON -DUSE_SSL=${{env.USE_SSL}}
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DENABLE_ASAN=ON -DENABLE_UBSAN=ON -DENABLE_COV=ON -DUSE_SSL=${{env.USE_SSL}}
 
       - name: Build
         run: cmake --build build --config Debug
@@ -46,7 +46,7 @@ jobs:
 
     strategy:
       matrix:
-        use_ssl: [ON, OFF]
+        USE_SSL: [ON, OFF]
 
     steps:
       - uses: actions/checkout@v4
@@ -73,7 +73,7 @@ jobs:
 
     strategy:
       matrix:
-        use_ssl: [ON, OFF]
+        USE_SSL: [ON, OFF]
 
     steps:
       - uses: actions/checkout@v4
@@ -99,7 +99,7 @@ jobs:
 
     strategy:
       matrix:
-        use_ssl: [ON, OFF]
+        USE_SSL: [ON, OFF]
 
     steps:
       - uses: actions/checkout@v4
@@ -125,7 +125,7 @@ jobs:
 
     strategy:
       matrix:
-        use_ssl: [ON, OFF]
+        USE_SSL: [ON, OFF]
 
     steps:
       - uses: actions/checkout@v4
@@ -152,7 +152,7 @@ jobs:
 
     strategy:
       matrix:
-        use_ssl: [ON, OFF]
+        USE_SSL: [ON, OFF]
 
     steps:
       - uses: actions/checkout@v4
@@ -178,7 +178,7 @@ jobs:
 
     strategy:
       matrix:
-        use_ssl: [ON, OFF]
+        USE_SSL: [ON, OFF]
 
     steps:
       - uses: actions/checkout@v4

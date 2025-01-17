@@ -36,15 +36,9 @@ namespace network
         asio::async_connect(socket, results, std::bind(&ws_client::on_connect, this, asio::placeholders::error));
     }
 
-    void ws_client::on_connect(const std::error_code &ec)
-    {
-    }
+    void ws_client::on_connect(const std::error_code &) {}
 
-    void ws_client::on_write(const std::error_code &ec, std::size_t bytes_transferred)
-    {
-    }
+    void ws_client::on_write(const std::error_code &, std::size_t) {}
 
-    void ws_client::on_read(const std::error_code &ec, std::size_t bytes_transferred)
-    {
-    }
+    void ws_client::on_read(const std::error_code &, std::size_t) {}
 } // namespace network
