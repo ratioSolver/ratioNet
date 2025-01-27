@@ -7,7 +7,7 @@ enable_testing()
 include(FetchContent)
 FetchContent_Declare(asio GIT_REPOSITORY https://github.com/chriskohlhoff/asio.git GIT_TAG asio-1-31-0)
 FetchContent_MakeAvailable(asio)
-list(APPEND CTEST_CUSTOM_COVERAGE_EXCLUDE ${asio_SOURCE_DIR})
+list(APPEND CTEST_CUSTOM_COVERAGE_EXCLUDE "${asio_SOURCE_DIR}/.*")
 
 add_library(asio INTERFACE)
 target_compile_definitions(asio INTERFACE ASIO_STANDALONE)
