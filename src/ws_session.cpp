@@ -19,11 +19,11 @@ namespace network
 
     void ws_session::read()
     {
-        msg = std::make_unique<message>();
+        msg = utils::make_u_ptr<message>();
         asio::async_read(socket, msg->buffer, asio::transfer_exactly(2), std::bind(&ws_session::on_read, shared_from_this(), asio::placeholders::error, asio::placeholders::bytes_transferred));
     }
 
-    void ws_session::enqueue(std::unique_ptr<message> res)
+    void ws_session::enqueue(utils::u_ptr<message> res)
     {
         asio::post(socket.get_executor(), [self = shared_from_this(), r = std::move(res)]() mutable
                    { self->res_queue.push(std::move(r));

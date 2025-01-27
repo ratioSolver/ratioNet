@@ -74,7 +74,7 @@ namespace network
         running = false;
     }
 
-    void server::add_route(verb v, std::string_view path, std::function<std::unique_ptr<response>(request &)> &&handler) noexcept
+    void server::add_route(verb v, std::string_view path, std::function<utils::u_ptr<response>(request &)> &&handler) noexcept
     {
         routes[v].emplace_back(std::regex(path.data()), std::move(handler));
 #ifdef ENABLE_CORS
@@ -99,15 +99,15 @@ namespace network
     {
         if (!ec)
 #ifdef ENABLE_SSL
-            std::make_shared<session>(*this, asio::ssl::stream<asio::ip::tcp::socket>(std::move(socket), ctx))->handshake();
+            utils::make_s_ptr<session>(*this, asio::ssl::stream<asio::ip::tcp::socket>(std::move(socket), ctx))->handshake();
 #else
-            std::make_shared<session>(*this, std::move(socket))->read();
+            utils::make_s_ptr<session>(*this, std::move(socket))->read();
 #endif
 
         do_accept();
     }
 
-    void server::handle_request(session &s, std::unique_ptr<request> req)
+    void server::handle_request(session &s, utils::u_ptr<request> req)
     {
         // read next request if connection is keep-alive
         if (req->is_keep_alive())
@@ -129,7 +129,7 @@ namespace network
                     catch (const std::exception &e)
                     {
                         LOG_ERR(e.what());
-                        auto res = std::make_unique<json_response>(json::json{{"message", "Internal Server Error"}}, status_code::internal_server_error);
+                        auto res = utils::make_u_ptr<json_response>(json::json{{"message", "Internal Server Error"}}, status_code::internal_server_error);
                         s.enqueue(std::move(res));
                     }
                     return;
@@ -137,7 +137,7 @@ namespace network
 
         LOG_WARN("No route for " + req->get_target());
         json::json msg = {{"message", "Not Found"}};
-        auto res = std::make_unique<json_response>(json::json(msg), status_code::not_found);
+        auto res = utils::make_u_ptr<json_response>(json::json(msg), status_code::not_found);
         s.enqueue(std::move(res));
     }
 
@@ -156,7 +156,7 @@ namespace network
             LOG_WARN("No route for " + s.path);
     }
 
-    void server::on_message(ws_session &s, std::unique_ptr<message> msg)
+    void server::on_message(ws_session &s, utils::u_ptr<message> msg)
     {
         switch (msg->get_fin_rsv_opcode() & 0x0F)
         {
@@ -190,14 +190,14 @@ namespace network
     }
 
 #ifdef ENABLE_CORS
-    std::unique_ptr<response> server::cors(const request &req)
+    utils::u_ptr<response> server::cors(const request &req)
     {
         std::map<std::string, std::string> headers;
         headers["Access-Control-Allow-Origin"] = "*";
         headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS";
         headers["Access-Control-Allow-Headers"] = "*";
         headers["Access-Control-Max-Age"] = "86400";
-        return std::make_unique<response>(status_code::ok, std::move(headers));
+        return utils::make_u_ptr<response>(status_code::ok, std::move(headers));
     }
 #endif
 } // namespace network

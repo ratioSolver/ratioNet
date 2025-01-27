@@ -26,11 +26,11 @@ void test_rest_server()
 #endif
 
     server.add_route(network::verb::Get, "/", [](network::request &)
-                     { return std::make_unique<network::html_response>("<html><body><h1>Hello, World!</h1></body></html>"); });
+                     { return utils::make_u_ptr<network::html_response>("<html><body><h1>Hello, World!</h1></body></html>"); });
     server.add_route(network::verb::Get, "/json", [](network::request &)
-                     { return std::make_unique<network::json_response>(json::json{{"message", "Hello, World!"}}); });
+                     { return utils::make_u_ptr<network::json_response>(json::json{{"message", "Hello, World!"}}); });
     server.add_route(network::verb::Get, "/ws", [](network::request &)
-                     { return std::make_unique<network::html_response>(R"(<html><body><script>
+                     { return utils::make_u_ptr<network::html_response>(R"(<html><body><script>
                         var ws = new WebSocket("ws://localhost:8080/ws");
                         ws.onopen = function() { document.body.innerHTML += "<p>Connected!</p>"; ws.send("Hello, World!"); };
                         ws.onmessage = function(event) { document.body.innerHTML += "<p>" + event.data + "</p>"; };
@@ -67,13 +67,13 @@ void test_cors_server()
                      {
                         std::map<std::string, std::string> headers;
                         headers["Access-Control-Allow-Origin"] = "*";
-                        return std::make_unique<network::json_response>(json::json{{"message", "Hello, World!"}}, network::ok, std::move(headers)); });
+                        return utils::make_u_ptr<network::json_response>(json::json{{"message", "Hello, World!"}}, network::ok, std::move(headers)); });
 
     server.add_route(network::verb::Post, "/json", [](network::request &)
                      {
                         std::map<std::string, std::string> headers;
                         headers["Access-Control-Allow-Origin"] = "*";
-                        return std::make_unique<network::json_response>(json::json{{"message", "Hello, World!"}}, network::ok, std::move(headers)); });
+                        return utils::make_u_ptr<network::json_response>(json::json{{"message", "Hello, World!"}}, network::ok, std::move(headers)); });
 
     server.add_route(network::verb::Options, "/json", [](network::request &)
                      {
@@ -81,7 +81,7 @@ void test_cors_server()
                         headers["Access-Control-Allow-Origin"] = "*";
                         headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS";
                         headers["Access-Control-Allow-Headers"] = "Content-Type";
-                        return std::make_unique<network::response>(network::ok, std::move(headers)); });
+                        return utils::make_u_ptr<network::response>(network::ok, std::move(headers)); });
 
     std::thread t{[&server]
                   { server.start(); }};

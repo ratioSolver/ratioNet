@@ -1,5 +1,6 @@
 #pragma once
 
+#include "memory.hpp"
 #include <regex>
 #include <functional>
 #include <set>
@@ -23,7 +24,7 @@ namespace network
      * @param path A regular expression representing the path for the route.
      * @param handler A function that takes a request reference and returns a unique pointer to a response.
      */
-    route(const std::regex &path, std::function<std::unique_ptr<response>(request &)> &&handler) noexcept : path(path), handler(std::move(handler)) {}
+    route(const std::regex &path, std::function<utils::u_ptr<response>(request &)> &&handler) noexcept : path(path), handler(std::move(handler)) {}
 
     /**
      * @brief Retrieves the path as a constant reference to a regex object.
@@ -43,10 +44,10 @@ namespace network
      *
      * @return A constant reference to the handler function.
      */
-    const std::function<std::unique_ptr<response>(request &)> &get_handler() const noexcept { return handler; }
+    const std::function<utils::u_ptr<response>(request &)> &get_handler() const noexcept { return handler; }
 
   private:
-    std::regex path;                                             // path of the route
-    std::function<std::unique_ptr<response>(request &)> handler; // handler function for the route
+    std::regex path;                                          // path of the route
+    std::function<utils::u_ptr<response>(request &)> handler; // handler function for the route
   };
 } // namespace network

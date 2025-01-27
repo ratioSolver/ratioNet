@@ -1,5 +1,6 @@
 #pragma once
 
+#include "memory.hpp"
 #include <asio.hpp>
 
 namespace network
@@ -17,21 +18,21 @@ namespace network
     /**
      * @brief Default constructor.
      */
-    message() : fin_rsv_opcode(0x81), payload(std::make_shared<std::string>()) {}
+    message() : fin_rsv_opcode(0x81), payload(utils::make_s_ptr<std::string>()) {}
 
     /**
      * @brief Constructor that sets the fin, rsv, and opcode of the message.
      *
      * @param fin_rsv_opcode The fin, rsv, and opcode of the message.
      */
-    message(unsigned char fin_rsv_opcode) : fin_rsv_opcode(fin_rsv_opcode), payload(std::make_shared<std::string>()) {}
+    message(unsigned char fin_rsv_opcode) : fin_rsv_opcode(fin_rsv_opcode), payload(utils::make_s_ptr<std::string>()) {}
 
     /**
      * @brief Constructor that sets the payload of the message.
      *
      * @param payload The payload of the message.
      */
-    message(std::shared_ptr<std::string> payload) : fin_rsv_opcode(0x81), payload(payload) {}
+    message(utils::s_ptr<std::string> payload) : fin_rsv_opcode(0x81), payload(payload) {}
 
     /**
      * @brief Get the fin, rsv, and opcode of the message.
@@ -75,8 +76,8 @@ namespace network
     }
 
   private:
-    unsigned char fin_rsv_opcode;         // fin, rsv, and opcode for the message
-    asio::streambuf buffer;               // buffer for the message
-    std::shared_ptr<std::string> payload; // payload of the message
+    unsigned char fin_rsv_opcode;      // fin, rsv, and opcode for the message
+    asio::streambuf buffer;            // buffer for the message
+    utils::s_ptr<std::string> payload; // payload of the message
   };
 } // namespace network

@@ -5,7 +5,7 @@ namespace network
 {
     ws_client::ws_client(const std::string &host, unsigned short port) : host(host), port(port), resolver(io_ctx), socket(io_ctx), strand(asio::make_strand(io_ctx)) { connect(); }
 
-    void ws_client::enqueue(std::unique_ptr<message> msg)
+    void ws_client::enqueue(utils::u_ptr<message> msg)
     {
         asio::post(strand, [this, m = std::move(msg)]() mutable
                    { res_queue.push(std::move(m));

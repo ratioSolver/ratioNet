@@ -1,8 +1,8 @@
 #pragma once
 
-#include <asio.hpp>
 #include "verb.hpp"
 #include "json.hpp"
+#include <asio.hpp>
 
 namespace network
 {

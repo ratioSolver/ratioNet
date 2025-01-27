@@ -1,5 +1,6 @@
 #pragma once
 
+#include "memory.hpp"
 #include "request.hpp"
 #include "response.hpp"
 #ifdef ENABLE_SSL
@@ -77,7 +78,7 @@ namespace network
      *
      * @param res A unique pointer to the response object to be enqueued.
      */
-    void enqueue(std::unique_ptr<response> res);
+    void enqueue(utils::u_ptr<response> res);
     /**
      * @brief Writes the first response, from the responses queue, to the client.
      */
@@ -103,9 +104,9 @@ namespace network
 #else
     asio::ip::tcp::socket socket; // The socket used to communicate with the client.
 #endif
-    std::unique_ptr<request> req;                         // The current request being processed.
+    utils::u_ptr<request> req;                            // The current request being processed.
     std::string chunked_body;                             // The body of the request when using chunked transfer encoding.
     asio::strand<asio::io_context::executor_type> strand; // The strand used to synchronize access to the queue of responses.
-    std::queue<std::unique_ptr<response>> res_queue;      // The queue of responses to send to the client.
+    std::queue<utils::u_ptr<response>> res_queue;         // The queue of responses to send to the client.
   };
 } // namespace network

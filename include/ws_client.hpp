@@ -1,5 +1,6 @@
 #pragma once
 
+#include "memory.hpp"
 #include "message.hpp"
 #include <queue>
 
@@ -10,7 +11,7 @@ namespace network
   public:
     ws_client(const std::string &host = SERVER_HOST, unsigned short port = SERVER_PORT);
 
-    void enqueue(std::unique_ptr<message> msg);
+    void enqueue(utils::u_ptr<message> msg);
 
   private:
     void connect();
@@ -31,7 +32,7 @@ namespace network
     asio::ip::tcp::resolver resolver;                     // The resolver used to resolve host names.
     asio::ip::tcp::socket socket;                         // The socket used to communicate with the server.
     asio::strand<asio::io_context::executor_type> strand; // The strand used to synchronize access to the queue of requests.
-    std::queue<std::unique_ptr<message>> res_queue;       // The queue of responses to send to the server.
-    std::unique_ptr<message> msg;                         // The current message being processed.
+    std::queue<utils::u_ptr<message>> res_queue;          // The queue of responses to send to the server.
+    utils::u_ptr<message> msg;                            // The current message being processed.
   };
 } // namespace network

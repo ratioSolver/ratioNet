@@ -18,7 +18,7 @@ namespace network
         disconnect();
     }
 
-    std::unique_ptr<response> client::send(std::unique_ptr<request> req)
+    utils::u_ptr<response> client::send(utils::u_ptr<request> req)
     {
 #ifdef ENABLE_SSL
         if (!socket.lowest_layer().is_open())
@@ -34,7 +34,7 @@ namespace network
             LOG_ERR(ec.message());
             return nullptr;
         }
-        auto res = std::make_unique<response>();
+        auto res = utils::make_u_ptr<response>();
 
         std::size_t bytes_transferred = 0;
         while (true)
@@ -80,14 +80,14 @@ namespace network
             }
             std::istream is(&res->buffer);
             if (res->get_headers().find("content-type") != res->get_headers().end() && res->get_headers().at("content-type") == "application/json")
-                res = std::make_unique<json_response>(json::load(is), res->get_status_code(), std::move(res->headers));
+                res = utils::make_u_ptr<json_response>(json::load(is), res->get_status_code(), std::move(res->headers));
             else
             {
                 std::string body;
                 body.reserve(len);
                 while (is.peek() != EOF)
                     body += is.get();
-                res = std::make_unique<string_response>(std::move(body), res->get_status_code(), std::move(res->headers));
+                res = utils::make_u_ptr<string_response>(std::move(body), res->get_status_code(), std::move(res->headers));
             }
         }
         else if (res->get_headers().find("transfer-encoding") != res->get_headers().end() && res->get_headers().at("transfer-encoding") == "chunked")
@@ -152,9 +152,9 @@ namespace network
                 res->buffer.consume(size + 2); // consume chunk and '\r\n'
             }
             if (res->get_headers().find("content-type") != res->get_headers().end() && res->get_headers().at("content-type") == "application/json")
-                res = std::make_unique<json_response>(json::load(body), res->get_status_code(), std::move(res->headers));
+                res = utils::make_u_ptr<json_response>(json::load(body), res->get_status_code(), std::move(res->headers));
             else
-                res = std::make_unique<string_response>(std::move(body), res->get_status_code(), std::move(res->headers));
+                res = utils::make_u_ptr<string_response>(std::move(body), res->get_status_code(), std::move(res->headers));
         }
 
         if (res->get_headers().find("connection") != res->get_headers().end() && res->get_headers().at("connection") == "close")

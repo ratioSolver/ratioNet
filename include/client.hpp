@@ -1,5 +1,6 @@
 #pragma once
 
+#include "memory.hpp"
 #include "request.hpp"
 #include "response.hpp"
 #include <queue>
@@ -21,7 +22,7 @@ namespace network
      * @param req The request to be sent.
      * @return The response received.
      */
-    std::unique_ptr<response> send(std::unique_ptr<request> req);
+    utils::u_ptr<response> send(utils::u_ptr<request> req);
 
     /**
      * Sends a GET request to the specified target with optional headers.
@@ -30,10 +31,10 @@ namespace network
      * @param hdrs The optional headers to include in the request.
      * @return A unique pointer to the response object.
      */
-    std::unique_ptr<response> get(std::string &&target, std::map<std::string, std::string> &&hdrs = {})
+    utils::u_ptr<response> get(std::string &&target, std::map<std::string, std::string> &&hdrs = {})
     {
       hdrs["Host"] = host + ":" + std::to_string(port);
-      return send(std::make_unique<request>(verb::Get, std::move(target), "HTTP/1.1", std::move(hdrs)));
+      return send(utils::make_u_ptr<request>(verb::Get, std::move(target), "HTTP/1.1", std::move(hdrs)));
     }
 
     /**
@@ -44,10 +45,10 @@ namespace network
      * @param hdrs The optional headers to include in the request.
      * @return A unique pointer to the response object.
      */
-    std::unique_ptr<response> post(std::string &&target, std::string &&body, std::map<std::string, std::string> &&hdrs = {})
+    utils::u_ptr<response> post(std::string &&target, std::string &&body, std::map<std::string, std::string> &&hdrs = {})
     {
       hdrs["Host"] = host + ":" + std::to_string(port);
-      return send(std::make_unique<string_request>(verb::Post, std::move(target), "HTTP/1.1", std::move(hdrs), std::move(body)));
+      return send(utils::make_u_ptr<string_request>(verb::Post, std::move(target), "HTTP/1.1", std::move(hdrs), std::move(body)));
     }
 
     /**
@@ -58,10 +59,10 @@ namespace network
      * @param hdrs The optional headers to include in the request.
      * @return A unique pointer to the response object.
      */
-    std::unique_ptr<response> post(std::string &&target, json::json &&body, std::map<std::string, std::string> &&hdrs = {})
+    utils::u_ptr<response> post(std::string &&target, json::json &&body, std::map<std::string, std::string> &&hdrs = {})
     {
       hdrs["Host"] = host + ":" + std::to_string(port);
-      return send(std::make_unique<json_request>(verb::Post, std::move(target), "HTTP/1.1", std::move(hdrs), std::move(body)));
+      return send(utils::make_u_ptr<json_request>(verb::Post, std::move(target), "HTTP/1.1", std::move(hdrs), std::move(body)));
     }
 
     /**
@@ -72,10 +73,10 @@ namespace network
      * @param hdrs The optional headers to include in the request.
      * @return A unique pointer to the response object.
      */
-    std::unique_ptr<response> put(std::string &&target, std::string &&body, std::map<std::string, std::string> &&hdrs = {})
+    utils::u_ptr<response> put(std::string &&target, std::string &&body, std::map<std::string, std::string> &&hdrs = {})
     {
       hdrs["Host"] = host + ":" + std::to_string(port);
-      return send(std::make_unique<string_request>(verb::Put, std::move(target), "HTTP/1.1", std::move(hdrs), std::move(body)));
+      return send(utils::make_u_ptr<string_request>(verb::Put, std::move(target), "HTTP/1.1", std::move(hdrs), std::move(body)));
     }
 
     /**
@@ -86,10 +87,10 @@ namespace network
      * @param hdrs The optional headers to include in the request.
      * @return A unique pointer to the response object.
      */
-    std::unique_ptr<response> put(std::string &&target, json::json &&body, std::map<std::string, std::string> &&hdrs = {})
+    utils::u_ptr<response> put(std::string &&target, json::json &&body, std::map<std::string, std::string> &&hdrs = {})
     {
       hdrs["Host"] = host + ":" + std::to_string(port);
-      return send(std::make_unique<json_request>(verb::Put, std::move(target), "HTTP/1.1", std::move(hdrs), std::move(body)));
+      return send(utils::make_u_ptr<json_request>(verb::Put, std::move(target), "HTTP/1.1", std::move(hdrs), std::move(body)));
     }
 
     /**
@@ -99,10 +100,10 @@ namespace network
      * @param hdrs The optional headers to include in the request.
      * @return A unique pointer to the response object.
      */
-    std::unique_ptr<response> del(std::string &&target, std::map<std::string, std::string> &&hdrs = {})
+    utils::u_ptr<response> del(std::string &&target, std::map<std::string, std::string> &&hdrs = {})
     {
       hdrs["Host"] = host + ":" + std::to_string(port);
-      return send(std::make_unique<request>(verb::Delete, std::move(target), "HTTP/1.1", std::move(hdrs)));
+      return send(utils::make_u_ptr<request>(verb::Delete, std::move(target), "HTTP/1.1", std::move(hdrs)));
     }
 
     /**

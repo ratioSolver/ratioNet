@@ -151,39 +151,39 @@ namespace network
      *
      * @param res The response message to enqueue.
      */
-    void enqueue(std::unique_ptr<message> res);
+    void enqueue(utils::u_ptr<message> res);
 
     /**
      * Sends a payload over the WebSocket session.
      *
      * @param payload The payload to be sent.
      */
-    void send(std::shared_ptr<std::string> payload) { enqueue(std::make_unique<message>(payload)); }
+    void send(utils::s_ptr<std::string> payload) { enqueue(utils::make_u_ptr<message>(payload)); }
 
     /**
      * Sends a message over the WebSocket session.
      *
      * @param payload The payload to be sent.
      */
-    void send(std::string_view payload) { send(std::make_shared<std::string>(payload)); }
+    void send(std::string_view payload) { send(utils::make_s_ptr<std::string>(payload)); }
 
     /**
      * Sends a ping message to the WebSocket server.
      * This function enqueues a ping message with opcode 0x89 to the WebSocket session.
      */
-    void ping() { enqueue(std::make_unique<message>(0x89)); }
+    void ping() { enqueue(utils::make_u_ptr<message>(0x89)); }
     /**
      * Sends a pong message to the WebSocket client.
      * This function enqueues a pong message with opcode 0x8A to be sent to the WebSocket client.
      */
-    void pong() { enqueue(std::make_unique<message>(0x8A)); }
+    void pong() { enqueue(utils::make_u_ptr<message>(0x8A)); }
     /**
      * @brief Closes the WebSocket session.
      *
      * This function enqueues a WebSocket close message with the opcode 0x88 to close the session.
      * The close message will be sent to the remote endpoint.
      */
-    void close() { enqueue(std::make_unique<message>(0x88)); }
+    void close() { enqueue(utils::make_u_ptr<message>(0x88)); }
 
     /**
      * @brief Get the remote endpoint of the WebSocket session.
@@ -210,7 +210,7 @@ namespace network
 #else
     asio::ip::tcp::socket socket; // The socket used to communicate with the client.
 #endif
-    std::unique_ptr<message> msg;                   // The message being read.
-    std::queue<std::unique_ptr<message>> res_queue; // The queue of outgoing messages.
+    utils::u_ptr<message> msg;                   // The message being read.
+    std::queue<utils::u_ptr<message>> res_queue; // The queue of outgoing messages.
   };
 } // namespace network

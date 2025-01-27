@@ -40,7 +40,7 @@ int main()
     network::server server;
 
     // Add a GET route to the server
-    server.add_route(network::verb::Get, "/", [](network::request &req) { return std::make_unique<network::html_response>("<html><body><h1>Hello, World!</h1></body></html>"); });
+    server.add_route(network::verb::Get, "/", [](network::request &req) { return utils::make_u_ptr<network::html_response>("<html><body><h1>Hello, World!</h1></body></html>"); });
 
     // Add a WebSocket route to the server
     server.add_ws_route("/ws").on_open([](network::ws_session &s) { s.send("Hello, World!"); })

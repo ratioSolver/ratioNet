@@ -33,11 +33,11 @@ namespace network
 
     void session::read()
     {
-        req = std::make_unique<request>();
+        req = utils::make_u_ptr<request>();
         asio::async_read_until(socket, req->buffer, "\r\n\r\n", std::bind(&session::on_read, shared_from_this(), asio::placeholders::error, asio::placeholders::bytes_transferred));
     }
 
-    void session::enqueue(std::unique_ptr<response> res)
+    void session::enqueue(utils::u_ptr<response> res)
     {
         asio::post(strand, [self = shared_from_this(), r = std::move(res)]() mutable
                    { self->res_queue.push(std::move(r));
@@ -128,10 +128,10 @@ namespace network
         sha1.get_digest_bytes(digest);
         std::string key = utils::base64_encode(digest, 20);
 
-        auto res = std::make_unique<response>(status_code::websocket_switching_protocols, std::map<std::string, std::string>{{"Upgrade", "websocket"}, {"Connection", "Upgrade"}, {"Sec-WebSocket-Accept", key}});
+        auto res = utils::make_u_ptr<response>(status_code::websocket_switching_protocols, std::map<std::string, std::string>{{"Upgrade", "websocket"}, {"Connection", "Upgrade"}, {"Sec-WebSocket-Accept", key}});
         auto &buf = res->get_buffer();
         asio::async_write(socket, buf, [self = shared_from_this(), res = std::move(res)](const std::error_code &ec, std::size_t)
-                          { if (ec) { LOG_ERR(ec.message()); return; } std::make_shared<ws_session>(self->srv, self->req->target, std::move(self->socket))->start(); });
+                          { if (ec) { LOG_ERR(ec.message()); return; } utils::make_s_ptr<ws_session>(self->srv, self->req->target, std::move(self->socket))->start(); });
     }
 
     void session::on_read(const std::error_code &ec, std::size_t bytes_transferred)
@@ -182,13 +182,13 @@ namespace network
 
         std::istream is(&req->buffer);
         if (req->headers.find("content-type") != req->headers.end() && req->headers["content-type"] == "application/json")
-            req = std::make_unique<json_request>(req->v, std::move(req->target), std::move(req->version), std::move(req->headers), json::load(is));
+            req = utils::make_u_ptr<json_request>(req->v, std::move(req->target), std::move(req->version), std::move(req->headers), json::load(is));
         else
         {
             std::string body;
             body.reserve(req->buffer.size());
             body.assign(asio::buffers_begin(req->buffer.data()), asio::buffers_end(req->buffer.data()));
-            req = std::make_unique<string_request>(req->v, std::move(req->target), std::move(req->version), std::move(req->headers), std::move(body));
+            req = utils::make_u_ptr<string_request>(req->v, std::move(req->target), std::move(req->version), std::move(req->headers), std::move(body));
         }
         srv.handle_request(*this, std::move(req));
     }
