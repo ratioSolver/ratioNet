@@ -99,11 +99,10 @@ namespace network
     {
         if (!ec)
 #ifdef ENABLE_SSL
-            utils::make_s_ptr<session>(*this, asio::ssl::stream<asio::ip::tcp::socket>(std::move(socket), ctx))->handshake();
+            std::make_shared<session>(*this, asio::ssl::stream<asio::ip::tcp::socket>(std::move(socket), ctx))->handshake();
 #else
-            utils::make_s_ptr<session>(*this, std::move(socket))->read();
+            std::make_shared<session>(*this, std::move(socket))->read();
 #endif
-
         do_accept();
     }
 

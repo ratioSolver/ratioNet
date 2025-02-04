@@ -131,7 +131,7 @@ namespace network
         auto res = utils::make_u_ptr<response>(status_code::websocket_switching_protocols, std::map<std::string, std::string>{{"Upgrade", "websocket"}, {"Connection", "Upgrade"}, {"Sec-WebSocket-Accept", key}});
         auto &buf = res->get_buffer();
         asio::async_write(socket, buf, [self = shared_from_this(), res = std::move(res)](const std::error_code &ec, std::size_t)
-                          { if (ec) { LOG_ERR(ec.message()); return; } utils::make_s_ptr<ws_session>(self->srv, self->req->target, std::move(self->socket))->start(); });
+                          { if (ec) { LOG_ERR(ec.message()); return; } std::make_shared<ws_session>(self->srv, self->req->target, std::move(self->socket))->start(); });
     }
 
     void session::on_read(const std::error_code &ec, std::size_t bytes_transferred)
