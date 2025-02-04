@@ -21,7 +21,9 @@ namespace network
     void ws_client::connect()
     {
         LOG_DEBUG("Connecting to host " + host + ":" + std::to_string(port));
-        resolver.async_resolve(host, std::to_string(port), std::bind(&ws_client::on_resolve, this, asio::placeholders::error, asio::placeholders::results));
+        auto query = asio::ip::tcp::resolver::query(host, std::to_string(port));
+        resolver.async_resolve(query, std::bind(&ws_client::on_resolve, this, asio::placeholders::error, asio::placeholders::results));
+        io_ctx.run();
     }
 
 #ifdef ENABLE_SSL

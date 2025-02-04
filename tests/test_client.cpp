@@ -29,7 +29,7 @@ void test_ws_client()
 
     std::thread t{[&server]
                   { server.start(); }};
-    std::this_thread::sleep_for(std::chrono::seconds(5));
+    std::this_thread::sleep_for(std::chrono::seconds(2));
 
     network::ws_client client("localhost", 8080, []()
                               { LOG_INFO("Connected to server"); }, [](std::string_view msg)
