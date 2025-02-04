@@ -1,7 +1,8 @@
 #include "server.hpp"
 #include "client.hpp"
 #include "ws_client.hpp"
-#include <iostream>
+#include "logging.hpp"
+#include <thread>
 
 #ifdef ENABLE_SSL
 void test_weather_client()
@@ -9,12 +10,36 @@ void test_weather_client()
     network::client client("api.open-meteo.com", 443);
     auto response = client.get("/v1/forecast?latitude=52.52&longitude=13.41");
     if (response)
-        std::cout << *response << std::endl;
+        LOG_INFO(*response);
 }
 #endif
 
 void test_ws_client()
 {
+    network::server server;
+
+#ifdef ENABLE_SSL
+    server.load_certificate("cert.pem", "key.pem");
+#endif
+
+    server.add_ws_route("/ws").on_open([](network::ws_session &s)
+                                       { s.send("Hello, World!"); })
+        .on_message([](network::ws_session &s, std::string_view msg)
+                    { s.send(msg); });
+
+    std::thread t{[&server]
+                  { server.start(); }};
+    std::this_thread::sleep_for(std::chrono::seconds(5));
+
+    network::ws_client client("localhost", 8080, []()
+                              { LOG_INFO("Connected to server"); }, [](std::string_view msg)
+                              { LOG_INFO("Received message: " + std::string(msg)); }, []()
+                              { LOG_INFO("Connection closed"); }, [](const std::error_code &ec)
+                              { LOG_ERR(ec.message()); });
+
+    std::this_thread::sleep_for(std::chrono::seconds(5));
+    server.stop();
+    t.join();
 }
 
 int main()
@@ -22,5 +47,6 @@ int main()
 #ifdef ENABLE_SSL
     test_weather_client();
 #endif
+    test_ws_client();
     return 0;
 }

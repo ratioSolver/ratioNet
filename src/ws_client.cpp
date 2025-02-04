@@ -4,9 +4,9 @@
 namespace network
 {
 #ifdef ENABLE_SSL
-    ws_client::ws_client(ws_client_handler handler, const std::string &host, unsigned short port) : handler(handler), host(host), port(port), resolver(io_ctx), socket(io_ctx, ctx), strand(asio::make_strand(io_ctx)) { connect(); }
+    ws_client::ws_client(const std::string &host, unsigned short port, std::function<void()> on_open_handler, std::function<void(std::string_view)> on_message_handler, std::function<void()> on_close_handler, std::function<void(const std::error_code &)> on_error_handler) : host(host), port(port), on_open_handler(on_open_handler), on_message_handler(on_message_handler), on_close_handler(on_close_handler), on_error_handler(on_error_handler), resolver(io_ctx), socket(io_ctx, ctx), strand(asio::make_strand(io_ctx)) { connect(); }
 #else
-    ws_client::ws_client(ws_client_handler handler, const std::string &host, unsigned short port) : handler(handler), host(host), port(port), resolver(io_ctx), socket(io_ctx), strand(asio::make_strand(io_ctx)) { connect(); }
+    ws_client::ws_client(const std::string &host, unsigned short port, std::function<void()> on_open_handler, std::function<void(std::string_view)> on_message_handler, std::function<void()> on_close_handler, std::function<void(const std::error_code &)> on_error_handler) : host(host), port(port), on_open_handler(on_open_handler), on_message_handler(on_message_handler), on_close_handler(on_close_handler), on_error_handler(on_error_handler), resolver(io_ctx), socket(io_ctx), strand(asio::make_strand(io_ctx)) { connect(); }
 #endif
     ws_client::~ws_client() { LOG_TRACE("WebSocket client destroyed"); }
 
@@ -37,7 +37,7 @@ namespace network
             return;
         }
 
-        handler.on_open_handler();
+        on_open_handler();
         read();
     }
 #endif
@@ -71,7 +71,7 @@ namespace network
 #ifdef ENABLE_SSL
         handshake();
 #else
-        handler.on_open_handler();
+        on_open_handler();
         read();
 #endif
     }
@@ -93,13 +93,13 @@ namespace network
     { // read the first two bytes of the message (opcode and length)
         if (ec == asio::error::eof)
         { // connection closed by client
-            handler.on_close_handler();
+            on_close_handler();
             return;
         }
         else if (ec)
         {
             LOG_ERR(ec.message());
-            handler.on_error_handler(ec);
+            on_error_handler(ec);
             return;
         }
 
@@ -133,13 +133,13 @@ namespace network
     { // read the rest of the message (mask and payload)
         if (ec == asio::error::eof)
         { // connection closed by client
-            handler.on_close_handler();
+            on_close_handler();
             return;
         }
         else if (ec)
         {
             LOG_ERR(ec.message());
-            handler.on_error_handler(ec);
+            on_error_handler(ec);
             return;
         }
 
@@ -150,7 +150,7 @@ namespace network
             *msg->payload += is.get() ^ mask[i % 4];
 
         if (msg->fin_rsv_opcode & 0x80) // fin bit is set
-            handler.on_message_handler(*msg->payload);
+            on_message_handler(*msg->payload);
 
         read(); // read the next message
     }

@@ -9,81 +9,10 @@
 
 namespace network
 {
-  class ws_client;
-
-  class ws_client_handler
-  {
-    friend class ws_client;
-
-  public:
-    ws_client_handler() = default;
-
-    /**
-     * @brief Registers a handler function to be called when the WebSocket session is opened.
-     *
-     * This function allows to set a custom handler function to be called when the WebSocket session is opened.
-     *
-     * @param handler The handler function to be called when the WebSocket session is opened.
-     */
-    ws_client_handler &on_open(std::function<void()> &&handler) noexcept
-    {
-      on_open_handler = std::move(handler);
-      return *this;
-    }
-
-    /**
-     * @brief Registers a handler function to be called when a message is received.
-     *
-     * This function allows to set a custom handler function to be called when a message is received by the WebSocket session.
-     * The handler function should take a reference to to the received message as its parameters.
-     *
-     * @param handler The handler function to be called. It takes a reference to to the received message.
-     */
-    ws_client_handler &on_message(std::function<void(std::string_view)> &&handler) noexcept
-    {
-      on_message_handler = std::move(handler);
-      return *this;
-    }
-
-    /**
-     * @brief Sets the handler function to be called when the WebSocket session is closed.
-     *
-     * This function allows to set a custom handler function to be called when the WebSocket session is closed.
-     *
-     * @param handler The handler function to be called when the WebSocket session is closed.
-     */
-    ws_client_handler &on_close(std::function<void()> &&handler) noexcept
-    {
-      on_close_handler = std::move(handler);
-      return *this;
-    }
-
-    /**
-     * @brief Sets the error handler for the WebSocket session.
-     *
-     * This function allows to set a custom error handler for the WebSocket session.
-     * The error handler will be called when an error occurs during the WebSocket session.
-     *
-     * @param handler The error handler function to be called when an error occurs.
-     * @return A reference to the `ws_client_handler` object.
-     */
-    ws_client_handler &on_error(std::function<void(const std::error_code &)> &&handler) noexcept
-    {
-      on_error_handler = std::move(handler);
-      return *this;
-    }
-
-  private:
-    std::function<void()> on_open_handler;                         // handler for the open event
-    std::function<void(std::string_view)> on_message_handler;      // handler for the message event
-    std::function<void()> on_close_handler;                        // handler for the close event
-    std::function<void(const std::error_code &)> on_error_handler; // handler for the error event
-  };
-
   class ws_client
   {
   public:
-    ws_client(ws_client_handler handler, const std::string &host = SERVER_HOST, unsigned short port = SERVER_PORT);
+    ws_client(const std::string &host = SERVER_HOST, unsigned short port = SERVER_PORT, std::function<void()> on_open_handler = []() {}, std::function<void(std::string_view)> on_message_handler = [](std::string_view) {}, std::function<void()> on_close_handler = []() {}, std::function<void(const std::error_code &)> on_error_handler = [](const std::error_code &) {});
     ~ws_client();
 
     /**
@@ -158,11 +87,14 @@ namespace network
     void on_message(const std::error_code &ec, std::size_t bytes_transferred);
 
   private:
-    ws_client_handler handler;        // The handler for the WebSocket client.
-    const std::string host;           // The host name of the server.
-    const unsigned short port;        // The port number of the server.
-    asio::io_context io_ctx;          // The I/O context used for asynchronous operations.
-    asio::ip::tcp::resolver resolver; // The resolver used to resolve host names.
+    const std::string host;                                        // The host name of the server.
+    const unsigned short port;                                     // The port number of the server.
+    std::function<void()> on_open_handler;                         // The handler for the open event.
+    std::function<void(std::string_view)> on_message_handler;      // handler for the message event.
+    std::function<void()> on_close_handler;                        // handler for the close event.
+    std::function<void(const std::error_code &)> on_error_handler; // handler for the error event.
+    asio::io_context io_ctx;                                       // The I/O context used for asynchronous operations.
+    asio::ip::tcp::resolver resolver;                              // The resolver used to resolve host names.
 #ifdef ENABLE_SSL
     asio::ssl::context ctx{asio::ssl::context::TLS_VERSION}; // The SSL context is required, and holds certificates
     asio::ssl::stream<asio::ip::tcp::socket> socket;         // The SSL socket used to communicate with the client.
