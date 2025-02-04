@@ -13,10 +13,7 @@ namespace network
 #else
     client::client(const std::string &host, unsigned short port) : host(host), port(port), resolver(io_ctx), socket(io_ctx) { connect(); }
 #endif
-    client::~client()
-    {
-        disconnect();
-    }
+    client::~client() { disconnect(); }
 
     utils::u_ptr<response> client::send(utils::u_ptr<request> req)
     {

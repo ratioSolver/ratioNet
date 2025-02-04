@@ -119,7 +119,7 @@ namespace network
     const unsigned short port; // The port number of the server.
     asio::io_context io_ctx;   // The I/O context used for asynchronous operations.
 #ifdef ENABLE_SSL
-    asio::ssl::context ssl_ctx{asio::ssl::context::tlsv12_client}; // The SSL context used for secure communication.
+    asio::ssl::context ssl_ctx{asio::ssl::context::TLS_VERSION}; // The SSL context used for secure communication.
 #endif
     asio::ip::tcp::resolver resolver; // The resolver used to resolve host names.
 #ifdef ENABLE_SSL
