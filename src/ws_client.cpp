@@ -24,6 +24,24 @@ namespace network
         resolver.async_resolve(host, std::to_string(port), std::bind(&ws_client::on_resolve, this, asio::placeholders::error, asio::placeholders::results));
     }
 
+#ifdef ENABLE_SSL
+    void ws_client::handshake() { socket.async_handshake(asio::ssl::stream_base::client, std::bind(&ws_client::on_handshake, this, asio::placeholders::error)); }
+
+    void ws_client::on_handshake(const std::error_code &ec)
+    {
+        if (ec == asio::ssl::error::stream_truncated)
+            return; // connection closed by client
+        else if (ec)
+        {
+            LOG_ERR(ec.message());
+            return;
+        }
+
+        handler.on_open_handler();
+        read();
+    }
+#endif
+
     void ws_client::read()
     {
         msg = utils::make_u_ptr<message>();
@@ -50,8 +68,12 @@ namespace network
     void ws_client::on_connect(const std::error_code &)
     {
         LOG_DEBUG("Connected to host " + host + ":" + std::to_string(port));
+#ifdef ENABLE_SSL
+        handshake();
+#else
         handler.on_open_handler();
         read();
+#endif
     }
 
     void ws_client::on_write(const std::error_code &ec, std::size_t)

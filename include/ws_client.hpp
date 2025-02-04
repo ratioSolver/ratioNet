@@ -130,6 +130,21 @@ namespace network
 
   private:
     void connect();
+#ifdef ENABLE_SSL
+    /**
+     * @brief Performs the SSL handshake with the client.
+     */
+    void handshake();
+
+    /**
+     * @brief Handler for the SSL handshake.
+     *
+     * This function is called when the SSL handshake with the client is completed.
+     *
+     * @param ec The error code returned by the handshake operation.
+     */
+    void on_handshake(const std::error_code &ec);
+#endif
 
     void read();
     void write();
