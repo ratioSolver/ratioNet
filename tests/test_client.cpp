@@ -1,5 +1,6 @@
 #include "server.hpp"
 #include "client.hpp"
+#include "ws_client.hpp"
 #include <iostream>
 
 #ifdef ENABLE_SSL
@@ -11,6 +12,10 @@ void test_weather_client()
         std::cout << *response << std::endl;
 }
 #endif
+
+void test_ws_client()
+{
+}
 
 int main()
 {

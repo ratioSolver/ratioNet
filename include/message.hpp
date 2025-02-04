@@ -6,6 +6,7 @@
 namespace network
 {
   class ws_session;
+  class ws_client;
 
   /**
    * @brief Represents a WebSocket message.
@@ -13,6 +14,7 @@ namespace network
   class message
   {
     friend class ws_session;
+    friend class ws_client;
 
   public:
     /**
