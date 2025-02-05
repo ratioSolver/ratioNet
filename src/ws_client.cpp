@@ -77,9 +77,9 @@ namespace network
         // send the WebSocket handshake request
         std::random_device rd;
         std::mt19937 gen(rd());
-        std::uniform_int_distribution<uint8_t> dist(0, 255);
+        std::uniform_int_distribution<int> dist(0, 255);
 
-        std::array<uint8_t, 16> random_bytes;
+        std::array<unsigned char, 16> random_bytes;
         for (auto &byte : random_bytes)
             byte = dist(gen);
 
