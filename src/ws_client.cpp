@@ -7,9 +7,9 @@
 namespace network
 {
 #ifdef ENABLE_SSL
-    ws_client::ws_client(const std::string &host, unsigned short port, std::string &&trgt, std::function<void()> on_open_handler, std::function<void(std::string_view)> on_message_handler, std::function<void()> on_close_handler, std::function<void(const std::error_code &)> on_error_handler) : host(host), port(port), target(trgt), resolver(io_ctx), socket(io_ctx, ssl_ctx), on_open_handler(on_open_handler), on_message_handler(on_message_handler), on_close_handler(on_close_handler), on_error_handler(on_error_handler) {}
+    ws_client::ws_client(std::string_view host, unsigned short port, std::string_view trgt) : host(host), port(port), target(trgt), resolver(io_ctx), socket(io_ctx, ssl_ctx) {}
 #else
-    ws_client::ws_client(const std::string &host, unsigned short port, std::string &&trgt, std::function<void()> on_open_handler, std::function<void(std::string_view)> on_message_handler, std::function<void()> on_close_handler, std::function<void(const std::error_code &)> on_error_handler) : host(host), port(port), target(trgt), resolver(io_ctx), socket(io_ctx), on_open_handler(on_open_handler), on_message_handler(on_message_handler), on_close_handler(on_close_handler), on_error_handler(on_error_handler) {}
+    ws_client::ws_client(std::string_view host, unsigned short port, std::string_view trgt) : host(host), port(port), target(trgt), resolver(io_ctx), socket(io_ctx) {}
 #endif
     ws_client::~ws_client() { LOG_TRACE("WebSocket client destroyed"); }
 
@@ -81,7 +81,7 @@ namespace network
 
         std::array<unsigned char, 16> random_bytes;
         for (auto &byte : random_bytes)
-            byte = dist(gen);
+            byte = static_cast<unsigned char>(dist(gen));
 
         std::map<std::string, std::string> hdrs;
         hdrs["Host"] = host + ":" + std::to_string(port);

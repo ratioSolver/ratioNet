@@ -34,12 +34,16 @@ void test_ws_client()
                    { server.start(); }};
     std::this_thread::sleep_for(std::chrono::seconds(2));
 
-    network::ws_client client("localhost", 8080, "/ws", [&client]()
-                              { LOG_INFO("Connected to server");
-                                client.send("Hello, World!"); }, [](std::string_view msg)
-                              { LOG_INFO("Received message: " + std::string(msg)); }, []()
-                              { LOG_INFO("Connection closed"); }, [](const std::error_code &ec)
-                              { LOG_ERR(ec.message()); });
+    network::ws_client client("localhost", 8080, "/ws");
+    client.set_on_open([&client]
+                       { LOG_INFO("Connected to server");
+                         client.send("Hello, World!"); });
+    client.set_on_message([](std::string_view msg)
+                          { LOG_INFO("Received message: " + std::string(msg)); });
+    client.set_on_close([]()
+                        { LOG_INFO("Connection closed"); });
+    client.set_on_error([](const std::error_code &ec)
+                        { LOG_ERR(ec.message()); });
     std::thread ct{[&client]
                    { client.connect(); }};
 

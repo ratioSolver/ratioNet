@@ -12,8 +12,13 @@ namespace network
   class ws_client
   {
   public:
-    ws_client(const std::string &host, unsigned short port, std::string &&trgt, std::function<void()> on_open_handler = []() {}, std::function<void(std::string_view)> on_message_handler = [](std::string_view) {}, std::function<void()> on_close_handler = []() {}, std::function<void(const std::error_code &)> on_error_handler = [](const std::error_code &) {});
+    ws_client(std::string_view host, unsigned short port, std::string_view trgt);
     ~ws_client();
+
+    void set_on_open(std::function<void()> handler) { on_open_handler = handler; }
+    void set_on_message(std::function<void(std::string_view)> handler) { on_message_handler = handler; }
+    void set_on_close(std::function<void()> handler) { on_close_handler = handler; }
+    void set_on_error(std::function<void(const std::error_code &)> handler) { on_error_handler = handler; }
 
     /**
      * @brief Enqueues a response message to be sent by the WebSocket session.
