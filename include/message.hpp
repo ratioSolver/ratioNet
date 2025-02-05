@@ -2,6 +2,7 @@
 
 #include "memory.hpp"
 #include <asio.hpp>
+#include <random>
 
 namespace network
 {
@@ -18,23 +19,18 @@ namespace network
 
   public:
     /**
-     * @brief Default constructor.
-     */
-    message() : fin_rsv_opcode(0x81), payload(utils::make_s_ptr<std::string>()) {}
-
-    /**
      * @brief Constructor that sets the fin, rsv, and opcode of the message.
      *
      * @param fin_rsv_opcode The fin, rsv, and opcode of the message.
      */
-    message(unsigned char fin_rsv_opcode) : fin_rsv_opcode(fin_rsv_opcode), payload(utils::make_s_ptr<std::string>()) {}
+    message(unsigned char fin_rsv_opcode = 0x81, bool masked = false) : masked(masked), fin_rsv_opcode(fin_rsv_opcode), payload(utils::make_s_ptr<std::string>()) {}
 
     /**
      * @brief Constructor that sets the payload of the message.
      *
      * @param payload The payload of the message.
      */
-    message(utils::s_ptr<std::string> payload) : fin_rsv_opcode(0x81), payload(payload) {}
+    message(utils::s_ptr<std::string> payload, bool masked = false) : masked(masked), fin_rsv_opcode(0x81), payload(payload) {}
 
     /**
      * @brief Get the fin, rsv, and opcode of the message.
@@ -73,11 +69,30 @@ namespace network
         for (int i = 7; i >= 0; --i)
           os.put((payload->size() >> (8 * i)) & 0xFF);
       }
-      os << *payload;
+
+      if (masked)
+      { // Create mask
+        std::array<unsigned char, 4> mask;
+        std::uniform_int_distribution<unsigned short> dist(0, 255);
+        std::random_device rd;
+        for (std::size_t c = 0; c < 4; c++)
+          mask[c] = static_cast<unsigned char>(dist(rd));
+
+        // Write mask to buffer
+        for (std::size_t c = 0; c < 4; c++)
+          os.put(mask[c]);
+
+        // Write masked payload to buffer
+        for (std::size_t c = 0; c < payload->size(); c++)
+          os.put((*payload)[c] ^ mask[c % 4]);
+      }
+      else // Write payload to buffer
+        os << *payload;
       return buffer;
     }
 
   private:
+    const bool masked = true;          // whether the message is masked
     unsigned char fin_rsv_opcode;      // fin, rsv, and opcode for the message
     asio::streambuf buffer;            // buffer for the message
     utils::s_ptr<std::string> payload; // payload of the message

@@ -30,7 +30,7 @@ namespace network
      *
      * @param payload The payload to be sent.
      */
-    void send(utils::s_ptr<std::string> payload) { enqueue(utils::make_u_ptr<message>(payload)); }
+    void send(utils::s_ptr<std::string> payload) { enqueue(utils::make_u_ptr<message>(payload, true)); }
 
     /**
      * Sends a message over the WebSocket session.
