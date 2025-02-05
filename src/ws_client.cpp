@@ -1,5 +1,4 @@
 #include "ws_client.hpp"
-#include "sha1.hpp"
 #include "base64.hpp"
 #include "request.hpp"
 #include "response.hpp"
@@ -76,16 +75,19 @@ namespace network
         LOG_DEBUG("Connected to " << host << ":" << port);
 
         // send the WebSocket handshake request
-        utils::sha1 sha1("dGhlIHNhbXBsZSBub25jZQ=="); // "dGhlIHNhbXBsZSBub25jZQ==" is the base64-encoded string "The WebSocket protocol"
-        uint8_t digest[20];
-        sha1.get_digest_bytes(digest);
-        std::string key = utils::base64_encode(digest, 20);
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_int_distribution<uint8_t> dist(0, 255);
+
+        std::array<uint8_t, 16> random_bytes;
+        for (auto &byte : random_bytes)
+            byte = dist(gen);
 
         std::map<std::string, std::string> hdrs;
         hdrs["Host"] = host + ":" + std::to_string(port);
         hdrs["Upgrade"] = "websocket";
         hdrs["Connection"] = "Upgrade";
-        hdrs["Sec-WebSocket-Key"] = key;
+        hdrs["Sec-WebSocket-Key"] = utils::base64_encode(random_bytes.data(), random_bytes.size());
         hdrs["Sec-WebSocket-Version"] = "13";
         auto req = utils::make_u_ptr<request>(verb::Get, std::string(target), "HTTP/1.1", std::move(hdrs));
         asio::write(socket, req->get_buffer(), ec);
