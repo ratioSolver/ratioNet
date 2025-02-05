@@ -168,15 +168,11 @@ namespace network
     void send(std::string_view payload) { send(utils::make_s_ptr<std::string>(payload)); }
 
     /**
-     * Sends a ping message to the WebSocket server.
-     * This function enqueues a ping message with opcode 0x89 to the WebSocket session.
-     */
-    void ping() { enqueue(utils::make_u_ptr<message>(0x89)); }
-    /**
      * Sends a pong message to the WebSocket client.
      * This function enqueues a pong message with opcode 0x8A to be sent to the WebSocket client.
      */
     void pong() { enqueue(utils::make_u_ptr<message>(0x8A)); }
+
     /**
      * @brief Closes the WebSocket session.
      *

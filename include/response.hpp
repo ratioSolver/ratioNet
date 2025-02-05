@@ -10,6 +10,7 @@ namespace network
 {
   class server;
   class client;
+  class ws_client;
 
   /**
    * @brief Represents an HTTP response.
@@ -18,6 +19,7 @@ namespace network
   {
     friend class server;
     friend class client;
+    friend class ws_client;
 
   public:
     /**

@@ -25,21 +25,27 @@ void test_ws_client()
     server.add_ws_route("/ws").on_open([](network::ws_session &s)
                                        { s.send("Hello, World!"); })
         .on_message([](network::ws_session &s, std::string_view msg)
-                    { s.send(msg); });
+                    { s.send(msg); })
+        .on_close([](network::ws_session &)
+                  { LOG_INFO("Connection closed"); });
 
-    std::thread t{[&server]
-                  { server.start(); }};
+    std::thread st{[&server]
+                   { server.start(); }};
     std::this_thread::sleep_for(std::chrono::seconds(2));
 
-    network::ws_client client("localhost", 8080, []()
+    network::ws_client client("localhost", 8080, "/ws", []()
                               { LOG_INFO("Connected to server"); }, [](std::string_view msg)
                               { LOG_INFO("Received message: " + std::string(msg)); }, []()
                               { LOG_INFO("Connection closed"); }, [](const std::error_code &ec)
                               { LOG_ERR(ec.message()); });
+    std::thread ct{[&client]
+                   { client.connect(); }};
 
     std::this_thread::sleep_for(std::chrono::seconds(5));
+    client.disconnect();
     server.stop();
-    t.join();
+    st.join();
+    ct.join();
 }
 
 int main()
