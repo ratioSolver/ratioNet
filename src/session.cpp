@@ -181,7 +181,7 @@ namespace network
         }
 
         std::istream is(&req->buffer);
-        if (req->headers.find("content-type") != req->headers.end() && req->headers["content-type"] == "application/json")
+        if (req->headers.find("content-type") != req->headers.end() && req->headers["content-type"].find("application/json") != std::string::npos)
             req = utils::make_u_ptr<json_request>(req->v, std::move(req->target), std::move(req->version), std::move(req->headers), json::load(is));
         else
         {
