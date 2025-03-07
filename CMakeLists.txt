@@ -7,7 +7,6 @@ enable_testing()
 include(FetchContent)
 FetchContent_Declare(asio GIT_REPOSITORY https://github.com/chriskohlhoff/asio.git GIT_TAG asio-1-31-0)
 FetchContent_MakeAvailable(asio)
-set(ASIO_SOURCE_DIR_VALUE "${asio_SOURCE_DIR}")
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/CTestCustom.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/CTestCustom.cmake @ONLY)
 
 add_library(asio INTERFACE)
