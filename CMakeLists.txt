@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5.0)
+cmake_minimum_required(VERSION 3.21)
 project(ratioNet VERSION 0.2.0 LANGUAGES CXX)
 
 include(CTest)
