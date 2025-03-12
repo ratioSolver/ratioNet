@@ -13,7 +13,7 @@ namespace network
   class client
   {
   public:
-    client(const std::string &host = SERVER_HOST, unsigned short port = SERVER_PORT);
+    client(std::string_view host = SERVER_HOST, unsigned short port = SERVER_PORT);
     ~client();
 
     /**

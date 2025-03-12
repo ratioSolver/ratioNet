@@ -5,13 +5,13 @@
 namespace network
 {
 #ifdef ENABLE_SSL
-    client::client(const std::string &host, unsigned short port) : host(host), port(port), resolver(io_ctx), socket(io_ctx, ssl_ctx)
+    client::client(std::string_view host, unsigned short port) : host(host), port(port), resolver(io_ctx), socket(io_ctx, ssl_ctx)
     {
         ssl_ctx.set_default_verify_paths();
         connect();
     }
 #else
-    client::client(const std::string &host, unsigned short port) : host(host), port(port), resolver(io_ctx), socket(io_ctx) { connect(); }
+    client::client(std::string_view host, unsigned short port) : host(host), port(port), resolver(io_ctx), socket(io_ctx) { connect(); }
 #endif
     client::~client() { disconnect(); }
 
