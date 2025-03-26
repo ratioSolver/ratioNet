@@ -111,4 +111,44 @@ namespace network
 
     return params;
   }
+
+  /**
+   * @brief Decodes a URL-encoded string.
+   * 
+   * This function takes a URL-encoded string and decodes it by converting
+   * percent-encoded characters (e.g., "%20") into their corresponding ASCII
+   * characters and replacing '+' characters with spaces.
+   * 
+   * @param encoded The URL-encoded string to decode.
+   * @return A decoded string with all percent-encoded characters and '+' 
+   *         characters replaced appropriately.
+   * 
+   * @note The function assumes that the input string is properly URL-encoded.
+   *       If the input contains invalid percent-encoded sequences, the behavior
+   *       is undefined.
+   */
+  inline std::string decode(const std::string &encoded)
+  {
+    std::ostringstream decoded;
+    size_t i = 0;
+    while (i < encoded.length())
+      if (encoded[i] == '%' && i + 2 < encoded.length())
+      {
+        std::string hex = encoded.substr(i + 1, 2);
+        char decodedChar = static_cast<char>(std::stoi(hex, nullptr, 16));
+        decoded << decodedChar;
+        i += 3; // Skip '%xx'
+      }
+      else if (encoded[i] == '+')
+      {
+        decoded << ' '; // '+' is space in URL encoding
+        i++;
+      }
+      else
+      {
+        decoded << encoded[i];
+        i++;
+      }
+    return decoded.str();
+  }
 } // namespace network
