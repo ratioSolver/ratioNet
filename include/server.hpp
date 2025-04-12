@@ -57,7 +57,7 @@ namespace network
     void load_certificate(std::string_view cert_file, std::string_view key_file);
 #endif
 
-#ifdef ENABLE_AUTH
+#ifdef ENABLE_SSL
   private:
     utils::u_ptr<response> login(const request &req);
 
@@ -71,7 +71,7 @@ namespace network
      * @param password The password associated with the username.
      * @return A string containing the authentication token.
      */
-    [[nodiscard]] virtual std::string get_token(const std::string &username, const std::string &password) const = 0;
+    [[nodiscard]] virtual std::string get_token([[maybe_unused]] const std::string &username, [[maybe_unused]] const std::string &password) const { return {}; }
 
   protected:
     /**
@@ -181,4 +181,9 @@ namespace network
       }
     return decoded.str();
   }
+
+#ifdef ENABLE_SSL
+  std::string encode_password(const std::string &password, const std::string &salt);
+  std::pair<std::string, std::string> encode_password(const std::string &password);
+#endif
 } // namespace network

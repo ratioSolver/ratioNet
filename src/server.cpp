@@ -5,6 +5,12 @@
 #define SIGQUIT 3 // Define a dummy value for SIGQUIT on Windows if necessary
 #endif
 #include <csignal>
+#ifdef ENABLE_SSL
+#include <openssl/sha.h>
+#include <openssl/evp.h>
+#include <openssl/rand.h>
+#include <iomanip>
+#endif
 
 namespace network
 {
@@ -19,7 +25,7 @@ namespace network
                                    stop();
                                } });
 
-#ifdef ENABLE_AUTH
+#ifdef ENABLE_SSL
         add_route(verb::Post, "^/login$", std::bind(&server::login, this, placeholders::request));
 #endif
     }
@@ -97,7 +103,7 @@ namespace network
     }
 #endif
 
-#ifdef ENABLE_AUTH
+#ifdef ENABLE_SSL
     utils::u_ptr<response> server::login(const request &req)
     {
         auto &body = static_cast<const json_request &>(req).get_body();
@@ -110,8 +116,7 @@ namespace network
             auto token = get_token(username, password);
             if (token.empty())
                 return utils::make_u_ptr<json_response>(json::json({{"message", "Unauthorized"}}), status_code::unauthorized);
-            auto res = utils::make_u_ptr<json_response>(json::json({{"token", token}}), status_code::ok);
-            return res;
+            return utils::make_u_ptr<json_response>(json::json({{"token", token.c_str()}}), status_code::ok);
         }
         catch (const std::exception &e)
         {
@@ -121,7 +126,7 @@ namespace network
 
     std::string server::get_token(const request &req) const
     {
-        if (auto it = req.headers.find("authorization"); it != req.headers.end())
+        if (auto it = req.get_headers().find("authorization"); it != req.get_headers().end())
         {
             std::string bearer = it->second;
             if (bearer.size() > 7 && bearer.substr(0, 7) == "Bearer ")
@@ -154,8 +159,8 @@ namespace network
             for (const auto &r : it->second)
                 if (std::regex_match(req->get_target(), r.get_path()))
                 {
-#ifdef ENABLE_AUTH
-                    if (r.get_verb() != verb::Options && get_token(*req).empty())
+#ifdef ENABLE_SSL
+                    if (req->get_verb() != verb::Options && get_token(*req).empty())
                     {
                         LOG_WARN("Unauthorized");
                         auto res = utils::make_u_ptr<json_response>(json::json{{"message", "Unauthorized"}}, status_code::unauthorized);
@@ -244,6 +249,31 @@ namespace network
         headers["Access-Control-Allow-Headers"] = "*";
         headers["Access-Control-Max-Age"] = "86400";
         return utils::make_u_ptr<response>(status_code::ok, std::move(headers));
+    }
+#endif
+
+#ifdef ENABLE_SSL
+    std::string encode_password(const std::string &password, const std::string &salt)
+    {
+        int iterations = 10000;
+        unsigned char hash[32];
+        if (PKCS5_PBKDF2_HMAC(password.c_str(), password.size(), reinterpret_cast<const unsigned char *>(salt.c_str()), salt.size(), iterations, EVP_sha256(), sizeof(hash), hash) == 0)
+            throw std::runtime_error("PKCS5_PBKDF2_HMAC failed");
+
+        std::stringstream hash_stream;
+        for (unsigned char c : hash)
+            hash_stream << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(c);
+        return hash_stream.str();
+    }
+
+    std::pair<std::string, std::string> encode_password(const std::string &password)
+    {
+        unsigned char salt[16];
+        RAND_bytes(salt, sizeof(salt));
+        std::stringstream salt_stream;
+        for (unsigned char c : salt)
+            salt_stream << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(c);
+        return {salt_stream.str(), encode_password(password, salt_stream.str())};
     }
 #endif
 } // namespace network
