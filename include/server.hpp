@@ -57,6 +57,36 @@ namespace network
     void load_certificate(std::string_view cert_file, std::string_view key_file);
 #endif
 
+#ifdef ENABLE_AUTH
+  private:
+    utils::u_ptr<response> login(const request &req);
+
+    /**
+     * @brief Retrieves an authentication token for the given username and password.
+     *
+     * This function is used to authenticate a user by providing their credentials
+     * and returns a token that can be used for subsequent authenticated requests.
+     *
+     * @param username The username of the user attempting to authenticate.
+     * @param password The password associated with the username.
+     * @return A string containing the authentication token.
+     */
+    [[nodiscard]] virtual std::string get_token(const std::string &username, const std::string &password) const = 0;
+
+  protected:
+    /**
+     * @brief Retrieves the token from the given request.
+     *
+     * This function extracts and returns a token string from the provided
+     * request object. The token is typically used for authentication or
+     * session management purposes.
+     *
+     * @param req The request object containing the token information.
+     * @return A string representing the extracted token.
+     */
+    [[nodiscard]] std::string get_token(const request &req) const;
+#endif
+
   private:
     void do_accept();
     void on_accept(const std::error_code &ec, asio::ip::tcp::socket socket);
@@ -114,15 +144,15 @@ namespace network
 
   /**
    * @brief Decodes a URL-encoded string.
-   * 
+   *
    * This function takes a URL-encoded string and decodes it by converting
    * percent-encoded characters (e.g., "%20") into their corresponding ASCII
    * characters and replacing '+' characters with spaces.
-   * 
+   *
    * @param encoded The URL-encoded string to decode.
-   * @return A decoded string with all percent-encoded characters and '+' 
+   * @return A decoded string with all percent-encoded characters and '+'
    *         characters replaced appropriately.
-   * 
+   *
    * @note The function assumes that the input string is properly URL-encoded.
    *       If the input contains invalid percent-encoded sequences, the behavior
    *       is undefined.

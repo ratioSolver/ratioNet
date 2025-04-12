@@ -18,6 +18,10 @@ namespace network
                                    LOG_DEBUG("Received signal " + std::to_string(signal));
                                    stop();
                                } });
+
+#ifdef ENABLE_AUTH
+        add_route(verb::Post, "^/login$", std::bind(&server::login, this, placeholders::request));
+#endif
     }
     server::~server()
     {
@@ -93,6 +97,40 @@ namespace network
     }
 #endif
 
+#ifdef ENABLE_AUTH
+    utils::u_ptr<response> server::login(const request &req)
+    {
+        auto &body = static_cast<const json_request &>(req).get_body();
+        if (body.get_type() != json::json_type::object || !body.contains("username") || body["username"].get_type() != json::json_type::string || !body.contains("password") || body["password"].get_type() != json::json_type::string)
+            return utils::make_u_ptr<json_response>(json::json({{"message", "Invalid request"}}), status_code::bad_request);
+        std::string username = body["username"];
+        std::string password = body["password"];
+        try
+        {
+            auto token = get_token(username, password);
+            if (token.empty())
+                return utils::make_u_ptr<json_response>(json::json({{"message", "Unauthorized"}}), status_code::unauthorized);
+            auto res = utils::make_u_ptr<json_response>(json::json({{"token", token}}), status_code::ok);
+            return res;
+        }
+        catch (const std::exception &e)
+        {
+            return utils::make_u_ptr<json_response>(json::json({{"message", e.what()}}), status_code::conflict);
+        }
+    }
+
+    std::string server::get_token(const request &req) const
+    {
+        if (auto it = req.headers.find("authorization"); it != req.headers.end())
+        {
+            std::string bearer = it->second;
+            if (bearer.size() > 7 && bearer.substr(0, 7) == "Bearer ")
+                return bearer.substr(7);
+        }
+        return {};
+    }
+#endif
+
     void server::do_accept() { acceptor.async_accept(asio::make_strand(io_ctx), std::bind(&server::on_accept, this, asio::placeholders::error, std::placeholders::_2)); }
 
     void server::on_accept(const std::error_code &ec, asio::ip::tcp::socket socket)
@@ -116,6 +154,15 @@ namespace network
             for (const auto &r : it->second)
                 if (std::regex_match(req->get_target(), r.get_path()))
                 {
+#ifdef ENABLE_AUTH
+                    if (r.get_verb() != verb::Options && get_token(*req).empty())
+                    {
+                        LOG_WARN("Unauthorized");
+                        auto res = utils::make_u_ptr<json_response>(json::json{{"message", "Unauthorized"}}, status_code::unauthorized);
+                        s.enqueue(std::move(res));
+                        return;
+                    }
+#endif
                     try
                     {
                         // call the route handler
