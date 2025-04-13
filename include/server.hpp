@@ -71,7 +71,7 @@ namespace network
      * @param password The password associated with the username.
      * @return A string containing the authentication token.
      */
-    [[nodiscard]] virtual std::string get_token([[maybe_unused]] const std::string &username, [[maybe_unused]] const std::string &password) const { return {}; }
+    [[nodiscard]] virtual std::string get_token([[maybe_unused]] const std::string &username, [[maybe_unused]] const std::string &password) { return {}; }
 
   protected:
     /**
