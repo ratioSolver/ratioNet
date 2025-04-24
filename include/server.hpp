@@ -25,6 +25,17 @@ namespace network
      */
     void stop();
 
+#ifdef ENABLE_SSL
+    /**
+     * Adds a route to the server.
+     *
+     * @param v The HTTP verb associated with the route.
+     * @param path The path of the route.
+     * @param handler The handler function that will be called when the route is requested.
+     * @param auth Whether the route requires authentication (default: true).
+     */
+    void add_route(verb v, std::string_view path, std::function<utils::u_ptr<response>(request &)> &&handler, bool auth = true) noexcept;
+#else
     /**
      * Adds a route to the server.
      *
@@ -33,6 +44,7 @@ namespace network
      * @param handler The handler function that will be called when the route is requested.
      */
     void add_route(verb v, std::string_view path, std::function<utils::u_ptr<response>(request &)> &&handler) noexcept;
+#endif
 
     /**
      * Adds a WebSocket route to the server.

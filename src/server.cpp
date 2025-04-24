@@ -84,9 +84,17 @@ namespace network
         running = false;
     }
 
+#ifdef ENABLE_SSL
+    void server::add_route(verb v, std::string_view path, std::function<utils::u_ptr<response>(request &)> &&handler, bool auth) noexcept
+#else
     void server::add_route(verb v, std::string_view path, std::function<utils::u_ptr<response>(request &)> &&handler) noexcept
+#endif
     {
+#ifdef ENABLE_SSL
+        routes[v].emplace_back(std::regex(path.data()), std::move(handler), auth);
+#else
         routes[v].emplace_back(std::regex(path.data()), std::move(handler));
+#endif
 #ifdef ENABLE_CORS
         if (v != verb::Options)
             routes[verb::Options].emplace_back(std::regex(path), std::bind(&server::cors, this, placeholders::request));
@@ -160,7 +168,7 @@ namespace network
                 if (std::regex_match(req->get_target(), r.get_path()))
                 {
 #ifdef ENABLE_SSL
-                    if (req->get_verb() != verb::Options && get_token(*req).empty())
+                    if (req->get_verb() != verb::Options && r.requires_auth() && get_token(*req).empty())
                     {
                         LOG_WARN("Unauthorized");
                         auto res = utils::make_u_ptr<json_response>(json::json{{"message", "Unauthorized"}}, status_code::unauthorized);
