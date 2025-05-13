@@ -47,6 +47,20 @@ namespace network
     const std::map<std::string, std::string> &get_headers() const { return headers; }
 
     /**
+     * @brief Adds a header to the response.
+     *
+     * @param key The header key.
+     * @param value The header value.
+     */
+    void add_header(std::string &&key, std::string &&value)
+    {
+      // convert key to lowercase
+      std::transform(key.begin(), key.end(), key.begin(), [](unsigned char c)
+                     { return std::tolower(c); });
+      headers.emplace(std::move(key), std::move(value));
+    }
+
+    /**
      * @brief Gets the HTTP version of the response.
      *
      * @return The HTTP version.

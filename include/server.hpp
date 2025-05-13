@@ -6,6 +6,8 @@
 
 namespace network
 {
+  class middleware;
+
   class server
   {
     friend class session;
@@ -25,17 +27,14 @@ namespace network
      */
     void stop();
 
-#ifdef ENABLE_SSL
-    /**
-     * Adds a route to the server.
-     *
-     * @param v The HTTP verb associated with the route.
-     * @param path The path of the route.
-     * @param handler The handler function that will be called when the route is requested.
-     * @param auth Whether the route requires authentication (default: true).
-     */
-    void add_route(verb v, std::string_view path, std::function<utils::u_ptr<response>(request &)> &&handler, bool auth = true) noexcept;
-#else
+    template <typename Tp, typename... Args>
+    void add_middleware(Args &&...args)
+    {
+      static_assert(std::is_base_of<middleware, Tp>::value, "Middleware must inherit from network::middleware");
+      auto m = std::make_unique<Tp>(std::forward<Args>(args)...);
+      middlewares.push_back(std::move(m));
+    }
+
     /**
      * Adds a route to the server.
      *
@@ -44,7 +43,6 @@ namespace network
      * @param handler The handler function that will be called when the route is requested.
      */
     void add_route(verb v, std::string_view path, std::function<utils::u_ptr<response>(request &)> &&handler) noexcept;
-#endif
 
     /**
      * Adds a WebSocket route to the server.
@@ -69,36 +67,6 @@ namespace network
     void load_certificate(std::string_view cert_file, std::string_view key_file);
 #endif
 
-#ifdef ENABLE_SSL
-  private:
-    utils::u_ptr<response> login(const request &req);
-
-    /**
-     * @brief Retrieves an authentication token for the given username and password.
-     *
-     * This function is used to authenticate a user by providing their credentials
-     * and returns a token that can be used for subsequent authenticated requests.
-     *
-     * @param username The username of the user attempting to authenticate.
-     * @param password The password associated with the username.
-     * @return A string containing the authentication token.
-     */
-    [[nodiscard]] virtual std::string get_token([[maybe_unused]] const std::string &username, [[maybe_unused]] const std::string &password) { return {}; }
-
-  protected:
-    /**
-     * @brief Retrieves the token from the given request.
-     *
-     * This function extracts and returns a token string from the provided
-     * request object. The token is typically used for authentication or
-     * session management purposes.
-     *
-     * @param req The request object containing the token information.
-     * @return A string representing the extracted token.
-     */
-    [[nodiscard]] std::string get_token(const request &req) const;
-#endif
-
   private:
     void do_accept();
     void on_accept(const std::error_code &ec, asio::ip::tcp::socket socket);
@@ -110,19 +78,16 @@ namespace network
     void on_message(ws_session &s, utils::u_ptr<message> msg);
     void on_error(ws_session &s, const std::error_code &ec);
 
-#ifdef ENABLE_CORS
-    utils::u_ptr<response> cors(const request &req);
-#endif
-
   private:
-    bool running = false;                        // The server is running
-    asio::io_context io_ctx;                     // The io_context is required for all I/O
-    asio::signal_set signals;                    // The signal_set is used to handle signals
-    std::vector<std::thread> threads;            // The thread pool
-    const asio::ip::tcp::endpoint endpoint;      // The endpoint for the server
-    asio::ip::tcp::acceptor acceptor;            // The acceptor for the server
-    std::map<verb, std::vector<route>> routes;   // The routes of the server
-    std::map<std::string, ws_handler> ws_routes; // The WebSocket routes of the server
+    bool running = false;                                 // The server is running
+    asio::io_context io_ctx;                              // The io_context is required for all I/O
+    asio::signal_set signals;                             // The signal_set is used to handle signals
+    std::vector<std::thread> threads;                     // The thread pool
+    const asio::ip::tcp::endpoint endpoint;               // The endpoint for the server
+    asio::ip::tcp::acceptor acceptor;                     // The acceptor for the server
+    std::map<verb, std::vector<route>> routes;            // The routes of the server
+    std::map<std::string, ws_handler> ws_routes;          // The WebSocket routes of the server
+    std::vector<std::unique_ptr<middleware>> middlewares; // The middlewares of the server
 #ifdef ENABLE_SSL
     asio::ssl::context ctx{asio::ssl::context::TLS_VERSION}; // The SSL context is required, and holds certificates
 #endif
@@ -193,9 +158,4 @@ namespace network
       }
     return decoded.str();
   }
-
-#ifdef ENABLE_SSL
-  std::string encode_password(const std::string &password, const std::string &salt);
-  std::pair<std::string, std::string> encode_password(const std::string &password);
-#endif
 } // namespace network

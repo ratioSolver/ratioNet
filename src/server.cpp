@@ -1,4 +1,5 @@
 #include "server.hpp"
+#include "middleware.hpp"
 #include "logging.hpp"
 #ifdef _WIN32
 // Windows-specific code
@@ -24,10 +25,6 @@ namespace network
                                    LOG_DEBUG("Received signal " + std::to_string(signal));
                                    stop();
                                } });
-
-#ifdef ENABLE_SSL
-        add_route(verb::Post, "^/login$", std::bind(&server::login, this, placeholders::request));
-#endif
     }
     server::~server()
     {
@@ -84,21 +81,12 @@ namespace network
         running = false;
     }
 
-#ifdef ENABLE_SSL
-    void server::add_route(verb v, std::string_view path, std::function<utils::u_ptr<response>(request &)> &&handler, bool auth) noexcept
-#else
     void server::add_route(verb v, std::string_view path, std::function<utils::u_ptr<response>(request &)> &&handler) noexcept
-#endif
     {
-#ifdef ENABLE_SSL
-        routes[v].emplace_back(std::regex(path.data()), std::move(handler), auth);
-#else
-        routes[v].emplace_back(std::regex(path.data()), std::move(handler));
-#endif
-#ifdef ENABLE_CORS
-        if (v != verb::Options)
-            routes[verb::Options].emplace_back(std::regex(path), std::bind(&server::cors, this, placeholders::request));
-#endif
+        routes[v].emplace_back(path, std::move(handler));
+        for (auto &m : middlewares)
+            m->added_route(v, routes[v].back());
+        LOG_DEBUG("Added route: " + std::string(path) + " for verb: " + to_string(v));
     }
 
 #ifdef ENABLE_SSL
@@ -108,39 +96,6 @@ namespace network
         ctx.use_certificate_chain_file(cert_file.data());
         LOG_DEBUG("Loading private key: " + std::string(key_file));
         ctx.use_private_key_file(key_file.data(), asio::ssl::context::pem);
-    }
-#endif
-
-#ifdef ENABLE_SSL
-    utils::u_ptr<response> server::login(const request &req)
-    {
-        auto &body = static_cast<const json_request &>(req).get_body();
-        if (body.get_type() != json::json_type::object || !body.contains("username") || body["username"].get_type() != json::json_type::string || !body.contains("password") || body["password"].get_type() != json::json_type::string)
-            return utils::make_u_ptr<json_response>(json::json({{"message", "Invalid request"}}), status_code::bad_request);
-        std::string username = body["username"];
-        std::string password = body["password"];
-        try
-        {
-            auto token = get_token(username, password);
-            if (token.empty())
-                return utils::make_u_ptr<json_response>(json::json({{"message", "Unauthorized"}}), status_code::unauthorized);
-            return utils::make_u_ptr<json_response>(json::json({{"token", token.c_str()}}), status_code::ok);
-        }
-        catch (const std::exception &e)
-        {
-            return utils::make_u_ptr<json_response>(json::json({{"message", e.what()}}), status_code::conflict);
-        }
-    }
-
-    std::string server::get_token(const request &req) const
-    {
-        if (auto it = req.get_headers().find("authorization"); it != req.get_headers().end())
-        {
-            std::string bearer = it->second;
-            if (bearer.size() > 7 && bearer.substr(0, 7) == "Bearer ")
-                return bearer.substr(7);
-        }
-        return {};
     }
 #endif
 
@@ -165,24 +120,16 @@ namespace network
 
         if (auto it = routes.find(req->get_verb()); it != routes.end())
             for (const auto &r : it->second)
-                if (std::regex_match(req->get_target(), r.get_path()))
+                if (r.match(req->get_target()))
                 {
-#ifdef ENABLE_SSL
-                    if (req->get_verb() != verb::Options && r.requires_auth() && get_token(*req).empty())
-                    {
-                        LOG_WARN("Unauthorized");
-                        auto res = utils::make_u_ptr<json_response>(json::json{{"message", "Unauthorized"}}, status_code::unauthorized);
-                        s.enqueue(std::move(res));
-                        return;
-                    }
-#endif
                     try
                     {
+                        for (auto &m : middlewares)
+                            m->before_request(*req);
                         // call the route handler
                         auto res = r.get_handler()(*req);
-#ifdef ENABLE_CORS
-                        res->headers["Access-Control-Allow-Origin"] = "*";
-#endif
+                        for (auto &m : middlewares)
+                            m->after_request(*req, *res);
                         s.enqueue(std::move(res));
                     }
                     catch (const std::exception &e)
@@ -247,41 +194,4 @@ namespace network
         else
             LOG_WARN("No route for " + s.path);
     }
-
-#ifdef ENABLE_CORS
-    utils::u_ptr<response> server::cors(const request &req)
-    {
-        std::map<std::string, std::string> headers;
-        headers["Access-Control-Allow-Origin"] = "*";
-        headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS";
-        headers["Access-Control-Allow-Headers"] = "*";
-        headers["Access-Control-Max-Age"] = "86400";
-        return utils::make_u_ptr<response>(status_code::ok, std::move(headers));
-    }
-#endif
-
-#ifdef ENABLE_SSL
-    std::string encode_password(const std::string &password, const std::string &salt)
-    {
-        int iterations = 10000;
-        unsigned char hash[32];
-        if (PKCS5_PBKDF2_HMAC(password.c_str(), password.size(), reinterpret_cast<const unsigned char *>(salt.c_str()), salt.size(), iterations, EVP_sha256(), sizeof(hash), hash) == 0)
-            throw std::runtime_error("PKCS5_PBKDF2_HMAC failed");
-
-        std::stringstream hash_stream;
-        for (unsigned char c : hash)
-            hash_stream << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(c);
-        return hash_stream.str();
-    }
-
-    std::pair<std::string, std::string> encode_password(const std::string &password)
-    {
-        unsigned char salt[16];
-        RAND_bytes(salt, sizeof(salt));
-        std::stringstream salt_stream;
-        for (unsigned char c : salt)
-            salt_stream << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(c);
-        return {salt_stream.str(), encode_password(password, salt_stream.str())};
-    }
-#endif
 } // namespace network

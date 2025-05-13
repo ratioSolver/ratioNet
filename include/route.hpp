@@ -12,40 +12,46 @@ namespace network
 
   /**
    * @brief Represents a route in the server.
-   *
-   * This class represents a route in the server. A route consists of a path and a handler function.
    */
   class route
   {
   public:
-#ifdef ENABLE_SSL
-    /**
-     * @brief Constructs a route object with the specified path and handler function.
-     *
-     * @param path A regular expression representing the path for the route.
-     * @param handler A function that takes a request reference and returns a unique pointer to a response.
-     * @param auth A boolean indicating whether the route requires authentication (default: true).
-     */
-    route(const std::regex &path, std::function<utils::u_ptr<response>(request &)> &&handler, bool auth = true) noexcept : path(path), handler(std::move(handler)), auth(auth) {}
-#else
-    /**
-     * @brief Constructs a route object with the specified path and handler function.
-     *
-     * @param path A regular expression representing the path for the route.
-     * @param handler A function that takes a request reference and returns a unique pointer to a response.
-     */
-    route(const std::regex &path, std::function<utils::u_ptr<response>(request &)> &&handler) noexcept : path(path), handler(std::move(handler)) {}
-#endif
+    route(std::string_view pattern, const std::function<utils::u_ptr<response>(request &)> &&handler) noexcept : pattern(pattern), path(pattern.data()), handler(std::move(handler)) {}
 
     /**
-     * @brief Retrieves the path as a constant reference to a regex object.
+     * @brief Retrieves the pattern associated with the route.
      *
-     * This function returns a constant reference to the regex object representing the path.
-     * It is marked as noexcept, indicating that it does not throw any exceptions.
+     * This function provides access to the pattern string, which is used
+     * to define the route's matching criteria.
      *
-     * @return const std::regex& A constant reference to the regex object representing the path.
+     * @return A constant reference to the pattern string.
+     */
+    [[nodiscard]] const std::string &get_pattern() const noexcept { return pattern; }
+
+    /**
+     * @brief Retrieves the path of the route.
+     *
+     * This function returns a constant reference to a std::regex object that represents
+     * the path of the route.
+     *
+     * @return A constant reference to the path regex.
      */
     [[nodiscard]] const std::regex &get_path() const noexcept { return path; }
+
+    /**
+     * @brief Checks if the given path matches the route's pattern.
+     *
+     * This function checks if the provided path string matches the route's pattern
+     * using regular expression matching.
+     *
+     * @param path The path string to check for a match.
+     * @return true if the path matches the route's pattern, false otherwise.
+     */
+    [[nodiscard]] bool match(const std::string &path) const noexcept
+    {
+      std::smatch match;
+      return std::regex_match(path, match, this->path);
+    }
 
     /**
      * @brief Retrieves the handler function for processing requests.
@@ -57,23 +63,9 @@ namespace network
      */
     [[nodiscard]] const std::function<utils::u_ptr<response>(request &)> &get_handler() const noexcept { return handler; }
 
-#ifdef ENABLE_SSL
-    /**
-     * @brief Checks if the route requires authentication.
-     *
-     * This function returns a boolean value indicating whether the route requires
-     * authentication or not.
-     *
-     * @return true if the route requires authentication, false otherwise.
-     */
-    [[nodiscard]] bool requires_auth() const noexcept { return auth; }
-#endif
-
   private:
-    std::regex path;                                          // path of the route
-    std::function<utils::u_ptr<response>(request &)> handler; // handler function for the route
-#ifdef ENABLE_SSL
-    bool auth; // whether the route requires authentication
-#endif
+    const std::string pattern;                                      // pattern of the route
+    const std::regex path;                                          // path of the route
+    const std::function<utils::u_ptr<response>(request &)> handler; // handler function for the route
   };
 } // namespace network

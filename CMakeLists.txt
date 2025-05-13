@@ -37,7 +37,7 @@ endif()
 
 add_library(ratioNet src/server.cpp src/session.cpp src/ws_session.cpp src/client.cpp src/ws_client.cpp)
 target_compile_features(ratioNet PUBLIC cxx_std_17)
-target_include_directories(ratioNet PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
+target_include_directories(ratioNet PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/middlewares>)
 target_compile_definitions(ratioNet PUBLIC SERVER_HOST="${SERVER_HOST}" SERVER_PORT=${SERVER_PORT})
 if(NOT TARGET json)
     add_subdirectory(extern/json)
@@ -46,6 +46,7 @@ endif()
 target_link_libraries(ratioNet PUBLIC asio json)
 
 if (ENABLE_CORS)
+    target_sources(ratioNet PRIVATE src/middlewares/cors.cpp)
     target_compile_definitions(ratioNet PUBLIC ENABLE_CORS)
 endif()
 
