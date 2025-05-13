@@ -4,7 +4,13 @@
 
 namespace network
 {
-    cors::cors(server &srv) : middleware(srv) {}
+    cors::cors(server &srv) : middleware(srv)
+    {
+        for (auto &[v, rs] : srv.get_routes())
+            if (v != verb::Options)
+                for (auto &r : rs)
+                    srv.add_route(Options, r.get_pattern(), std::bind(&cors::option_route, this, std::placeholders::_1));
+    }
 
     void cors::added_route(verb v, const route &r)
     {

@@ -45,6 +45,20 @@ namespace network
     void add_route(verb v, std::string_view path, std::function<utils::u_ptr<response>(request &)> &&handler) noexcept;
 
     /**
+     * @brief Retrieves the collection of routes registered on the server.
+     *
+     * This function provides access to the internal mapping of HTTP verbs
+     * to their corresponding routes. The returned map associates each HTTP
+     * verb with a vector of routes that are handled by the server.
+     *
+     * @return A constant reference to a map where the keys are HTTP verbs
+     *         (of type `verb`) and the values are vectors of routes (of type `route`).
+     *         The returned reference is guaranteed to be valid as long as the
+     *         server object exists.
+     */
+    [[nodiscard]] const std::map<verb, std::vector<route>> &get_routes() const noexcept { return routes; }
+
+    /**
      * Adds a WebSocket route to the server.
      *
      * This function adds a WebSocket route to the server, allowing clients to establish WebSocket connections
@@ -54,6 +68,19 @@ namespace network
      * @return A reference to the `ws_handler` associated with the added route.
      */
     ws_handler &add_ws_route(std::string_view path) noexcept { return ws_routes[path.data()]; }
+
+    /**
+     * @brief Retrieves the collection of WebSocket routes registered on the server.
+     *
+     * This function provides access to the internal mapping of WebSocket routes.
+     * The returned map associates each WebSocket route path with its corresponding
+     * handler function.
+     *
+     * @return A constant reference to a map where the keys are WebSocket route paths
+     *         (of type `std::string`) and the values are `ws_handler` objects that
+     *         handle the WebSocket connections.
+     */
+    [[nodiscard]] const std::map<std::string, ws_handler> &get_ws_routes() const noexcept { return ws_routes; }
 
 #ifdef ENABLE_SSL
     /**
