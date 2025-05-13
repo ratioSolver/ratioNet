@@ -1,17 +1,6 @@
 #include "server.hpp"
 #include "middleware.hpp"
 #include "logging.hpp"
-#ifdef _WIN32
-// Windows-specific code
-#define SIGQUIT 3 // Define a dummy value for SIGQUIT on Windows if necessary
-#endif
-#include <csignal>
-#ifdef ENABLE_SSL
-#include <openssl/sha.h>
-#include <openssl/evp.h>
-#include <openssl/rand.h>
-#include <iomanip>
-#endif
 
 namespace network
 {
