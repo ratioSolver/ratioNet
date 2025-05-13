@@ -11,6 +11,8 @@ namespace network
   private:
     void added_route(verb v, const route &r) override;
 
+    void after_request(const request &req, response &res) override;
+
     utils::u_ptr<response> option_route(const request &req);
   };
 } // namespace network

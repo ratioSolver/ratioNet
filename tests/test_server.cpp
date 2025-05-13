@@ -100,6 +100,8 @@ void test_cors_middleware()
     server.add_middleware<network::cors>(server);
     server.add_route(network::verb::Get, "/json", [](network::request &)
                      { return utils::make_u_ptr<network::json_response>(json::json{{"message", "Hello, World!"}}); });
+    server.add_route(network::verb::Post, "/json", [](network::request &)
+                     { return utils::make_u_ptr<network::json_response>(json::json{{"message", "Hello, World!"}}); });
 
     std::thread t{[&server]
                   { server.start(); }};
