@@ -33,7 +33,7 @@ namespace network
    * @param code The status code to convert.
    * @return The string representation of the status code.
    */
-  inline std::string to_string(status_code code)
+  [[nodiscard]] inline std::string to_string(status_code code)
   {
     switch (code)
     {

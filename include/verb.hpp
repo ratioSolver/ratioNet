@@ -13,7 +13,7 @@ namespace network
     Options
   };
 
-  inline std::string to_string(verb v)
+  [[nodiscard]] inline std::string to_string(verb v)
   {
     switch (v)
     {

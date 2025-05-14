@@ -161,7 +161,7 @@ namespace network
    *       If the input contains invalid percent-encoded sequences, the behavior
    *       is undefined.
    */
-  inline std::string decode(const std::string &encoded)
+  [[nodiscard]] inline std::string decode(const std::string &encoded)
   {
     std::ostringstream decoded;
     size_t i = 0;
