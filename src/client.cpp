@@ -8,6 +8,11 @@ namespace network
     client::client(std::string_view host, unsigned short port) : host(host), port(port), resolver(io_ctx), socket(io_ctx, ssl_ctx)
     {
         ssl_ctx.set_default_verify_paths();
+        if (!SSL_set_tlsext_host_name(socket.native_handle(), host.data()))
+        {
+            LOG_ERR("SSL_set_tlsext_host_name failed");
+            throw std::runtime_error("SSL_set_tlsext_host_name failed");
+        }
         connect();
     }
 #else
