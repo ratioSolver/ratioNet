@@ -13,6 +13,12 @@ namespace network
   class client
   {
   public:
+    /**
+     * @brief Constructs a client object with the specified host and port.
+     *
+     * @param host The host name of the server.
+     * @param port The port number of the server.
+     */
     client(std::string_view host = SERVER_HOST, unsigned short port = SERVER_PORT);
     ~client();
 
@@ -106,13 +112,18 @@ namespace network
       return send(utils::make_u_ptr<request>(verb::Delete, std::move(target), "HTTP/1.1", std::move(hdrs)));
     }
 
+  private:
+    /**
+     * @brief Connects the client to the server.
+     *
+     * This function establishes a connection to the server using the specified host and port.
+     */
+    void connect();
+
     /**
      * @brief Disconnects the client from the server.
      */
     void disconnect();
-
-  private:
-    void connect();
 
   private:
     const std::string host;    // The host name of the server.

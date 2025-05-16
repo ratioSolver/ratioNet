@@ -164,6 +164,31 @@ namespace network
         return res;
     }
 
+    void client::connect()
+    {
+        LOG_DEBUG("Connecting to " << host << ":" << port << "...");
+        std::error_code ec;
+#ifdef ENABLE_SSL
+        asio::connect(socket.lowest_layer(), resolver.resolve(host, std::to_string(port)), ec);
+        if (ec)
+        {
+            LOG_ERR(ec.message());
+            return;
+        }
+        socket.set_verify_mode(asio::ssl::verify_peer);
+        socket.set_verify_callback(asio::ssl::host_name_verification(host));
+        socket.handshake(asio::ssl::stream_base::client, ec);
+#else
+        asio::connect(socket, resolver.resolve(host, std::to_string(port)), ec);
+#endif
+        if (ec)
+        {
+            LOG_ERR(ec.message());
+            return;
+        }
+        LOG_DEBUG("Connected to " << host << ":" << port);
+    }
+
     void client::disconnect()
     {
         LOG_DEBUG("Disconnecting from " << host << ":" << port << "...");
@@ -191,30 +216,5 @@ namespace network
         if (ec)
             LOG_ERR(ec.message());
         LOG_DEBUG("Disconnected from " << host << ":" << port);
-    }
-
-    void client::connect()
-    {
-        LOG_DEBUG("Connecting to " << host << ":" << port << "...");
-        std::error_code ec;
-#ifdef ENABLE_SSL
-        asio::connect(socket.lowest_layer(), resolver.resolve(host, std::to_string(port)), ec);
-        if (ec)
-        {
-            LOG_ERR(ec.message());
-            return;
-        }
-        socket.set_verify_mode(asio::ssl::verify_peer);
-        socket.set_verify_callback(asio::ssl::host_name_verification(host));
-        socket.handshake(asio::ssl::stream_base::client, ec);
-#else
-        asio::connect(socket, resolver.resolve(host, std::to_string(port)), ec);
-#endif
-        if (ec)
-        {
-            LOG_ERR(ec.message());
-            return;
-        }
-        LOG_DEBUG("Connected to " << host << ":" << port);
     }
 } // namespace network
