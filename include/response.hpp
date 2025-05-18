@@ -10,6 +10,7 @@ namespace network
 {
   class server;
   class client;
+  class async_client;
   class ws_client;
 
   /**
@@ -19,6 +20,7 @@ namespace network
   {
     friend class server;
     friend class client;
+    friend class async_client;
     friend class ws_client;
 
   public:

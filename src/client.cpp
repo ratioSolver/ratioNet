@@ -1,5 +1,4 @@
 #include "client.hpp"
-#include "verb.hpp"
 #include "logging.hpp"
 
 namespace network
