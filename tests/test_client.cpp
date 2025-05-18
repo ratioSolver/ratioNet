@@ -1,5 +1,6 @@
 #include "server.hpp"
 #include "client.hpp"
+#include "async_client.hpp"
 #include "ws_client.hpp"
 #include "logging.hpp"
 #include <thread>
@@ -11,6 +12,12 @@ void test_weather_client()
     auto response = client.get("/v1/forecast?latitude=52.52&longitude=13.41");
     if (response)
         LOG_INFO(*response);
+}
+
+void test_async_weather_client()
+{
+    network::async_client client("api.open-meteo.com", 443);
+    std::this_thread::sleep_for(std::chrono::seconds(5));
 }
 #endif
 
@@ -58,6 +65,7 @@ int main()
 {
 #ifdef ENABLE_SSL
     test_weather_client();
+    test_async_weather_client();
 #endif
     test_ws_client();
     return 0;

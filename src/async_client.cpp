@@ -4,7 +4,7 @@
 namespace network
 {
 #ifdef ENABLE_SSL
-    async_client::async_client(std::string_view host, unsigned short port) : host(host), port(port), resolver(io_ctx), socket(io_ctx, ssl_ctx)
+    async_client::async_client(std::string_view host, unsigned short port) : host(host), port(port), work_guard(asio::make_work_guard(io_ctx)), resolver(io_ctx), socket(io_ctx, ssl_ctx)
     {
         ssl_ctx.set_default_verify_paths();
         if (!SSL_set_tlsext_host_name(socket.native_handle(), host.data()))
@@ -13,12 +13,26 @@ namespace network
             throw std::runtime_error("SSL_set_tlsext_host_name failed");
         }
         connect();
+        io_thrd = std::thread([this]
+                              { io_ctx.run(); });
     }
 #else
-    async_client::async_client(std::string_view host, unsigned short port) : host(host), port(port), resolver(io_ctx), socket(io_ctx) { connect(); }
+    async_client::async_client(std::string_view host, unsigned short port) : host(host), port(port), work_guard(asio::make_work_guard(io_ctx)), resolver(io_ctx), socket(io_ctx)
+    {
+        connect();
+        io_thrd = std::thread([this]
+                              { io_ctx.run(); });
+    }
 #endif
 
-    async_client::~async_client() { disconnect(); }
+    async_client::~async_client()
+    {
+        disconnect();
+        work_guard.reset();
+        io_ctx.stop();
+        if (io_thrd.joinable())
+            io_thrd.join();
+    }
 
     void async_client::connect()
     {
@@ -27,24 +41,25 @@ namespace network
                                {
             if (!ec)
             {
-                asio::async_connect(socket, results, [this](const asio::error_code &ec, const asio::ip::tcp::endpoint &) {
+#ifdef ENABLE_SSL
+                asio::async_connect(socket.lowest_layer(), results, [this](const asio::error_code &ec, const asio::ip::tcp::endpoint &)
+                {
                     if (!ec)
                     {
-#ifdef ENABLE_SSL
-                        socket.async_handshake(asio::ssl::stream_base::client, [this](const asio::error_code &ec) {
-                            if (!ec)
-                            {
-                                LOG_INFO("Connected to " << host << ":" << port);
-                            }
-                            else
+                        socket.set_verify_mode(asio::ssl::verify_peer);
+                        socket.set_verify_callback(asio::ssl::host_name_verification(host));
+                        socket.async_handshake(asio::ssl::stream_base::client, [this](const asio::error_code &ec)
+                        {
+                            if (ec)
                             {
                                 LOG_ERR("SSL handshake failed: " << ec.message());
                                 disconnect();
                             }
+                            else
+                            {
+                                LOG_DEBUG("Connected to " << host << ":" << port);
+                            }
                         });
-#else
-                        LOG_INFO("Connected to " << host << ":" << port);
-#endif
                     }
                     else
                     {
@@ -52,6 +67,20 @@ namespace network
                         disconnect();
                     }
                 });
+#else
+                asio::async_connect(socket, results, [this](const asio::error_code &ec, const asio::ip::tcp::endpoint &endpoint)
+                {
+                    if (!ec)
+                    {
+                        LOG_DEBUG("Connected to " << host << ":" << port);
+                    }
+                    else
+                    {
+                        LOG_ERR("Failed to connect: " << ec.message());
+                        disconnect();
+                    }
+                });
+#endif
             }
             else
             {
@@ -62,10 +91,25 @@ namespace network
 
     void async_client::disconnect()
     {
+#ifdef ENABLE_SSL
+        if (socket.lowest_layer().is_open())
+        {
+            asio::error_code ec;
+            socket.lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both, ec);
+            socket.lowest_layer().close(ec);
+            if (ec)
+                LOG_ERR("Failed to close socket: " << ec.message());
+        }
+#else
         if (socket.is_open())
         {
-            socket.close();
-            LOG_INFO("Disconnected from " << host << ":" << port);
+            asio::error_code ec;
+            socket.shutdown(asio::ip::tcp::socket::shutdown_both, ec);
+            socket.close(ec);
+            if (ec)
+                LOG_ERR("Failed to close socket: " << ec.message());
         }
+#endif
+        LOG_DEBUG("Disconnected from " << host << ":" << port);
     }
 } // namespace network

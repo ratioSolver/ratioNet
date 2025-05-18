@@ -7,6 +7,7 @@
 #ifdef ENABLE_SSL
 #include <asio/ssl.hpp>
 #endif
+#include <thread>
 
 namespace network
 {
@@ -22,17 +23,6 @@ namespace network
     async_client(std::string_view host = SERVER_HOST, unsigned short port = SERVER_PORT);
     ~async_client();
 
-    /**
-     * @brief Sends a request asynchronously and invokes the provided callback upon receiving a response.
-     *
-     * This function takes ownership of the given request and sends it asynchronously.
-     * Once a response is received, the specified callback function is called with the response as its argument.
-     *
-     * @param req A unique pointer to the request object to be sent.
-     * @param callback A callable object (e.g., lambda or function) that will be invoked with the received response.
-     */
-    void send(utils::u_ptr<request> req, std::function<void(const response &)> &&callback);
-
   private:
     /**
      * @brief Connects the client to the server.
@@ -47,9 +37,10 @@ namespace network
     void disconnect();
 
   private:
-    const std::string host;    // The host name of the server.
-    const unsigned short port; // The port number of the server.
-    asio::io_context io_ctx;   // The I/O context used for asynchronous operations.
+    const std::string host;                                                // The host name of the server.
+    const unsigned short port;                                             // The port number of the server.
+    asio::io_context io_ctx;                                               // The I/O context used for asynchronous operations.
+    asio::executor_work_guard<asio::io_context::executor_type> work_guard; // Work guard to keep the io_context running.
 #ifdef ENABLE_SSL
     asio::ssl::context ssl_ctx{asio::ssl::context::TLS_VERSION}; // The SSL context used for secure communication.
 #endif
@@ -59,5 +50,7 @@ namespace network
 #else
     asio::ip::tcp::socket socket; // The socket used to communicate with the server.
 #endif
+    std::queue<std::pair<utils::u_ptr<request>, std::function<void(const response &)>>> requests; // Queue to store requests and their corresponding callbacks
+    std::thread io_thrd;                                                                          // Thread for processing asynchronous operations
   };
 } // namespace network
