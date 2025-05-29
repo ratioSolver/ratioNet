@@ -3,33 +3,19 @@
 
 namespace network
 {
-#ifdef ENABLE_SSL
-    client::client(std::string_view host, unsigned short port) : host(host), port(port), resolver(io_ctx), endpoints(resolver.resolve(host, std::to_string(port))), socket(io_ctx, ssl_ctx)
+    sync_client::sync_client(std::string_view host, unsigned short port) : host(host), port(port), io_ctx(), resolver(io_ctx), endpoints(resolver.resolve(host, std::to_string(port))) {}
+
+    utils::u_ptr<response> sync_client::send(utils::u_ptr<request> req)
     {
-        ssl_ctx.set_default_verify_paths();
-        if (!SSL_set_tlsext_host_name(socket.native_handle(), host.data()))
+        if (!is_connected())
+            connect(endpoints);
+        if (ec)
         {
-            LOG_ERR("SSL_set_tlsext_host_name failed");
-            throw std::runtime_error("SSL_set_tlsext_host_name failed");
+            LOG_ERR(ec.message());
+            return nullptr;
         }
-        connect();
-    }
-#else
-    client::client(std::string_view host, unsigned short port) : host(host), port(port), resolver(io_ctx), endpoints(resolver.resolve(host, std::to_string(port))), socket(io_ctx) { connect(); }
-#endif
-    client::~client() { disconnect(); }
 
-    utils::u_ptr<response> client::send(utils::u_ptr<request> req)
-    {
-#ifdef ENABLE_SSL
-        if (!socket.lowest_layer().is_open())
-#else
-        if (!socket.is_open())
-#endif
-            connect();
-
-        std::error_code ec;
-        asio::write(socket, req->get_buffer(), ec);
+        write(req->get_buffer());
         if (ec)
         {
             LOG_ERR(ec.message());
@@ -40,13 +26,13 @@ namespace network
         std::size_t bytes_transferred = 0;
         while (true)
         {
-            bytes_transferred = asio::read_until(socket, res->buffer, "\r\n\r\n", ec);
+            bytes_transferred = read_until(res->buffer, "\r\n\r\n");
             if (ec == asio::error::eof)
             { // connection closed by server
                 LOG_DEBUG("Connection closed by server");
-                connect();
+                connect(endpoints);
                 ec.clear();
-                asio::write(socket, req->get_buffer(), ec);
+                write(req->get_buffer());
                 if (ec)
                 {
                     LOG_ERR(ec.message());
@@ -72,7 +58,7 @@ namespace network
             auto len = std::stoul(res->get_headers().at("content-length"));
             if (len > additional_bytes)
             { // read the remaining body
-                asio::read(socket, res->buffer, asio::transfer_exactly(len - additional_bytes), ec);
+                read(res->buffer, len - additional_bytes);
                 if (ec)
                 {
                     LOG_ERR(ec.message());
@@ -96,7 +82,7 @@ namespace network
             std::string body;
             while (true)
             {
-                bytes_transferred = asio::read_until(socket, res->buffer, "\r\n", ec); // read the chunk size
+                bytes_transferred = read_until(res->buffer, "\r\n"); // read the chunk size
                 if (ec)
                 {
                     LOG_ERR(ec.message());
@@ -130,7 +116,7 @@ namespace network
                 if (size == 0)
                 {
                     // read the trailing CRLF
-                    asio::read_until(socket, res->buffer, "\r\n", ec);
+                    read_until(res->buffer, "\r\n");
                     if (ec)
                     {
                         LOG_ERR(ec.message());
@@ -141,7 +127,7 @@ namespace network
                 }
                 else if (size > additional_bytes)
                 { // read the remaining chunk
-                    asio::read(socket, res->buffer, asio::transfer_exactly((size - additional_bytes) + 2), ec);
+                    read(res->buffer, (size - additional_bytes) + 2);
                     if (ec)
                     {
                         LOG_ERR(ec.message());
@@ -163,57 +149,81 @@ namespace network
         return res;
     }
 
-    void client::connect()
+    client::client(std::string_view host, unsigned short port) : sync_client(host, port), socket(io_ctx) {}
+    client::~client()
     {
-        LOG_DEBUG("Connecting to " << host << ":" << port << "...");
-        std::error_code ec;
-#ifdef ENABLE_SSL
-        asio::connect(socket.lowest_layer(), endpoints, ec);
+        if (is_connected())
+            disconnect();
+        if (ec && ec != asio::error::not_connected)
+            LOG_ERR("Failed to disconnect: " << ec.message());
+    }
+
+    bool client::is_connected() const { return socket.is_open(); }
+    asio::ip::tcp::endpoint client::connect(const asio::ip::basic_resolver_results<asio::ip::tcp> &endpoints)
+    {
+        for (const auto &endpoint : endpoints)
+            LOG_DEBUG("Trying to connect to " << endpoint.endpoint());
+        auto endpoint = asio::connect(socket, endpoints, ec);
         if (ec)
-        {
-            LOG_ERR(ec.message());
+            return endpoint;
+        LOG_DEBUG("Connected to " << endpoint);
+        return endpoint;
+    }
+    void client::disconnect()
+    {
+        socket.shutdown(asio::ip::tcp::socket::shutdown_both, ec);
+        if (ec && ec != asio::error::not_connected)
             return;
+        socket.close(ec);
+    }
+
+    std::size_t client::read(asio::streambuf &buffer, std::size_t size) { return asio::read(socket, buffer, asio::transfer_exactly(size), ec); }
+    std::size_t client::read_until(asio::streambuf &buffer, std::string_view delim) { return asio::read_until(socket, buffer, delim, ec); }
+    std::size_t client::write(asio::streambuf &buffer) { return asio::write(socket, buffer, ec); }
+
+#ifdef ENABLE_SSL
+    ssl_client::ssl_client(std::string_view host, unsigned short port) : sync_client(host, port), ssl_ctx(asio::ssl::context::sslv23), socket(io_ctx, ssl_ctx)
+    {
+        ssl_ctx.set_default_verify_paths();
+        if (!SSL_set_tlsext_host_name(socket.native_handle(), host.data()))
+        {
+            LOG_ERR("SSL_set_tlsext_host_name failed");
+            throw std::runtime_error("SSL_set_tlsext_host_name failed");
         }
+    }
+    ssl_client::~ssl_client()
+    {
+        if (is_connected())
+            disconnect();
+        if (ec && ec != asio::error::not_connected)
+            LOG_ERR("Failed to disconnect: " << ec.message());
+    }
+
+    bool ssl_client::is_connected() const { return socket.lowest_layer().is_open(); }
+    asio::ip::tcp::endpoint ssl_client::connect(const asio::ip::basic_resolver_results<asio::ip::tcp> &endpoints)
+    {
+        auto endpoint = asio::connect(socket.lowest_layer(), endpoints, ec);
+        if (ec)
+            return endpoint;
+        LOG_DEBUG("Connected to " << endpoint);
         socket.set_verify_mode(asio::ssl::verify_peer);
         socket.set_verify_callback(asio::ssl::host_name_verification(host));
         socket.handshake(asio::ssl::stream_base::client, ec);
-#else
-        asio::connect(socket, endpoints, ec);
-#endif
         if (ec)
-        {
-            LOG_ERR(ec.message());
+            return endpoint;
+        LOG_DEBUG("SSL handshake completed with " << host);
+        return endpoint;
+    }
+    void ssl_client::disconnect()
+    {
+        socket.lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both, ec);
+        if (ec && ec != asio::error::not_connected)
             return;
-        }
-        LOG_DEBUG("Connected to " << host << ":" << port);
+        socket.lowest_layer().close(ec);
     }
 
-    void client::disconnect()
-    {
-        LOG_DEBUG("Disconnecting from " << host << ":" << port << "...");
-        std::error_code ec;
-#ifdef ENABLE_SSL
-        socket.lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both, ec);
-#else
-        socket.shutdown(asio::ip::tcp::socket::shutdown_both, ec);
+    std::size_t ssl_client::read(asio::streambuf &buffer, std::size_t size) { return asio::read(socket, buffer, asio::transfer_exactly(size), ec); }
+    std::size_t ssl_client::read_until(asio::streambuf &buffer, std::string_view delim) { return asio::read_until(socket, buffer, delim, ec); }
+    std::size_t ssl_client::write(asio::streambuf &buffer) { return asio::write(socket, buffer, ec); }
 #endif
-        if (ec == asio::error::eof)
-        { // connection closed by server
-            ec.clear();
-            LOG_DEBUG("Connection closed by server");
-        }
-        else if (ec)
-        {
-            LOG_ERR(ec.message());
-            return;
-        }
-#ifdef ENABLE_SSL
-        socket.lowest_layer().close(ec);
-#else
-        socket.close(ec);
-#endif
-        if (ec)
-            LOG_ERR(ec.message());
-        LOG_DEBUG("Disconnected from " << host << ":" << port);
-    }
 } // namespace network

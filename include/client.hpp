@@ -10,17 +10,11 @@
 
 namespace network
 {
-  class client
+  class sync_client
   {
   public:
-    /**
-     * @brief Constructs a client object with the specified host and port.
-     *
-     * @param host The host name of the server.
-     * @param port The port number of the server.
-     */
-    client(std::string_view host = SERVER_HOST, unsigned short port = SERVER_PORT);
-    ~client();
+    sync_client(std::string_view host = SERVER_HOST, unsigned short port = SERVER_PORT);
+    virtual ~sync_client() = default;
 
     /**
      * Sends a request and returns the response.
@@ -113,31 +107,75 @@ namespace network
     }
 
   private:
-    /**
-     * @brief Connects the client to the server.
-     *
-     * This function establishes a connection to the server using the specified host and port.
-     */
-    void connect();
+    virtual bool is_connected() const = 0; // Check if the client is connected to the server.
+    virtual asio::ip::tcp::endpoint connect(const asio::ip::basic_resolver_results<asio::ip::tcp> &endpoints) = 0;
+    virtual void disconnect() = 0;
 
-    /**
-     * @brief Disconnects the client from the server.
-     */
-    void disconnect();
+    virtual std::size_t read(asio::streambuf &buffer, std::size_t size) = 0;
+    virtual std::size_t read_until(asio::streambuf &buffer, std::string_view delimiter) = 0;
+    virtual std::size_t write(asio::streambuf &buffer) = 0;
 
-  private:
+  protected:
     const std::string host;    // The host name of the server.
     const unsigned short port; // The port number of the server.
     asio::io_context io_ctx;   // The I/O context used for asynchronous operations.
-#ifdef ENABLE_SSL
-    asio::ssl::context ssl_ctx{asio::ssl::context::TLS_VERSION}; // The SSL context used for secure communication.
-#endif
+  private:
     asio::ip::tcp::resolver resolver;                          // The resolver used to resolve host names.
     asio::ip::basic_resolver_results<asio::ip::tcp> endpoints; // The resolved endpoints for the server.
-#ifdef ENABLE_SSL
-    asio::ssl::stream<asio::ip::tcp::socket> socket; // The SSL socket used to communicate with the server.
-#else
-    asio::ip::tcp::socket socket; // The socket used to communicate with the server.
-#endif
+  protected:
+    asio::error_code ec; // Error code for handling errors in operations.
   };
+
+  class client : public sync_client
+  {
+  public:
+    /**
+     * @brief Constructs an http_client object with the specified host and port.
+     *
+     * @param host The host name of the server.
+     * @param port The port number of the server.
+     */
+    client(std::string_view host = SERVER_HOST, unsigned short port = SERVER_PORT);
+    ~client();
+
+  private:
+    bool is_connected() const override;
+    asio::ip::tcp::endpoint connect(const asio::ip::basic_resolver_results<asio::ip::tcp> &endpoints) override;
+    void disconnect() override;
+
+    std::size_t read(asio::streambuf &buffer, std::size_t size) override;
+    std::size_t read_until(asio::streambuf &buffer, std::string_view delimiter) override;
+    std::size_t write(asio::streambuf &buffer);
+
+  private:
+    asio::ip::tcp::socket socket; // The TCP socket used to communicate with the server.
+  };
+
+#ifdef ENABLE_SSL
+  class ssl_client : public sync_client
+  {
+  public:
+    /**
+     * @brief Constructs an ssl_client object with the specified host and port.
+     *
+     * @param host The host name of the server.
+     * @param port The port number of the server.
+     */
+    ssl_client(std::string_view host = SERVER_HOST, unsigned short port = SERVER_PORT);
+    ~ssl_client();
+
+  private:
+    bool is_connected() const override;
+    asio::ip::tcp::endpoint connect(const asio::ip::basic_resolver_results<asio::ip::tcp> &endpoints) override;
+    void disconnect() override;
+
+    std::size_t read(asio::streambuf &buffer, std::size_t size) override;
+    std::size_t read_until(asio::streambuf &buffer, std::string_view delimiter) override;
+    std::size_t write(asio::streambuf &buffer);
+
+  private:
+    asio::ssl::context ssl_ctx;                      // The SSL context used for secure communication.
+    asio::ssl::stream<asio::ip::tcp::socket> socket; // The SSL socket used to communicate with the server.
+  };
+#endif
 } // namespace network

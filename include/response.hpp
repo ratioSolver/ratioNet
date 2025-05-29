@@ -9,7 +9,7 @@
 namespace network
 {
   class server;
-  class client;
+  class sync_client;
   class async_client;
   class ws_client;
 
@@ -19,7 +19,7 @@ namespace network
   class response
   {
     friend class server;
-    friend class client;
+    friend class sync_client;
     friend class async_client;
     friend class ws_client;
 
