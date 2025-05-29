@@ -35,7 +35,7 @@ if(ENABLE_SSL)
     message(STATUS "TLS version: ${TLS_VERSION}")
 endif()
 
-add_library(ratioNet src/server.cpp src/session.cpp src/ws_session.cpp src/client.cpp src/async_client.cpp src/ws_client.cpp)
+add_library(ratioNet src/server.cpp src/session.cpp src/ws_session.cpp src/client.cpp src/c.cpp src/async_client.cpp src/ws_client.cpp)
 target_compile_features(ratioNet PUBLIC cxx_std_17)
 target_include_directories(ratioNet PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/middlewares>)
 target_compile_definitions(ratioNet PUBLIC SERVER_HOST="${SERVER_HOST}" SERVER_PORT=${SERVER_PORT})
