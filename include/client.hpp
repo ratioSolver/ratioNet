@@ -132,7 +132,8 @@ namespace network
 #ifdef ENABLE_SSL
     asio::ssl::context ssl_ctx{asio::ssl::context::TLS_VERSION}; // The SSL context used for secure communication.
 #endif
-    asio::ip::tcp::resolver resolver; // The resolver used to resolve host names.
+    asio::ip::tcp::resolver resolver;                          // The resolver used to resolve host names.
+    asio::ip::basic_resolver_results<asio::ip::tcp> endpoints; // The resolved endpoints for the server.
 #ifdef ENABLE_SSL
     asio::ssl::stream<asio::ip::tcp::socket> socket; // The SSL socket used to communicate with the server.
 #else

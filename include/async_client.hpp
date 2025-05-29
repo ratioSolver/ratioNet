@@ -23,6 +23,14 @@ namespace network
     async_client(std::string_view host = SERVER_HOST, unsigned short port = SERVER_PORT);
     ~async_client();
 
+    /**
+     * @brief Sends a request asynchronously and invokes a callback upon receiving the response.
+     *
+     * @param req A unique pointer to the request object to be sent.
+     * @param cb A callback function to be called with the response once it is received.
+     */
+    void send(utils::u_ptr<request> &&req, std::function<void(const response &)> &&cb);
+
   private:
     /**
      * @brief Connects the client to the server.
@@ -36,6 +44,14 @@ namespace network
      */
     void disconnect();
 
+    /**
+     * @brief Processes the requests in the queue.
+     *
+     * This function retrieves requests from the queue and sends them to the server.
+     * It also handles the responses by invoking the corresponding callbacks.
+     */
+    void process_requests();
+
   private:
     const std::string host;                                                // The host name of the server.
     const unsigned short port;                                             // The port number of the server.
@@ -44,7 +60,8 @@ namespace network
 #ifdef ENABLE_SSL
     asio::ssl::context ssl_ctx{asio::ssl::context::TLS_VERSION}; // The SSL context used for secure communication.
 #endif
-    asio::ip::tcp::resolver resolver; // The resolver used to resolve host names.
+    asio::ip::tcp::resolver resolver;                          // The resolver used to resolve host names.
+    asio::ip::basic_resolver_results<asio::ip::tcp> endpoints; // The resolved endpoints for the server.
 #ifdef ENABLE_SSL
     asio::ssl::stream<asio::ip::tcp::socket> socket; // The SSL socket used to communicate with the server.
 #else

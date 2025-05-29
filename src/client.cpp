@@ -4,7 +4,7 @@
 namespace network
 {
 #ifdef ENABLE_SSL
-    client::client(std::string_view host, unsigned short port) : host(host), port(port), resolver(io_ctx), socket(io_ctx, ssl_ctx)
+    client::client(std::string_view host, unsigned short port) : host(host), port(port), resolver(io_ctx), endpoints(resolver.resolve(host, std::to_string(port))), socket(io_ctx, ssl_ctx)
     {
         ssl_ctx.set_default_verify_paths();
         if (!SSL_set_tlsext_host_name(socket.native_handle(), host.data()))
@@ -15,7 +15,7 @@ namespace network
         connect();
     }
 #else
-    client::client(std::string_view host, unsigned short port) : host(host), port(port), resolver(io_ctx), socket(io_ctx) { connect(); }
+    client::client(std::string_view host, unsigned short port) : host(host), port(port), resolver(io_ctx), endpoints(resolver.resolve(host, std::to_string(port))), socket(io_ctx) { connect(); }
 #endif
     client::~client() { disconnect(); }
 
@@ -168,7 +168,7 @@ namespace network
         LOG_DEBUG("Connecting to " << host << ":" << port << "...");
         std::error_code ec;
 #ifdef ENABLE_SSL
-        asio::connect(socket.lowest_layer(), resolver.resolve(host, std::to_string(port)), ec);
+        asio::connect(socket.lowest_layer(), endpoints, ec);
         if (ec)
         {
             LOG_ERR(ec.message());
@@ -178,7 +178,7 @@ namespace network
         socket.set_verify_callback(asio::ssl::host_name_verification(host));
         socket.handshake(asio::ssl::stream_base::client, ec);
 #else
-        asio::connect(socket, resolver.resolve(host, std::to_string(port)), ec);
+        asio::connect(socket, endpoints, ec);
 #endif
         if (ec)
         {

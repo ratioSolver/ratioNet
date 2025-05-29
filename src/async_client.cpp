@@ -4,7 +4,7 @@
 namespace network
 {
 #ifdef ENABLE_SSL
-    async_client::async_client(std::string_view host, unsigned short port) : host(host), port(port), work_guard(asio::make_work_guard(io_ctx)), resolver(io_ctx), socket(io_ctx, ssl_ctx)
+    async_client::async_client(std::string_view host, unsigned short port) : host(host), port(port), work_guard(asio::make_work_guard(io_ctx)), resolver(io_ctx), endpoints(resolver.resolve(host, std::to_string(port))), socket(io_ctx, ssl_ctx)
     {
         ssl_ctx.set_default_verify_paths();
         if (!SSL_set_tlsext_host_name(socket.native_handle(), host.data()))
@@ -17,7 +17,7 @@ namespace network
                               { io_ctx.run(); });
     }
 #else
-    async_client::async_client(std::string_view host, unsigned short port) : host(host), port(port), work_guard(asio::make_work_guard(io_ctx)), resolver(io_ctx), socket(io_ctx)
+    async_client::async_client(std::string_view host, unsigned short port) : host(host), port(port), work_guard(asio::make_work_guard(io_ctx)), resolver(io_ctx), endpoints(resolver.resolve(host, std::to_string(port))), socket(io_ctx)
     {
         connect();
         io_thrd = std::thread([this]
@@ -32,6 +32,12 @@ namespace network
         io_ctx.stop();
         if (io_thrd.joinable())
             io_thrd.join();
+    }
+
+    void async_client::send(utils::u_ptr<request> &&req, std::function<void(const response &)> &&cb)
+    {
+        asio::post(io_ctx, [this, req = std::move(req), cb = std::move(cb)]
+                   { process_requests(); });
     }
 
     void async_client::connect()
@@ -58,6 +64,8 @@ namespace network
                             else
                             {
                                 LOG_DEBUG("Connected to " << host << ":" << port);
+                                // Start processing requests after successful connection..
+                                process_requests();
                             }
                         });
                     }
@@ -111,5 +119,9 @@ namespace network
         }
 #endif
         LOG_DEBUG("Disconnected from " << host << ":" << port);
+    }
+
+    void async_client::process_requests()
+    {
     }
 } // namespace network
