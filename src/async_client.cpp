@@ -3,8 +3,57 @@
 
 namespace network
 {
+    async_client_base::async_client_base(std::string_view host, unsigned short port) : host(host), port(port), work_guard(asio::make_work_guard(io_ctx)), resolver(io_ctx), endpoints(resolver.resolve(host, std::to_string(port)))
+    {
+        io_thrd = std::thread([this]
+                              { io_ctx.run(); });
+    }
+
+    void async_client_base::send(utils::u_ptr<request> &&req, std::function<void(const response &)> &&cb)
+    {
+    }
+
+    void async_client_base::on_connect(const asio::error_code &ec, const asio::ip::tcp::endpoint &endpoint)
+    {
+        if (ec)
+        {
+            LOG_ERR("Failed to connect to " << endpoint << ": " << ec.message());
+            return;
+        }
+        LOG_DEBUG("Connected to " << endpoint);
+    }
+
+    async_client::async_client(std::string_view host, unsigned short port) : async_client_base(host, port), socket(io_ctx) {}
+    async_client::~async_client()
+    {
+        if (is_connected())
+            disconnect();
+        asio::error_code ec;
+        if (ec && ec != asio::error::not_connected)
+            LOG_ERR("Failed to disconnect: " << ec.message());
+        work_guard.reset(); // Stop the io_context from running
+        if (io_thrd.joinable())
+            io_thrd.join();
+    }
+
+    bool async_client::is_connected() const { return socket.is_open(); }
+    void async_client::connect(const asio::ip::basic_resolver_results<asio::ip::tcp> &endpoints)
+    {
+        for (const auto &endpoint : endpoints)
+            LOG_DEBUG("Trying to connect to " << endpoint.endpoint());
+        asio::async_connect(socket, endpoints, std::bind(&async_client::on_connect, this, std::placeholders::_1, std::placeholders::_2));
+    }
+    void async_client::disconnect()
+    {
+        asio::error_code ec;
+        socket.shutdown(asio::ip::tcp::socket::shutdown_both, ec);
+        if (ec && ec != asio::error::not_connected)
+            LOG_ERR("Failed to disconnect: " << ec.message());
+        socket.close(ec);
+    }
+
 #ifdef ENABLE_SSL
-    async_client::async_client(std::string_view host, unsigned short port) : host(host), port(port), work_guard(asio::make_work_guard(io_ctx)), resolver(io_ctx), endpoints(resolver.resolve(host, std::to_string(port))), socket(io_ctx, ssl_ctx)
+    async_ssl_client::async_ssl_client(std::string_view host, unsigned short port) : async_client_base(host, port), ssl_ctx(asio::ssl::context::TLS_VERSION), socket(io_ctx, ssl_ctx)
     {
         ssl_ctx.set_default_verify_paths();
         if (!SSL_set_tlsext_host_name(socket.native_handle(), host.data()))
@@ -12,116 +61,45 @@ namespace network
             LOG_ERR("SSL_set_tlsext_host_name failed");
             throw std::runtime_error("SSL_set_tlsext_host_name failed");
         }
-        connect();
-        io_thrd = std::thread([this]
-                              { io_ctx.run(); });
     }
-#else
-    async_client::async_client(std::string_view host, unsigned short port) : host(host), port(port), work_guard(asio::make_work_guard(io_ctx)), resolver(io_ctx), endpoints(resolver.resolve(host, std::to_string(port))), socket(io_ctx)
+    async_ssl_client::~async_ssl_client()
     {
-        connect();
-        io_thrd = std::thread([this]
-                              { io_ctx.run(); });
-    }
-#endif
-
-    async_client::~async_client()
-    {
-        disconnect();
-        work_guard.reset();
-        io_ctx.stop();
+        if (is_connected())
+            disconnect();
+        asio::error_code ec;
+        if (ec && ec != asio::error::not_connected)
+            LOG_ERR("Failed to disconnect: " << ec.message());
+        work_guard.reset(); // Stop the io_context from running
         if (io_thrd.joinable())
             io_thrd.join();
     }
 
-    void async_client::send(utils::u_ptr<request> &&req, std::function<void(const response &)> &&cb)
+    bool async_ssl_client::is_connected() const { return socket.next_layer().is_open(); }
+    void async_ssl_client::connect(const asio::ip::basic_resolver_results<asio::ip::tcp> &endpoints)
     {
-        asio::post(io_ctx, [this, req = std::move(req), cb = std::move(cb)]
-                   { process_requests(); });
-    }
-
-    void async_client::connect()
-    {
-        asio::ip::tcp::resolver::query query(host, std::to_string(port));
-        resolver.async_resolve(query, [this](const asio::error_code &ec, asio::ip::tcp::resolver::results_type results)
-                               {
-            if (!ec)
-            {
-#ifdef ENABLE_SSL
-                asio::async_connect(socket.lowest_layer(), results, [this](const asio::error_code &ec, const asio::ip::tcp::endpoint &)
-                {
-                    if (!ec)
-                    {
-                        socket.set_verify_mode(asio::ssl::verify_peer);
-                        socket.set_verify_callback(asio::ssl::host_name_verification(host));
-                        socket.async_handshake(asio::ssl::stream_base::client, [this](const asio::error_code &ec)
-                        {
-                            if (ec)
+        for (const auto &endpoint : endpoints)
+            LOG_DEBUG("Trying to connect to " << endpoint.endpoint());
+        asio::async_connect(socket.next_layer(), endpoints, [this](const asio::error_code &ec, const asio::ip::tcp::endpoint &endpoint)
                             {
-                                LOG_ERR("SSL handshake failed: " << ec.message());
-                                disconnect();
-                            }
-                            else
-                            {
-                                LOG_DEBUG("Connected to " << host << ":" << port);
-                                // Start processing requests after successful connection..
-                                process_requests();
-                            }
-                        });
-                    }
-                    else
-                    {
-                        LOG_ERR("Failed to connect: " << ec.message());
-                        disconnect();
-                    }
-                });
-#else
-                asio::async_connect(socket, results, [this](const asio::error_code &ec, const asio::ip::tcp::endpoint &endpoint)
-                {
-                    if (!ec)
-                    {
-                        LOG_DEBUG("Connected to " << host << ":" << port);
-                    }
-                    else
-                    {
-                        LOG_ERR("Failed to connect: " << ec.message());
-                        disconnect();
-                    }
-                });
-#endif
-            }
-            else
-            {
-                LOG_ERR("Failed to resolve host: " << ec.message());
-                disconnect();
-            } });
+                                if (ec)
+                                    return on_connect(ec, endpoint);
+                                socket.async_handshake(asio::ssl::stream_base::client, [this, &endpoint](const asio::error_code &ec)
+                                                       {
+                                                           if (ec)
+                                                           {
+                                                               LOG_ERR("SSL handshake failed: " << ec.message());
+                                                               return on_connect(ec, endpoint);
+                                                           }
+                                                           LOG_DEBUG("SSL handshake successful");
+                                                           on_connect(ec, endpoint); }); });
     }
-
-    void async_client::disconnect()
+    void async_ssl_client::disconnect()
     {
-#ifdef ENABLE_SSL
-        if (socket.lowest_layer().is_open())
-        {
-            asio::error_code ec;
-            socket.lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both, ec);
-            socket.lowest_layer().close(ec);
-            if (ec)
-                LOG_ERR("Failed to close socket: " << ec.message());
-        }
-#else
-        if (socket.is_open())
-        {
-            asio::error_code ec;
-            socket.shutdown(asio::ip::tcp::socket::shutdown_both, ec);
-            socket.close(ec);
-            if (ec)
-                LOG_ERR("Failed to close socket: " << ec.message());
-        }
+        asio::error_code ec;
+        socket.next_layer().shutdown(asio::ip::tcp::socket::shutdown_both, ec);
+        if (ec && ec != asio::error::not_connected)
+            LOG_ERR("Failed to disconnect: " << ec.message());
+        socket.next_layer().close(ec);
+    }
 #endif
-        LOG_DEBUG("Disconnected from " << host << ":" << port);
-    }
-
-    void async_client::process_requests()
-    {
-    }
 } // namespace network

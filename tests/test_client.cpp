@@ -8,7 +8,7 @@
 #ifdef ENABLE_SSL
 void test_weather_client()
 {
-    network::client client("api.open-meteo.com", 443);
+    network::ssl_client client("api.open-meteo.com", 443);
     auto response = client.get("/v1/forecast?latitude=52.52&longitude=13.41");
     if (response)
         LOG_INFO(*response);
@@ -16,7 +16,7 @@ void test_weather_client()
 
 void test_async_weather_client()
 {
-    network::async_client client("api.open-meteo.com", 443);
+    network::async_ssl_client client("api.open-meteo.com", 443);
     std::this_thread::sleep_for(std::chrono::seconds(5));
 }
 #endif

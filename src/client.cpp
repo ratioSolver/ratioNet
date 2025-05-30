@@ -3,9 +3,9 @@
 
 namespace network
 {
-    sync_client::sync_client(std::string_view host, unsigned short port) : host(host), port(port), io_ctx(), resolver(io_ctx), endpoints(resolver.resolve(host, std::to_string(port))) {}
+    client_base::client_base(std::string_view host, unsigned short port) : host(host), port(port), io_ctx(), resolver(io_ctx), endpoints(resolver.resolve(host, std::to_string(port))) {}
 
-    utils::u_ptr<response> sync_client::send(utils::u_ptr<request> req)
+    utils::u_ptr<response> client_base::send(utils::u_ptr<request> req)
     {
         if (!is_connected())
             connect(endpoints);
@@ -149,7 +149,7 @@ namespace network
         return res;
     }
 
-    client::client(std::string_view host, unsigned short port) : sync_client(host, port), socket(io_ctx) {}
+    client::client(std::string_view host, unsigned short port) : client_base(host, port), socket(io_ctx) {}
     client::~client()
     {
         if (is_connected())
@@ -182,7 +182,7 @@ namespace network
     std::size_t client::write(asio::streambuf &buffer) { return asio::write(socket, buffer, ec); }
 
 #ifdef ENABLE_SSL
-    ssl_client::ssl_client(std::string_view host, unsigned short port) : sync_client(host, port), ssl_ctx(asio::ssl::context::sslv23), socket(io_ctx, ssl_ctx)
+    ssl_client::ssl_client(std::string_view host, unsigned short port) : client_base(host, port), ssl_ctx(asio::ssl::context::TLS_VERSION), socket(io_ctx, ssl_ctx)
     {
         ssl_ctx.set_default_verify_paths();
         if (!SSL_set_tlsext_host_name(socket.native_handle(), host.data()))

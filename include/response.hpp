@@ -9,8 +9,8 @@
 namespace network
 {
   class server;
-  class sync_client;
-  class async_client;
+  class client_base;
+  class async_client_base;
   class ws_client;
 
   /**
@@ -19,8 +19,8 @@ namespace network
   class response
   {
     friend class server;
-    friend class sync_client;
-    friend class async_client;
+    friend class client_base;
+    friend class async_client_base;
     friend class ws_client;
 
   public:

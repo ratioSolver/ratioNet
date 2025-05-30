@@ -10,11 +10,11 @@
 
 namespace network
 {
-  class sync_client
+  class client_base
   {
   public:
-    sync_client(std::string_view host = SERVER_HOST, unsigned short port = SERVER_PORT);
-    virtual ~sync_client() = default;
+    client_base(std::string_view host = SERVER_HOST, unsigned short port = SERVER_PORT);
+    virtual ~client_base() = default;
 
     /**
      * Sends a request and returns the response.
@@ -107,7 +107,12 @@ namespace network
     }
 
   private:
-    virtual bool is_connected() const = 0; // Check if the client is connected to the server.
+    /**
+     * @brief Checks if the client is currently connected.
+     *
+     * @return true if the client is connected; false otherwise.
+     */
+    virtual bool is_connected() const = 0;
     virtual asio::ip::tcp::endpoint connect(const asio::ip::basic_resolver_results<asio::ip::tcp> &endpoints) = 0;
     virtual void disconnect() = 0;
 
@@ -126,11 +131,11 @@ namespace network
     asio::error_code ec; // Error code for handling errors in operations.
   };
 
-  class client : public sync_client
+  class client : public client_base
   {
   public:
     /**
-     * @brief Constructs an http_client object with the specified host and port.
+     * @brief Constructs a client object with the specified host and port.
      *
      * @param host The host name of the server.
      * @param port The port number of the server.
@@ -152,7 +157,7 @@ namespace network
   };
 
 #ifdef ENABLE_SSL
-  class ssl_client : public sync_client
+  class ssl_client : public client_base
   {
   public:
     /**
