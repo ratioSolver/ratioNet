@@ -13,6 +13,12 @@ namespace network
         return *request_queue.back();
     }
 
+    void server_session_base::enqueue(std::unique_ptr<response> res)
+    {
+        asio::post(strand, [self = shared_from_this(), res = std::move(res)]() mutable
+                   { self->response_queue.emplace(std::move(res)); });
+    }
+
     void server_session_base::on_read(request &req, const std::error_code &ec, std::size_t bytes_transferred)
     {
         if (ec)

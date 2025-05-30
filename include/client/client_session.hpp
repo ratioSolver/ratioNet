@@ -26,11 +26,27 @@ namespace network
      */
     virtual ~client_session_base();
 
+    /**
+     * @brief Writes the request to the server.
+     *
+     * This function is called to send the request to the server.
+     */
+    virtual void write() = 0;
+
+    void on_write(std::function<void(const response &)> &&cb, const std::error_code &ec, std::size_t bytes_transferred);
+
+    virtual void read_until(asio::streambuf &buffer, std::string_view delimiter) = 0;
+
+  protected:
+    std::pair<std::unique_ptr<request>, std::function<void(const response &)>> &get_request();
+
+    void enqueue(std::unique_ptr<request> req, std::function<void(const response &)> &&cb);
+
   private:
-    async_client_base &client;                            // Reference to the client base associated with this session
-    asio::strand<asio::io_context::executor_type> strand; // Strand to ensure thread-safe operations within the session
-    std::queue<std::unique_ptr<request>> request_queue;   // Queue to hold outgoing requests
-    std::queue<std::unique_ptr<response>> response_queue; // Queue to hold incoming responses
+    async_client_base &client;                                                                              // Reference to the client base associated with this session
+    asio::strand<asio::io_context::executor_type> strand;                                                   // Strand to ensure thread-safe operations within the session
+    std::queue<std::pair<std::unique_ptr<request>, std::function<void(const response &)>>> request_queue;   // Queue to hold outgoing requests
+    std::queue<std::pair<std::unique_ptr<response>, std::function<void(const response &)>>> response_queue; // Queue to hold incoming responses
   };
 
   /**
@@ -51,6 +67,9 @@ namespace network
      * @param socket The socket used to communicate with the server.
      */
     client_session(async_client_base &client, asio::ip::tcp::socket &&socket);
+
+  private:
+    void write() override;
 
   private:
     asio::ip::tcp::socket socket; // The socket used to communicate with the server.

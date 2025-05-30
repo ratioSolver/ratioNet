@@ -45,6 +45,8 @@ namespace network
   protected:
     request &create_request();
 
+    void enqueue(std::unique_ptr<response> res);
+
   private:
     server_base &server;                                  // Reference to the server base associated with this session
     asio::strand<asio::io_context::executor_type> strand; // Strand to ensure thread-safe operations within the session

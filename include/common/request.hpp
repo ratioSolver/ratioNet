@@ -6,6 +6,7 @@
 
 namespace network
 {
+  class client_session_base;
   class server_session_base;
 
   namespace placeholders
@@ -18,6 +19,7 @@ namespace network
    */
   class request
   {
+    friend class client_session_base;
     friend class server_session_base;
 
   public:
