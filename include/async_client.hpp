@@ -29,10 +29,24 @@ namespace network
      * @param req A unique pointer to the request object to be sent.
      * @param cb A callback function to be called with the response once it is received.
      */
-    void send(utils::u_ptr<request> &&req, std::function<void(const response &)> &&cb);
+    void send(utils::u_ptr<request> req, std::function<void(const response &)> &&cb);
+
+    /**
+     * @brief Sends a GET request asynchronously.
+     *
+     * @param target The target URL or path.
+     * @param cb A callback function to be called with the response once it is received.
+     * @param hdrs Optional headers to include in the request.
+     */
+    void get(std::string &&target, std::function<void(const response &)> &&cb, std::map<std::string, std::string> &&hdrs = {})
+    {
+      hdrs["Host"] = host + ":" + std::to_string(port);
+      send(utils::make_u_ptr<request>(verb::Get, std::move(target), "HTTP/1.1", std::move(hdrs)), std::move(cb));
+    }
 
   protected:
     void on_connect(const asio::error_code &ec, const asio::ip::tcp::endpoint &endpoint);
+    void on_write(const asio::error_code &ec, std::size_t bytes_transferred);
 
   private:
     /**
@@ -52,6 +66,8 @@ namespace network
      */
     virtual void disconnect() = 0;
 
+    virtual void write(asio::streambuf &buffer) = 0;
+
   protected:
     const std::string host;                                                // The host name of the server.
     const unsigned short port;                                             // The port number of the server.
@@ -59,8 +75,9 @@ namespace network
     asio::executor_work_guard<asio::io_context::executor_type> work_guard; // Work guard to keep the io_context running.
     std::thread io_thrd;                                                   // Thread for processing asynchronous operations.
   private:
-    asio::ip::tcp::resolver resolver;                          // The resolver used to resolve host names.
-    asio::ip::basic_resolver_results<asio::ip::tcp> endpoints; // The resolved endpoints for the server.
+    asio::ip::tcp::resolver resolver;                                                                  // The resolver used to resolve host names.
+    asio::ip::basic_resolver_results<asio::ip::tcp> endpoints;                                         // The resolved endpoints for the server.
+    std::queue<std::pair<utils::u_ptr<request>, std::function<void(const response &)>>> request_queue; // Queue for pending requests.
   };
 
   class async_client : public async_client_base
@@ -92,6 +109,8 @@ namespace network
      * @brief Disconnects the client from the server.
      */
     void disconnect() override;
+
+    void write(asio::streambuf &buffer) override;
 
   private:
     asio::ip::tcp::socket socket; // The TCP socket used to communicate with the server.
@@ -127,6 +146,8 @@ namespace network
      * @brief Disconnects the client from the server.
      */
     void disconnect() override;
+
+    void write(asio::streambuf &buffer) override;
 
   private:
     asio::ssl::context ssl_ctx;                      // SSL context for secure communication.

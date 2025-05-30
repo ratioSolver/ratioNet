@@ -150,7 +150,7 @@ namespace network
 
     std::size_t read(asio::streambuf &buffer, std::size_t size) override;
     std::size_t read_until(asio::streambuf &buffer, std::string_view delimiter) override;
-    std::size_t write(asio::streambuf &buffer);
+    std::size_t write(asio::streambuf &buffer) override;
 
   private:
     asio::ip::tcp::socket socket; // The TCP socket used to communicate with the server.
@@ -176,7 +176,7 @@ namespace network
 
     std::size_t read(asio::streambuf &buffer, std::size_t size) override;
     std::size_t read_until(asio::streambuf &buffer, std::string_view delimiter) override;
-    std::size_t write(asio::streambuf &buffer);
+    std::size_t write(asio::streambuf &buffer) override;
 
   private:
     asio::ssl::context ssl_ctx;                      // The SSL context used for secure communication.
