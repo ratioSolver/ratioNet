@@ -4,8 +4,12 @@
 
 namespace network
 {
+  class server_session_base;
+
   class server_base
   {
+    friend class server_session_base;
+
   public:
     /**
      * @brief Constructs a server_base instance with the specified host, port, and concurrency hint.
