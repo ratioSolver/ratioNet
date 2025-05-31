@@ -41,4 +41,28 @@ namespace network
         asio::async_read_until(socket, req.get_buffer(), "\r\n\r\n", [self = shared_from_this(), &req](const std::error_code &ec, std::size_t bytes_transferred)
                                { if (ec != asio::error::eof) self->on_read(req, ec, bytes_transferred); });
     }
+
+#ifdef ENABLE_SSL
+    ssl_server_session::ssl_server_session(server_base &server, asio::ssl::stream<asio::ip::tcp::socket> &&socket) : server_session_base(server), socket(std::move(socket)) {}
+
+    void ssl_server_session::handshake()
+    {
+        socket.async_handshake(asio::ssl::stream_base::server, [self = shared_from_this()](const std::error_code &ec)
+                               {
+                                   if (ec)
+                                   {
+                                       LOG_ERR("SSL handshake failed: " + ec.message());
+                                       return;
+                                   }
+                                   self->read(); // Start reading after successful handshake
+                               });
+    }
+
+    void ssl_server_session::read()
+    {
+        request &req = create_request();
+        asio::async_read_until(socket, req.get_buffer(), "\r\n\r\n", [self = shared_from_this(), &req](const std::error_code &ec, std::size_t bytes_transferred)
+                               { if (ec != asio::error::eof) self->on_read(req, ec, bytes_transferred); });
+    }
+#endif
 } // namespace network

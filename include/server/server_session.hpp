@@ -3,6 +3,9 @@
 #include "request.hpp"
 #include "response.hpp"
 #include <asio.hpp>
+#ifdef ENABLE_SSL
+#include <asio/ssl.hpp>
+#endif
 #include <queue>
 
 namespace network
@@ -73,7 +76,6 @@ namespace network
      */
     server_session(server_base &srv, asio::ip::tcp::socket &&socket);
 
-  private:
     /**
      * @brief Performs the read operation to receive requests from the client.
      */
@@ -82,4 +84,39 @@ namespace network
   private:
     asio::ip::tcp::socket socket; // The socket used to communicate with the client.
   };
+
+#ifdef ENABLE_SSL
+  /**
+   * @brief Represents a secure session in the server context.
+   *
+   * This class is used to manage secure sessions within the server, inheriting from server_session_base.
+   */
+  class ssl_server_session : public server_session_base
+  {
+  public:
+    /**
+     * @brief Constructs a secure_server_session instance.
+     *
+     * @param srv The server base associated with this session.
+     * @param socket The SSL socket used to communicate with the client.
+     */
+    ssl_server_session(server_base &srv, asio::ssl::stream<asio::ip::tcp::socket> &&socket);
+
+    /**
+     * @brief Performs the SSL handshake to establish a secure connection.
+     *
+     * This function is called to perform the SSL handshake with the client.
+     * It should be called before any read or write operations.
+     */
+    void handshake();
+
+    /**
+     * @brief Performs the read operation to receive requests from the client.
+     */
+    void read() override;
+
+  private:
+    asio::ssl::stream<asio::ip::tcp::socket> socket; // The SSL socket used for secure communication.
+  };
+#endif
 } // namespace network

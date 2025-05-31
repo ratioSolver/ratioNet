@@ -27,4 +27,14 @@ namespace network
         asio::async_write(socket, req.first->get_buffer(), [self = shared_from_this(), cb = std::move(req.second)](const std::error_code &ec, std::size_t bytes_transferred) mutable
                           { self->on_write(std::move(cb), ec, bytes_transferred); });
     }
+
+#ifdef ENABLE_SSL
+    ssl_client_session::ssl_client_session(async_client_base &client, asio::ssl::stream<asio::ip::tcp::socket> &&socket) : client_session_base(client), socket(std::move(socket)) {}
+    void ssl_client_session::write()
+    {
+        auto &req = get_request();
+        asio::async_write(socket, req.first->get_buffer(), [self = shared_from_this(), cb = std::move(req.second)](const std::error_code &ec, std::size_t bytes_transferred) mutable
+                          { self->on_write(std::move(cb), ec, bytes_transferred); });
+    }
+#endif
 } // namespace network
