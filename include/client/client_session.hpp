@@ -30,6 +30,17 @@ namespace network
     virtual ~client_session_base();
 
     /**
+     * @brief Establishes a connection to one of the provided TCP endpoints.
+     *
+     * This function attempts to connect to one of the resolved TCP endpoints.
+     *
+     * @param endpoints A reference to a list of resolved TCP endpoints to attempt connection.
+     */
+    virtual void connect(asio::ip::basic_resolver_results<asio::ip::tcp> &endpoints) = 0;
+
+    void on_connect(const asio::error_code &ec, const asio::ip::tcp::endpoint &endpoint);
+
+    /**
      * @brief Writes the request to the server.
      *
      * This function is called to send the request to the server.
@@ -72,6 +83,8 @@ namespace network
     client_session(async_client_base &client, asio::ip::tcp::socket &&socket);
 
   private:
+    void connect(asio::ip::basic_resolver_results<asio::ip::tcp> &endpoints) override;
+
     void write() override;
 
   private:
@@ -99,6 +112,8 @@ namespace network
     ssl_client_session(async_client_base &client, asio::ssl::stream<asio::ip::tcp::socket> &&socket);
 
   private:
+    void connect(asio::ip::basic_resolver_results<asio::ip::tcp> &endpoints) override;
+
     void write() override;
 
   private:

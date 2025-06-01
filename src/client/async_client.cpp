@@ -1,4 +1,5 @@
 #include "async_client.hpp"
+#include "client_session.hpp"
 #include "logging.hpp"
 
 namespace network

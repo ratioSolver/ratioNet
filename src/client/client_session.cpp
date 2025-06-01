@@ -15,11 +15,27 @@ namespace network
                    { self->request_queue.emplace(std::move(req), std::move(cb)); });
     }
 
+    void client_session_base::on_connect(const asio::error_code &ec, const asio::ip::tcp::endpoint &endpoint)
+    {
+        if (ec)
+        {
+            LOG_ERR("Connection failed: " + ec.message());
+            return;
+        }
+        LOG_INFO("Connected to " + endpoint.address().to_string() + ":" + std::to_string(endpoint.port()));
+    }
+
     void client_session_base::on_write(std::function<void(const response &)> &&cb, const std::error_code &ec, std::size_t bytes_transferred)
     {
     }
 
     client_session::client_session(async_client_base &client, asio::ip::tcp::socket &&socket) : client_session_base(client), socket(std::move(socket)) {}
+
+    void client_session::connect(asio::ip::basic_resolver_results<asio::ip::tcp> &endpoints)
+    {
+        asio::async_connect(socket, endpoints, [self = shared_from_this()](const asio::error_code &ec, const asio::ip::tcp::endpoint &endpoint) mutable
+                            { self->on_connect(ec, endpoint); });
+    }
 
     void client_session::write()
     {
@@ -30,6 +46,17 @@ namespace network
 
 #ifdef ENABLE_SSL
     ssl_client_session::ssl_client_session(async_client_base &client, asio::ssl::stream<asio::ip::tcp::socket> &&socket) : client_session_base(client), socket(std::move(socket)) {}
+
+    void ssl_client_session::connect(asio::ip::basic_resolver_results<asio::ip::tcp> &endpoints)
+    {
+        asio::async_connect(socket.next_layer(), endpoints, [this, self = shared_from_this()](const asio::error_code &ec, const asio::ip::tcp::endpoint &endpoint) mutable
+                            {
+                                if (ec)
+                                    return self->on_connect(ec, endpoint);
+                                socket.async_handshake(asio::ssl::stream_base::client, [self = shared_from_this(), &endpoint](const asio::error_code &ec)
+                                    { self->on_connect(ec, endpoint); }); });
+    }
+
     void ssl_client_session::write()
     {
         auto &req = get_request();
