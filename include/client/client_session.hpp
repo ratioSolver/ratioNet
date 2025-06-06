@@ -16,48 +16,39 @@ namespace network
   {
   public:
     /**
-     * @brief Constructs a client_session instance.
+     * @brief Constructs a client_session_base instance.
      *
-     * This constructor initializes the session with the provided client base.
+     * This constructor initializes the session with the provided client base and host/port.
      *
      * @param client The client base associated with this session.
+     * @param host The host name of the server (default is SERVER_HOST).
+     * @param port The port number of the server (default is SERVER_PORT).
      */
-    explicit client_session_base(async_client_base &client);
+    explicit client_session_base(async_client_base &client, std::string_view host = SERVER_HOST, unsigned short port = SERVER_PORT);
 
     /**
      * @brief Destroys the client_session instance.
      */
     virtual ~client_session_base();
 
-    /**
-     * @brief Establishes a connection to one of the provided TCP endpoints.
-     *
-     * This function attempts to connect to one of the resolved TCP endpoints.
-     *
-     * @param endpoints A reference to a list of resolved TCP endpoints to attempt connection.
-     */
-    virtual void connect(asio::ip::basic_resolver_results<asio::ip::tcp> &endpoints) = 0;
-
-    void on_connect(const asio::error_code &ec, const asio::ip::tcp::endpoint &endpoint);
-
-    /**
-     * @brief Writes the request to the server.
-     *
-     * This function is called to send the request to the server.
-     */
-    virtual void write() = 0;
-
-    void on_write(std::function<void(const response &)> &&cb, const std::error_code &ec, std::size_t bytes_transferred);
-
-    virtual void read_until(asio::streambuf &buffer, std::string_view delimiter) = 0;
-
-  protected:
-    std::pair<std::unique_ptr<request>, std::function<void(const response &)>> &get_request();
-
-    void enqueue(std::unique_ptr<request> req, std::function<void(const response &)> &&cb);
+    void run();
 
   private:
-    async_client_base &client;                                                                              // Reference to the client base associated with this session
+    virtual void connect(asio::ip::basic_resolver_results<asio::ip::tcp> &endpoints, std::function<void(const asio::error_code &, const asio::ip::tcp::endpoint &)> callback) = 0;
+
+    virtual void read(asio::streambuf &buffer, std::size_t size, std::function<void(const std::error_code &, std::size_t)> callback) = 0;
+    virtual void read_until(asio::streambuf &buffer, std::string_view delimiter, std::function<void(const std::error_code &, std::size_t)> callback) = 0;
+    virtual void write(asio::streambuf &buffer, std::function<void(const std::error_code &, std::size_t)> callback) = 0;
+
+  protected:
+    void enqueue(std::unique_ptr<request> req, std::function<void(const response &)> &&cb);
+    void enqueue(std::unique_ptr<response> res, std::function<void(const response &)> &&cb);
+
+  protected:
+    async_client_base &client; // Reference to the client base associated with this session
+    const std::string host;    // The host name of the server
+    const unsigned short port; // The port number of the server
+  private:
     asio::strand<asio::io_context::executor_type> strand;                                                   // Strand to ensure thread-safe operations within the session
     std::queue<std::pair<std::unique_ptr<request>, std::function<void(const response &)>>> request_queue;   // Queue to hold outgoing requests
     std::queue<std::pair<std::unique_ptr<response>, std::function<void(const response &)>>> response_queue; // Queue to hold incoming responses
@@ -80,12 +71,14 @@ namespace network
      * @param client The client base associated with this session.
      * @param socket The socket used to communicate with the server.
      */
-    client_session(async_client_base &client, asio::ip::tcp::socket &&socket);
+    client_session(async_client_base &client, std::string_view host, unsigned short port, asio::ip::tcp::socket &&socket);
 
   private:
-    void connect(asio::ip::basic_resolver_results<asio::ip::tcp> &endpoints) override;
+    void connect(asio::ip::basic_resolver_results<asio::ip::tcp> &endpoints, std::function<void(const asio::error_code &, const asio::ip::tcp::endpoint &)> callback) override;
 
-    void write() override;
+    void read(asio::streambuf &buffer, std::size_t size, std::function<void(const std::error_code &, std::size_t)> callback) override;
+    void read_until(asio::streambuf &buffer, std::string_view delimiter, std::function<void(const std::error_code &, std::size_t)> callback) override;
+    void write(asio::streambuf &buffer, std::function<void(const std::error_code &, std::size_t)> callback) override;
 
   private:
     asio::ip::tcp::socket socket; // The socket used to communicate with the server.
@@ -109,12 +102,14 @@ namespace network
      * @param client The client base associated with this session.
      * @param socket The SSL socket used to communicate with the server.
      */
-    ssl_client_session(async_client_base &client, asio::ssl::stream<asio::ip::tcp::socket> &&socket);
+    ssl_client_session(async_client_base &client, std::string_view host, unsigned short port, asio::ssl::stream<asio::ip::tcp::socket> &&socket);
 
   private:
-    void connect(asio::ip::basic_resolver_results<asio::ip::tcp> &endpoints) override;
+    void connect(asio::ip::basic_resolver_results<asio::ip::tcp> &endpoints, std::function<void(const asio::error_code &, const asio::ip::tcp::endpoint &)> callback) override;
 
-    void write() override;
+    void read(asio::streambuf &buffer, std::size_t size, std::function<void(const std::error_code &, std::size_t)> callback) override;
+    void read_until(asio::streambuf &buffer, std::string_view delimiter, std::function<void(const std::error_code &, std::size_t)> callback) override;
+    void write(asio::streambuf &buffer, std::function<void(const std::error_code &, std::size_t)> callback) override;
 
   private:
     asio::ssl::stream<asio::ip::tcp::socket> socket; // The SSL socket used to communicate with the server.

@@ -64,7 +64,7 @@ namespace network
     void server::on_accept(const std::error_code &ec, asio::ip::tcp::socket socket)
     {
         if (!ec)
-            std::make_shared<server_session>(*this, std::move(socket))->read();
+            std::make_shared<server_session>(*this, std::move(socket))->run();
         else
             LOG_ERR("Accept error: " + ec.message());
         do_accept();
@@ -76,7 +76,15 @@ namespace network
     void ssl_server::on_accept(const std::error_code &ec, asio::ip::tcp::socket socket)
     {
         if (!ec)
-            std::make_shared<ssl_server_session>(*this, asio::ssl::stream<asio::ip::tcp::socket>(std::move(socket), ssl_ctx))->handshake();
+        {
+            auto session = std::make_shared<ssl_server_session>(*this, asio::ssl::stream<asio::ip::tcp::socket>(std::move(socket), ssl_ctx));
+            session->handshake([this, session](const std::error_code &ec)
+                               {
+                                   if (!ec)
+                                       session->run();
+                                   else
+                                       LOG_ERR("SSL Handshake error: " + ec.message()); });
+        }
         else
             LOG_ERR("SSL Accept error: " + ec.message());
         do_accept();

@@ -30,25 +30,33 @@ namespace network
     virtual ~server_session_base();
 
     /**
-     * @brief Starts the session by initiating the read operation.
+     * @brief Enqueues a request for processing.
      *
-     * This function is called to start the session and begin reading requests.
+     * This method adds a request to the session's request queue for later processing.
+     *
+     * @param req The request to enqueue.
      */
-    virtual void read() = 0;
+    void enqueue(std::unique_ptr<request> req);
+    /**
+     * @brief Enqueues a response for sending.
+     *
+     * This method adds a response to the session's response queue for later sending.
+     *
+     * @param res The response to enqueue.
+     */
+    void enqueue(std::unique_ptr<response> res);
 
     /**
-     * @brief Handles the read operation for incoming requests.
+     * @brief Runs the session to process requests and responses.
      *
-     * @param req The request object to be filled with data.
-     * @param ec The error code indicating the result of the read operation.
-     * @param bytes_transferred The number of bytes transferred during the read operation.
+     * This method is responsible for reading requests, processing them, and sending responses.
      */
-    void on_read(request &req, const std::error_code &ec, std::size_t bytes_transferred);
+    void run();
 
-  protected:
-    request &create_request();
-
-    void enqueue(std::unique_ptr<response> res);
+  private:
+    virtual void read(asio::streambuf &buffer, std::size_t size, std::function<void(const std::error_code &, std::size_t)> callback) = 0;
+    virtual void read_until(asio::streambuf &buffer, std::string_view delimiter, std::function<void(const std::error_code &, std::size_t)> callback) = 0;
+    virtual void write(asio::streambuf &buffer, std::function<void(const std::error_code &, std::size_t)> callback) = 0;
 
   private:
     server_base &server;                                  // Reference to the server base associated with this session
@@ -76,10 +84,9 @@ namespace network
      */
     server_session(server_base &srv, asio::ip::tcp::socket &&socket);
 
-    /**
-     * @brief Performs the read operation to receive requests from the client.
-     */
-    void read() override;
+    void read(asio::streambuf &buffer, std::size_t size, std::function<void(const std::error_code &, std::size_t)> callback) override;
+    void read_until(asio::streambuf &buffer, std::string_view delimiter, std::function<void(const std::error_code &, std::size_t)> callback) override;
+    void write(asio::streambuf &buffer, std::function<void(const std::error_code &, std::size_t)> callback) override;
 
   private:
     asio::ip::tcp::socket socket; // The socket used to communicate with the client.
@@ -103,17 +110,15 @@ namespace network
     ssl_server_session(server_base &srv, asio::ssl::stream<asio::ip::tcp::socket> &&socket);
 
     /**
-     * @brief Performs the SSL handshake to establish a secure connection.
+     * @brief Initiates the SSL handshake.
      *
-     * This function is called to perform the SSL handshake with the client.
-     * It should be called before any read or write operations.
+     * This method is called to perform the SSL handshake with the client.
      */
-    void handshake();
+    void handshake(std::function<void(const std::error_code &)> callback);
 
-    /**
-     * @brief Performs the read operation to receive requests from the client.
-     */
-    void read() override;
+    void read(asio::streambuf &buffer, std::size_t size, std::function<void(const std::error_code &, std::size_t)> callback) override;
+    void read_until(asio::streambuf &buffer, std::string_view delimiter, std::function<void(const std::error_code &, std::size_t)> callback) override;
+    void write(asio::streambuf &buffer, std::function<void(const std::error_code &, std::size_t)> callback) override;
 
   private:
     asio::ssl::stream<asio::ip::tcp::socket> socket; // The SSL socket used for secure communication.

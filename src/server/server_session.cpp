@@ -7,10 +7,10 @@ namespace network
     server_session_base::server_session_base(server_base &server) : server(server), strand(asio::make_strand(server.io_ctx)) {}
     server_session_base::~server_session_base() {}
 
-    request &server_session_base::create_request()
+    void server_session_base::enqueue(std::unique_ptr<request> req)
     {
-        request_queue.push(std::make_unique<request>());
-        return *request_queue.back();
+        asio::post(strand, [self = shared_from_this(), req = std::move(req)]() mutable
+                   { self->request_queue.emplace(std::move(req)); });
     }
 
     void server_session_base::enqueue(std::unique_ptr<response> res)
@@ -19,50 +19,17 @@ namespace network
                    { self->response_queue.emplace(std::move(res)); });
     }
 
-    void server_session_base::on_read(request &req, const std::error_code &ec, std::size_t bytes_transferred)
-    {
-        if (ec)
-        {
-            LOG_ERR(ec.message());
-            return;
-        }
-
-        // the buffer may contain additional bytes beyond the delimiter
-        std::size_t additional_bytes = req.buffer.size() - bytes_transferred;
-
-        req.parse(); // parse the request line and headers
-    }
-
     server_session::server_session(server_base &server, asio::ip::tcp::socket &&socket) : server_session_base(server), socket(std::move(socket)) {}
 
-    void server_session::read()
-    {
-        request &req = create_request();
-        asio::async_read_until(socket, req.get_buffer(), "\r\n\r\n", [self = shared_from_this(), &req](const std::error_code &ec, std::size_t bytes_transferred)
-                               { if (ec != asio::error::eof) self->on_read(req, ec, bytes_transferred); });
-    }
+    void server_session::read(asio::streambuf &buffer, std::size_t size, std::function<void(const std::error_code &, std::size_t)> callback) { asio::async_read(socket, buffer, asio::transfer_exactly(size), callback); }
+    void server_session::read_until(asio::streambuf &buffer, std::string_view delimiter, std::function<void(const std::error_code &, std::size_t)> callback) { asio::async_read_until(socket, buffer, delimiter, callback); }
+    void server_session::write(asio::streambuf &buffer, std::function<void(const std::error_code &, std::size_t)> callback) { asio::async_write(socket, buffer, callback); }
 
 #ifdef ENABLE_SSL
     ssl_server_session::ssl_server_session(server_base &server, asio::ssl::stream<asio::ip::tcp::socket> &&socket) : server_session_base(server), socket(std::move(socket)) {}
 
-    void ssl_server_session::handshake()
-    {
-        socket.async_handshake(asio::ssl::stream_base::server, [self = shared_from_this()](const std::error_code &ec)
-                               {
-                                   if (ec)
-                                   {
-                                       LOG_ERR("SSL handshake failed: " + ec.message());
-                                       return;
-                                   }
-                                   self->read(); // Start reading after successful handshake
-                               });
-    }
-
-    void ssl_server_session::read()
-    {
-        request &req = create_request();
-        asio::async_read_until(socket, req.get_buffer(), "\r\n\r\n", [self = shared_from_this(), &req](const std::error_code &ec, std::size_t bytes_transferred)
-                               { if (ec != asio::error::eof) self->on_read(req, ec, bytes_transferred); });
-    }
+    void ssl_server_session::read(asio::streambuf &buffer, std::size_t size, std::function<void(const std::error_code &, std::size_t)> callback) { asio::async_read(socket, buffer, asio::transfer_exactly(size), callback); }
+    void ssl_server_session::read_until(asio::streambuf &buffer, std::string_view delimiter, std::function<void(const std::error_code &, std::size_t)> callback) { asio::async_read_until(socket, buffer, delimiter, callback); }
+    void ssl_server_session::write(asio::streambuf &buffer, std::function<void(const std::error_code &, std::size_t)> callback) { asio::async_write(socket, buffer, callback); }
 #endif
 } // namespace network
