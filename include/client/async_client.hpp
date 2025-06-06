@@ -16,50 +16,37 @@ namespace network
     friend class client_session_base;
 
   public:
-    async_client_base(std::string_view host = SERVER_HOST, unsigned short port = SERVER_PORT);
+    async_client_base();
     virtual ~async_client_base();
 
-    /**
-     * @brief Sends a GET request asynchronously.
-     *
-     * @param target The target URL or path.
-     * @param cb A callback function to be called with the response once it is received.
-     * @param hdrs Optional headers to include in the request.
-     */
-    void get(std::string &&target, std::function<void(const response &)> &&cb, std::map<std::string, std::string> &&hdrs = {})
-    {
-      hdrs["Host"] = host + ":" + std::to_string(port);
-      send(std::make_unique<request>(verb::Get, std::move(target), "HTTP/1.1", std::move(hdrs)), std::move(cb));
-    }
+    std::shared_ptr<client_session_base> get_session(std::string_view host, unsigned short port);
 
-    /**
-     * @brief Sends a request asynchronously and invokes a callback upon receiving the response.
-     *
-     * @param req A unique pointer to the request object to be sent.
-     * @param cb A callback function to be called with the response once it is received.
-     */
-    void send(std::unique_ptr<request> req, std::function<void(const response &)> &&cb);
+  private:
+    virtual std::shared_ptr<client_session_base> create_session(std::string_view host, unsigned short port) = 0;
 
   protected:
-    const std::string host;    // The host name of the server.
-    const unsigned short port; // The port number of the server.
-    asio::io_context io_ctx;   // The I/O context used for asynchronous operations.
+    asio::io_context io_ctx; // The I/O context used for asynchronous operations.
   private:
-    asio::ip::tcp::resolver resolver;                          // The resolver used to resolve host names.
-    asio::ip::basic_resolver_results<asio::ip::tcp> endpoints; // The resolved endpoints for the server.
+    std::unordered_map<std::string, std::shared_ptr<client_session_base>> sessions; // A map of active client sessions.
+    asio::executor_work_guard<asio::io_context::executor_type> work_guard;          // Work guard to keep the io_context running.
+    std::thread io_thrd;                                                            // Thread for processing asynchronous operations.
   };
 
   class async_client : public async_client_base
   {
   public:
-    async_client(std::string_view host = SERVER_HOST, unsigned short port = SERVER_PORT);
+    async_client();
+
+    std::shared_ptr<client_session_base> create_session(std::string_view host, unsigned short port) override;
   };
 
 #ifdef ENABLE_SSL
   class ssl_async_client : public async_client_base
   {
   public:
-    ssl_async_client(std::string_view host = SERVER_HOST, unsigned short port = SERVER_PORT);
+    ssl_async_client();
+
+    std::shared_ptr<client_session_base> create_session(std::string_view host, unsigned short port) override;
 
   private:
     asio::ssl::context ssl_ctx; // The SSL context used for secure connections.

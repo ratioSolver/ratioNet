@@ -35,7 +35,7 @@ namespace network
      * @param ver The HTTP version of the request.
      * @param hdrs The headers of the request.
      */
-    request(verb v, std::string &&trgt, std::string &&ver, std::map<std::string, std::string> &&hdrs) : v(v), target(trgt), version(ver), headers(hdrs) {}
+    request(verb v, std::string_view trgt, std::string_view ver, std::map<std::string, std::string> &&hdrs) : v(v), target(trgt), version(ver), headers(hdrs) {}
 
     /**
      * @brief Destructor.
@@ -187,7 +187,7 @@ namespace network
       return os;
     }
 
-    void add_header(std::string &&header, std::string &&value) { headers.emplace(std::move(header), std::move(value)); }
+    void add_header(std::string_view header, std::string_view value) { headers.emplace(std::move(header), std::move(value)); }
 
   private:
     verb v;                                     // The HTTP verb of the request
@@ -200,7 +200,7 @@ namespace network
   class string_request : public request
   {
   public:
-    string_request(verb v, std::string &&trgt, std::string &&ver, std::map<std::string, std::string> &&hdrs, std::string &&b) : request(v, std::move(trgt), std::move(ver), std::move(hdrs)), body(std::move(b))
+    string_request(verb v, std::string_view trgt, std::string_view ver, std::map<std::string, std::string> &&hdrs, std::string &&b) : request(v, std::move(trgt), std::move(ver), std::move(hdrs)), body(std::move(b))
     {
       add_header("content-type", "text/plain");
       add_header("content-length", std::to_string(body.size()));
@@ -222,7 +222,7 @@ namespace network
   class json_request : public request
   {
   public:
-    json_request(verb v, std::string &&trgt, std::string &&ver, std::map<std::string, std::string> &&hdrs, json::json &&b) : request(v, std::move(trgt), std::move(ver), std::move(hdrs)), body(b), str_body(body.dump())
+    json_request(verb v, std::string_view trgt, std::string_view ver, std::map<std::string, std::string> &&hdrs, json::json &&b) : request(v, std::move(trgt), std::move(ver), std::move(hdrs)), body(b), str_body(body.dump())
     {
       add_header("content-type", "application/json");
       add_header("content-length", std::to_string(str_body.size()));

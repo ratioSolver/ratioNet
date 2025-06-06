@@ -31,7 +31,20 @@ namespace network
      */
     virtual ~client_session_base();
 
-    void run();
+    /**
+     * @brief Sends a GET request asynchronously.
+     *
+     * This method sends a GET request to the specified target resource on the server.
+     *
+     * @param target The target resource on the server.
+     * @param cb A callback function to be called with the response once it is received.
+     * @param hdrs Optional headers to include in the request.
+     */
+    void get(std::string_view target, std::function<void(const response &)> &&cb, std::map<std::string, std::string> &&hdrs = {})
+    {
+      hdrs["Host"] = std::string(host) + ":" + std::to_string(port);
+      enqueue(std::make_unique<request>(verb::Get, target, "HTTP/1.1", std::move(hdrs)), std::move(cb));
+    }
 
   private:
     virtual void connect(asio::ip::basic_resolver_results<asio::ip::tcp> &endpoints, std::function<void(const asio::error_code &, const asio::ip::tcp::endpoint &)> callback) = 0;
@@ -48,6 +61,9 @@ namespace network
     async_client_base &client; // Reference to the client base associated with this session
     const std::string host;    // The host name of the server
     const unsigned short port; // The port number of the server
+  private:
+    asio::ip::tcp::resolver resolver;                          // The resolver used to resolve host names.
+    asio::ip::basic_resolver_results<asio::ip::tcp> endpoints; // The resolved endpoints for the server.
   private:
     asio::strand<asio::io_context::executor_type> strand;                                                   // Strand to ensure thread-safe operations within the session
     std::queue<std::pair<std::unique_ptr<request>, std::function<void(const response &)>>> request_queue;   // Queue to hold outgoing requests

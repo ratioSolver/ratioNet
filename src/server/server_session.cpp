@@ -7,6 +7,10 @@ namespace network
     server_session_base::server_session_base(server_base &server) : server(server), strand(asio::make_strand(server.io_ctx)) {}
     server_session_base::~server_session_base() {}
 
+    void server_session_base::run()
+    {
+    }
+
     void server_session_base::enqueue(std::unique_ptr<request> req)
     {
         asio::post(strand, [self = shared_from_this(), req = std::move(req)]() mutable
