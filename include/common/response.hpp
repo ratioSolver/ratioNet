@@ -10,7 +10,7 @@ namespace network
 {
   class server;
   class client_base;
-  class async_client_base;
+  class client_session_base;
   class ws_client;
 
   /**
@@ -20,7 +20,7 @@ namespace network
   {
     friend class server;
     friend class client_base;
-    friend class async_client_base;
+    friend class client_session_base;
     friend class ws_client;
 
   public:

@@ -43,19 +43,24 @@ namespace network
     void get(std::string_view target, std::function<void(const response &)> &&cb, std::map<std::string, std::string> &&hdrs = {})
     {
       hdrs["Host"] = std::string(host) + ":" + std::to_string(port);
-      enqueue(std::make_unique<request>(verb::Get, target, "HTTP/1.1", std::move(hdrs)), std::move(cb));
+      send(std::make_unique<request>(verb::Get, target, "HTTP/1.1", std::move(hdrs)), std::move(cb));
     }
 
+    void send(std::unique_ptr<request> req, std::function<void(const response &)> &&cb);
+
   private:
+    virtual bool is_connected() const = 0;
     virtual void connect(asio::ip::basic_resolver_results<asio::ip::tcp> &endpoints, std::function<void(const asio::error_code &, const asio::ip::tcp::endpoint &)> callback) = 0;
 
     virtual void read(asio::streambuf &buffer, std::size_t size, std::function<void(const std::error_code &, std::size_t)> callback) = 0;
     virtual void read_until(asio::streambuf &buffer, std::string_view delimiter, std::function<void(const std::error_code &, std::size_t)> callback) = 0;
     virtual void write(asio::streambuf &buffer, std::function<void(const std::error_code &, std::size_t)> callback) = 0;
 
-  protected:
-    void enqueue(std::unique_ptr<request> req, std::function<void(const response &)> &&cb);
-    void enqueue(std::unique_ptr<response> res, std::function<void(const response &)> &&cb);
+    void on_connect(const asio::error_code &ec, const asio::ip::tcp::endpoint &endpoint);
+    void on_write(const asio::error_code &ec, std::size_t bytes_transferred);
+    void on_read_headers(const asio::error_code &ec, std::size_t bytes_transferred);
+    void on_read_body(const asio::error_code &ec, std::size_t bytes_transferred);
+    void read_chunk(std::string body = "");
 
   protected:
     async_client_base &client; // Reference to the client base associated with this session
@@ -90,6 +95,7 @@ namespace network
     client_session(async_client_base &client, std::string_view host, unsigned short port, asio::ip::tcp::socket &&socket);
 
   private:
+    bool is_connected() const override;
     void connect(asio::ip::basic_resolver_results<asio::ip::tcp> &endpoints, std::function<void(const asio::error_code &, const asio::ip::tcp::endpoint &)> callback) override;
 
     void read(asio::streambuf &buffer, std::size_t size, std::function<void(const std::error_code &, std::size_t)> callback) override;
@@ -121,6 +127,7 @@ namespace network
     ssl_client_session(async_client_base &client, std::string_view host, unsigned short port, asio::ssl::stream<asio::ip::tcp::socket> &&socket);
 
   private:
+    bool is_connected() const override;
     void connect(asio::ip::basic_resolver_results<asio::ip::tcp> &endpoints, std::function<void(const asio::error_code &, const asio::ip::tcp::endpoint &)> callback) override;
 
     void read(asio::streambuf &buffer, std::size_t size, std::function<void(const std::error_code &, std::size_t)> callback) override;
