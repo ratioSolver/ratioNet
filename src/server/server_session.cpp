@@ -2,6 +2,7 @@
 #include "server.hpp"
 #include "sha1.hpp"
 #include "base64.hpp"
+#include "ws_server_session.hpp"
 #include "logging.hpp"
 
 namespace network
@@ -86,9 +87,6 @@ namespace network
     }
     void server_session_base::on_read_body(const asio::error_code &ec, std::size_t bytes_transferred) {}
     void server_session_base::read_chunk(std::string body) {}
-
-    ws_server_session_base::ws_server_session_base(server_base &server, asio::io_context::executor_type executor) : server(server), strand(asio::make_strand(executor)) {}
-    ws_server_session_base::~ws_server_session_base() {}
 
     server_session::server_session(server_base &server, asio::ip::tcp::socket &&socket) : server_session_base(server), socket(std::move(socket)) {}
 

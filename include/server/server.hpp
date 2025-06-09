@@ -13,10 +13,12 @@
 namespace network
 {
   class server_session_base;
+  class ws_server_session_base;
 
   class server_base
   {
     friend class server_session_base;
+    friend class ws_server_session_base;
 
   public:
     /**
@@ -67,6 +69,11 @@ namespace network
     virtual void on_accept(const std::error_code &ec, asio::ip::tcp::socket socket) = 0;
 
     void handle_request(server_session_base &s, std::unique_ptr<request> req);
+
+    void on_connect(ws_server_session_base &s);
+    void on_disconnect(ws_server_session_base &s);
+    void on_message(ws_server_session_base &s, message &msg);
+    void on_error(ws_server_session_base &s, const std::error_code &ec);
 
   private:
     asio::io_context io_ctx;                              // The io_context is required for all I/O
