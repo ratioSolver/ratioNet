@@ -58,6 +58,14 @@ namespace network
         io_ctx.run();
     }
 
+    void server_base::stop()
+    {
+        LOG_DEBUG("Stopping server");
+        io_ctx.stop();
+        for (auto &thread : threads)
+            thread.join();
+    }
+
     void server_base::add_route(verb v, std::string_view path, std::function<std::unique_ptr<response>(request &)> &&handler) noexcept
     {
         routes[v].emplace_back(path, std::move(handler));

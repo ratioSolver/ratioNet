@@ -15,6 +15,15 @@ namespace network
         read(incoming_messages.front()->get_buffer(), 2, std::bind(&ws_server_session_base::on_read, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
     }
 
+    void ws_server_session_base::enqueue(std::unique_ptr<message> msg)
+    {
+        asio::post(executor, [this, self = shared_from_this(), msg = std::move(msg)]() mutable
+                   {
+                       outgoing_messages.emplace(std::move(msg));
+                       if (outgoing_messages.size() == 1)
+                           write(outgoing_messages.front()->get_buffer(), std::bind(&ws_server_session_base::on_write, self, std::placeholders::_1, std::placeholders::_2)); });
+    }
+
     void ws_server_session_base::on_read(const asio::error_code &ec, std::size_t)
     {
         if (ec == asio::error::eof)
@@ -101,7 +110,13 @@ namespace network
 
     ws_server_session::ws_server_session(server_base &server, std::string_view path, asio::ip::tcp::socket &&socket) : ws_server_session_base(server, path, socket.get_executor()), socket(std::move(socket)) {}
 
+    void ws_server_session::read(asio::streambuf &buffer, std::size_t size, std::function<void(const std::error_code &, std::size_t)> callback) { asio::async_read(socket, buffer, asio::transfer_exactly(size), std::move(callback)); }
+    void ws_server_session::write(asio::streambuf &buffer, std::function<void(const std::error_code &, std::size_t)> callback) { asio::async_write(socket, buffer, std::move(callback)); }
+
 #ifdef ENABLE_SSL
     wss_server_session::wss_server_session(server_base &server, std::string_view path, asio::ssl::stream<asio::ip::tcp::socket> &&socket) : ws_server_session_base(server, path, socket.get_executor()), socket(std::move(socket)) {}
+
+    void wss_server_session::read(asio::streambuf &buffer, std::size_t size, std::function<void(const std::error_code &, std::size_t)> callback) { asio::async_read(socket, buffer, asio::transfer_exactly(size), std::move(callback)); }
+    void wss_server_session::write(asio::streambuf &buffer, std::function<void(const std::error_code &, std::size_t)> callback) { asio::async_write(socket, buffer, std::move(callback)); }
 #endif
 } // namespace network

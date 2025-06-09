@@ -129,10 +129,6 @@ namespace network
     void read(asio::streambuf &buffer, std::size_t size, std::function<void(const std::error_code &, std::size_t)> callback) override;
     void write(asio::streambuf &buffer, std::function<void(const std::error_code &, std::size_t)> callback) override;
 
-    void on_read(const asio::error_code &ec, std::size_t bytes_transferred);
-    void on_message(const asio::error_code &ec, std::size_t bytes_transferred);
-    void on_write(const asio::error_code &ec, std::size_t bytes_transferred);
-
   private:
     asio::ssl::stream<asio::ip::tcp::socket> socket; // The SSL socket used to communicate with the client.
   };

@@ -190,6 +190,8 @@ namespace network
 #ifdef ENABLE_SSL
     ssl_server_session::ssl_server_session(server_base &server, asio::ssl::stream<asio::ip::tcp::socket> &&socket) : server_session_base(server), socket(std::move(socket)) {}
 
+    void ssl_server_session::handshake(std::function<void(const std::error_code &)> callback) { socket.async_handshake(asio::ssl::stream_base::server, callback); }
+
     void ssl_server_session::on_upgrade(const asio::error_code &ec, std::size_t)
     {
         if (ec)
