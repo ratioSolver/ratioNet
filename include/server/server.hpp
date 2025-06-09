@@ -68,7 +68,7 @@ namespace network
   private:
     virtual void on_accept(const std::error_code &ec, asio::ip::tcp::socket socket) = 0;
 
-    void handle_request(server_session_base &s, std::unique_ptr<request> req);
+    void handle_request(server_session_base &s, request &req);
 
     void on_connect(ws_server_session_base &s);
     void on_disconnect(ws_server_session_base &s);

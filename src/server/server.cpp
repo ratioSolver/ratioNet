@@ -1,5 +1,6 @@
 #include "server.hpp"
 #include "server_session.hpp"
+#include "ws_server_session.hpp"
 #include "logging.hpp"
 
 namespace network
@@ -59,24 +60,24 @@ namespace network
 
     void server_base::do_accept() { acceptor.async_accept(asio::make_strand(io_ctx), std::bind(&server_base::on_accept, this, asio::placeholders::error, std::placeholders::_2)); }
 
-    void server_base::handle_request(server_session_base &s, std::unique_ptr<request> req)
+    void server_base::handle_request(server_session_base &s, request &req)
     {
         // read next request if connection is keep-alive
-        if (req->is_keep_alive())
+        if (req.is_keep_alive())
             s.run(); // read next request
 
-        if (auto it = routes.find(req->get_verb()); it != routes.end())
+        if (auto it = routes.find(req.get_verb()); it != routes.end())
             for (const auto &r : it->second)
-                if (r.match(req->get_target()))
+                if (r.match(req.get_target()))
                 {
                     try
                     {
                         for (auto &m : middlewares)
-                            m->before_request(*req);
+                            m->before_request(req);
                         // call the route handler
-                        auto res = r.get_handler()(*req);
+                        auto res = r.get_handler()(req);
                         for (auto &m : middlewares)
-                            m->after_request(*req, *res);
+                            m->after_request(req, *res);
                         s.enqueue(std::move(res));
                     }
                     catch (const std::exception &e)
@@ -87,9 +88,55 @@ namespace network
                     return;
                 }
 
-        LOG_WARN("No route for " + req->get_target());
+        LOG_WARN("No route for " + req.get_target());
         json::json msg = {{"message", "Not Found"}};
         s.enqueue(std::make_unique<json_response>(json::json(msg), status_code::not_found));
+    }
+
+    void server_base::on_connect(ws_server_session_base &s)
+    {
+        if (auto it = ws_routes.find(s.path); it != ws_routes.end())
+            it->second.on_open_handler(s);
+        else
+            LOG_WARN("No route for " + s.path);
+    }
+    void server_base::on_disconnect(ws_server_session_base &s)
+    {
+        if (auto it = ws_routes.find(s.path); it != ws_routes.end())
+            it->second.on_close_handler(s);
+        else
+            LOG_WARN("No route for " + s.path);
+    }
+    void server_base::on_message(ws_server_session_base &s, message &msg)
+    {
+        switch (msg.get_fin_rsv_opcode() & 0x0F)
+        {
+        case 0x00: // continuation
+        case 0x01: // text
+        case 0x02: // binary
+            if (auto it = ws_routes.find(s.path); it != ws_routes.end())
+                it->second.on_message_handler(s, msg.get_payload());
+            else
+                LOG_WARN("No route for " + s.path);
+            break;
+        case 0x08: // close
+            s.close();
+            break;
+        case 0x09: // ping
+            s.pong();
+            break;
+        case 0x0A: // pong
+            break;
+        default:
+            LOG_ERR("Unknown opcode");
+        }
+    }
+    void server_base::on_error(ws_server_session_base &s, const std::error_code &ec)
+    {
+        if (auto it = ws_routes.find(s.path); it != ws_routes.end())
+            it->second.on_error_handler(s, ec);
+        else
+            LOG_WARN("No route for " + s.path + " - Error: " + ec.message());
     }
 
     server::server(std::string_view host, unsigned short port, std::size_t concurrency_hint) : server_base(host, port, concurrency_hint) {}

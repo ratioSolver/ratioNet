@@ -22,9 +22,10 @@ namespace network
      * This constructor initializes the WebSocket session with the provided server base and executor.
      *
      * @param server The server base associated with this WebSocket session.
+     * @param path The path for the WebSocket session.
      * @param executor The executor to use for asynchronous operations.
      */
-    ws_server_session_base(server_base &server, asio::any_io_executor executor);
+    ws_server_session_base(server_base &server, std::string_view path, asio::any_io_executor executor);
     /**
      * @brief Destroys the WebSocket server session base.
      */
@@ -87,6 +88,7 @@ namespace network
 
   private:
     server_base &server;                                    // Reference to the server base associated with this WebSocket session
+    std::string path;                                       // The path for the WebSocket session
     asio::any_io_executor &executor;                        // The executor used for asynchronous operations
     std::queue<std::unique_ptr<message>> incoming_messages; // Queue to hold incoming WebSocket messages
     std::queue<std::unique_ptr<message>> outgoing_messages; // Queue to hold outgoing WebSocket messages
@@ -95,7 +97,7 @@ namespace network
   class ws_server_session : public ws_server_session_base
   {
   public:
-    ws_server_session(server_base &srv, asio::ip::tcp::socket &&socket);
+    ws_server_session(server_base &srv, std::string_view path, asio::ip::tcp::socket &&socket);
 
   private:
     void read(asio::streambuf &buffer, std::size_t size, std::function<void(const std::error_code &, std::size_t)> callback) override;
@@ -114,7 +116,7 @@ namespace network
      * @param srv The server base associated with this session.
      * @param socket The SSL socket used to communicate with the client.
      */
-    wss_server_session(server_base &srv, asio::ssl::stream<asio::ip::tcp::socket> &&socket);
+    wss_server_session(server_base &srv, std::string_view path, asio::ssl::stream<asio::ip::tcp::socket> &&socket);
 
   private:
     void read(asio::streambuf &buffer, std::size_t size, std::function<void(const std::error_code &, std::size_t)> callback) override;

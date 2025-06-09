@@ -46,6 +46,12 @@ namespace network
      */
     void enqueue(std::unique_ptr<response> res);
 
+  protected:
+    request &get_next_request() { return *request_queue.front(); }
+    const request &get_next_request() const { return *request_queue.front(); }
+    response &get_next_response() { return *response_queue.front(); }
+    const response &get_next_response() const { return *response_queue.front(); }
+
   private:
     void upgrade();
 

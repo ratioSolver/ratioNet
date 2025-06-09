@@ -4,7 +4,7 @@
 
 namespace network
 {
-    ws_server_session_base::ws_server_session_base(server_base &server, asio::any_io_executor executor) : server(server), executor(executor) {}
+    ws_server_session_base::ws_server_session_base(server_base &server, std::string_view path, asio::any_io_executor executor) : server(server), path(path), executor(executor) {}
     ws_server_session_base::~ws_server_session_base() { LOG_TRACE("WebSocket server session destroyed"); }
 
     void ws_server_session_base::run()
@@ -99,9 +99,9 @@ namespace network
             write(outgoing_messages.front()->get_buffer(), std::bind(&ws_server_session_base::on_write, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
     }
 
-    ws_server_session::ws_server_session(server_base &server, asio::ip::tcp::socket &&socket) : ws_server_session_base(server, socket.get_executor()), socket(std::move(socket)) {}
+    ws_server_session::ws_server_session(server_base &server, std::string_view path, asio::ip::tcp::socket &&socket) : ws_server_session_base(server, path, socket.get_executor()), socket(std::move(socket)) {}
 
 #ifdef ENABLE_SSL
-    wss_server_session::wss_server_session(server_base &server, asio::ssl::stream<asio::ip::tcp::socket> &&socket) : ws_server_session_base(server, socket.get_executor()), socket(std::move(socket)) {}
+    wss_server_session::wss_server_session(server_base &server, std::string_view path, asio::ssl::stream<asio::ip::tcp::socket> &&socket) : ws_server_session_base(server, path, socket.get_executor()), socket(std::move(socket)) {}
 #endif
 } // namespace network
