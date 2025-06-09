@@ -10,9 +10,10 @@ namespace network
     void ws_server_session_base::run()
     {
         LOG_TRACE("WebSocket server session started");
+        server.on_connect(*this);
         incoming_messages.emplace(std::make_unique<message>());
         // Start reading the first two bytes to determine the message type and size
-        read(incoming_messages.front()->get_buffer(), 2, std::bind(&ws_server_session_base::on_read, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
+        read(incoming_messages.front()->buffer, 2, std::bind(&ws_server_session_base::on_read, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
     }
 
     void ws_server_session_base::enqueue(std::unique_ptr<message> msg)
@@ -90,7 +91,7 @@ namespace network
         server.on_message(*this, *msg);
         incoming_messages.pop();
         if (!incoming_messages.empty())
-            read(incoming_messages.front()->get_buffer(), 2, std::bind(&ws_server_session_base::on_read, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
+            read(incoming_messages.front()->buffer, 2, std::bind(&ws_server_session_base::on_read, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
     }
 
     void ws_server_session_base::on_write(const asio::error_code &ec, std::size_t)

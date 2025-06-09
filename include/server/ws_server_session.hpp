@@ -96,7 +96,7 @@ namespace network
   private:
     server_base &server;                                    // Reference to the server base associated with this WebSocket session
     std::string path;                                       // The path for the WebSocket session
-    asio::any_io_executor &executor;                        // The executor used for asynchronous operations
+    asio::any_io_executor executor;                         // The executor used for asynchronous operations
     std::queue<std::unique_ptr<message>> incoming_messages; // Queue to hold incoming WebSocket messages
     std::queue<std::unique_ptr<message>> outgoing_messages; // Queue to hold outgoing WebSocket messages
   };

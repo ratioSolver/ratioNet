@@ -9,6 +9,14 @@ namespace network
   class client_session_base;
   class server_session_base;
 
+  inline bool iequals(const std::string &a, const char *b)
+  {
+    if (a.size() != std::strlen(b))
+      return false;
+    return std::equal(a.begin(), a.end(), b, [](unsigned char c1, unsigned char c2)
+                      { return std::tolower(c1) == std::tolower(c2); });
+  }
+
   namespace placeholders
   {
     static constexpr auto &request = std::placeholders::_1;
@@ -79,7 +87,17 @@ namespace network
      *
      * @return true if the request is an upgrade request for a WebSocket connection, false otherwise.
      */
-    bool is_upgrade() const { return headers.find("upgrade") != headers.end() && headers.at("upgrade") == "websocket"; }
+    bool is_upgrade() const
+    {
+      auto upgrade_it = headers.find("upgrade");
+      if (upgrade_it == headers.end())
+        return false;
+      auto connection_it = headers.find("connection");
+      if (connection_it == headers.end())
+        return false;
+      // Case-insensitive compare for 'websocket' and 'upgrade'
+      return iequals(upgrade_it->second, "websocket") && iequals(connection_it->second, "upgrade");
+    }
 
     /**
      * Checks if the request is a keep-alive request.
@@ -88,7 +106,14 @@ namespace network
      *
      * @return true if the request is a keep-alive request, false otherwise.
      */
-    bool is_keep_alive() const { return headers.find("connection") != headers.end() && headers.at("connection") == "keep-alive"; }
+    bool is_keep_alive() const
+    {
+      auto connection_it = headers.find("connection");
+      if (connection_it == headers.end())
+        return false;
+      // Case-insensitive compare for 'keep-alive'
+      return iequals(connection_it->second, "keep-alive");
+    }
 
     /**
      * @brief Get the buffer containing the request.
@@ -151,8 +176,14 @@ namespace network
 
       // Read headers
       std::string line;
-      while (std::getline(is, line) && line != "\r")
+      while (std::getline(is, line))
       {
+        if (!line.empty() && line.back() == '\r')
+          line.pop_back(); // Remove trailing '\r' if present (for CRLF line endings)
+
+        if (line.empty())
+          break; // Empty line signals end of headers
+
         auto colon = line.find(':');
         if (colon != std::string::npos)
         {
