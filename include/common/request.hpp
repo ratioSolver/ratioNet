@@ -149,27 +149,27 @@ namespace network
       is.get(); // consume '\r'
       is.get(); // consume '\n'
 
-      while (is.peek() != '\r')
+      // Read headers
+      std::string line;
+      while (std::getline(is, line) && line != "\r")
       {
-        std::string header, value;
-        while (is.peek() != ':')
-          header += static_cast<char>(is.get());
-        is.get(); // consume ':'
-        is.get(); // consume space
-        while (is.peek() != '\r')
-          value += static_cast<char>(is.get());
-        is.get(); // consume '\r'
-        is.get(); // consume '\n'
+        auto colon = line.find(':');
+        if (colon != std::string::npos)
+        {
+          std::string header = line.substr(0, colon);
+          std::string value = line.substr(colon + 1);
 
-        // convert header to lowercase
-        std::transform(header.begin(), header.end(), header.begin(), [](unsigned char c)
-                       { return std::tolower(c); });
+          // trim leading spaces
+          size_t start = value.find_first_not_of(" ");
+          if (start != std::string::npos)
+            value = value.substr(start);
 
-        // add header to the map
-        headers.emplace(std::move(header), std::move(value));
+          std::transform(header.begin(), header.end(), header.begin(), [](unsigned char c)
+                         { return std::tolower(c); });
+
+          headers.emplace(std::move(header), std::move(value));
+        }
       }
-      is.get(); // consume '\r'
-      is.get(); // consume '\n'
     }
 
   protected:

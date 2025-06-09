@@ -17,7 +17,11 @@ namespace network
                                } });
     }
 
-    server_base::~server_base() { stop(); }
+    server_base::~server_base()
+    {
+        if (acceptor.is_open())
+            stop();
+    }
 
     void server_base::start()
     {
@@ -61,6 +65,7 @@ namespace network
     void server_base::stop()
     {
         LOG_DEBUG("Stopping server");
+        acceptor.close();
         io_ctx.stop();
         for (auto &thread : threads)
             thread.join();
@@ -162,7 +167,10 @@ namespace network
         if (ec)
             LOG_ERR("Accept error: " + ec.message());
         else
+        {
+            LOG_DEBUG("Accepted connection from " + socket.remote_endpoint().address().to_string() + ":" + std::to_string(socket.remote_endpoint().port()));
             std::make_shared<server_session>(*this, std::move(socket))->run();
+        }
         do_accept();
     }
 

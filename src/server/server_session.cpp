@@ -14,7 +14,7 @@ namespace network
     {
         request_queue.emplace(std::make_unique<request>());
         if (request_queue.size() == 1) // If this is the first request, start reading headers
-            read_until(get_next_request().get_buffer(), "\r\n\r\n", std::bind(&server_session_base::on_read_headers, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
+            read_until(get_next_request().buffer, "\r\n\r\n", std::bind(&server_session_base::on_read_headers, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
     }
 
     void server_session_base::upgrade()
@@ -77,7 +77,7 @@ namespace network
         auto &req = get_next_request(); // Get the current request object
 
         // the buffer may contain additional bytes beyond the delimiter
-        std::size_t additional_bytes = req.get_buffer().size() - bytes_transferred;
+        std::size_t additional_bytes = req.buffer.size() - bytes_transferred;
 
         req.parse(); // parse the request line and headers
 

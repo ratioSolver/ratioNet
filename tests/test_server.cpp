@@ -12,8 +12,6 @@
  * - A JSON route ("/json") that returns a JSON response with a message "Hello, World!".
  * - A WebSocket route ("/ws") that returns an HTML page with a WebSocket client script.
  *
- * If SSL is enabled (ENABLE_SSL), the server loads the SSL certificate and key.
- *
  * The WebSocket route ("/ws") also sets up handlers for WebSocket events:
  * - on_open: Sends "Hello, World!" when a WebSocket connection is opened.
  * - on_message: Echoes back any received message.
@@ -44,12 +42,26 @@ void test_rest_server()
 
     std::thread t{[&server]
                   { server.start(); }};
-    std::this_thread::sleep_for(std::chrono::seconds(50));
+    std::this_thread::sleep_for(std::chrono::seconds(500));
     server.stop();
     t.join();
 }
 
 #ifdef ENABLE_SSL
+/**
+ * @brief Test function to set up and run an SSL server with various routes.
+ *
+ * This function initializes a network SSL server and sets up several routes:
+ * - A root route ("/") that returns an HTML response with "Hello, World!".
+ * - A JSON route ("/json") that returns a JSON response with a message "Hello, World!".
+ * - A WebSocket route ("/ws") that returns an HTML page with a WebSocket client script.
+ *
+ * The WebSocket route ("/ws") also sets up handlers for WebSocket events:
+ * - on_open: Sends "Hello, World!" when a WebSocket connection is opened.
+ * - on_message: Echoes back any received message.
+ *
+ * The server runs in a separate thread for 5 seconds before stopping.
+ */
 void test_ssl_server()
 {
     network::ssl_server server;
