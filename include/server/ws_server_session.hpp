@@ -58,6 +58,13 @@ namespace network
     void send(std::shared_ptr<std::string> payload) { enqueue(std::make_unique<message>(payload)); }
 
     /**
+     * Sends a message over the WebSocket session.
+     *
+     * @param payload The payload to be sent.
+     */
+    void send(std::string_view payload) { send(std::make_shared<std::string>(payload)); }
+
+    /**
      * @brief Sends a WebSocket Pong frame to the client.
      *
      * This function enqueues a Pong message (opcode 0x8A) to maintain the connection alive

@@ -15,7 +15,7 @@ namespace network
         read(incoming_messages.front()->get_buffer(), 2, std::bind(&ws_server_session_base::on_read, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
     }
 
-    void ws_server_session_base::on_read(const asio::error_code &ec, std::size_t bytes_transferred)
+    void ws_server_session_base::on_read(const asio::error_code &ec, std::size_t)
     {
         if (ec == asio::error::eof)
         { // connection closed by client
@@ -84,7 +84,7 @@ namespace network
             read(incoming_messages.front()->get_buffer(), 2, std::bind(&ws_server_session_base::on_read, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
     }
 
-    void ws_server_session_base::on_write(const asio::error_code &ec, std::size_t bytes_transferred)
+    void ws_server_session_base::on_write(const asio::error_code &ec, std::size_t)
     {
         if (ec)
         {

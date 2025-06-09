@@ -58,6 +58,14 @@ namespace network
         io_ctx.run();
     }
 
+    void server_base::add_route(verb v, std::string_view path, std::function<std::unique_ptr<response>(request &)> &&handler) noexcept
+    {
+        routes[v].emplace_back(path, std::move(handler));
+        for (auto &m : middlewares)
+            m->added_route(v, routes[v].back());
+        LOG_DEBUG("Added route: " + std::string(path) + " for verb: " + to_string(v));
+    }
+
     void server_base::do_accept() { acceptor.async_accept(asio::make_strand(io_ctx), std::bind(&server_base::on_accept, this, asio::placeholders::error, std::placeholders::_2)); }
 
     void server_base::handle_request(server_session_base &s, request &req)
@@ -152,6 +160,14 @@ namespace network
 
 #ifdef ENABLE_SSL
     ssl_server::ssl_server(std::string_view host, unsigned short port, std::size_t concurrency_hint) : server_base(host, port, concurrency_hint), ssl_ctx(asio::ssl::context::TLS_VERSION) {}
+
+    void ssl_server::load_certificate(std::string_view cert_file, std::string_view key_file)
+    {
+        LOG_DEBUG("Loading certificate: " + std::string(cert_file));
+        ssl_ctx.use_certificate_chain_file(cert_file.data());
+        LOG_DEBUG("Loading private key: " + std::string(key_file));
+        ssl_ctx.use_private_key_file(key_file.data(), asio::ssl::context::pem);
+    }
 
     void ssl_server::on_accept(const std::error_code &ec, asio::ip::tcp::socket socket)
     {

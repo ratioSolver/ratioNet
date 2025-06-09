@@ -4,6 +4,7 @@
 #include "route.hpp"
 #include "ws_handler.hpp"
 #include "server_session.hpp"
+#include "ws_server_session.hpp"
 #include "middleware.hpp"
 #include <asio.hpp>
 #ifdef ENABLE_SSL
@@ -54,6 +55,62 @@ namespace network
      */
     void stop();
 
+    /**
+     * Adds a route to the server.
+     *
+     * @param v The HTTP verb associated with the route.
+     * @param path The path of the route.
+     * @param handler The handler function that will be called when the route is requested.
+     */
+    void add_route(verb v, std::string_view path, std::function<std::unique_ptr<response>(request &)> &&handler) noexcept;
+
+    /**
+     * @brief Retrieves the collection of routes registered on the server.
+     *
+     * This function provides access to the internal mapping of HTTP verbs
+     * to their corresponding routes. The returned map associates each HTTP
+     * verb with a vector of routes that are handled by the server.
+     *
+     * @return A constant reference to a map where the keys are HTTP verbs
+     *         (of type `verb`) and the values are vectors of routes (of type `route`).
+     */
+    [[nodiscard]] const std::map<verb, std::vector<route>> &get_routes() const noexcept { return routes; }
+
+    /**
+     * Adds a WebSocket route to the server.
+     *
+     * This function adds a WebSocket route to the server, allowing clients to establish WebSocket connections
+     * to the specified path.
+     *
+     * @param path The path of the WebSocket route.
+     * @return A reference to the `ws_handler` associated with the added route.
+     */
+    ws_handler &add_ws_route(std::string_view path) noexcept { return ws_routes[path.data()]; }
+
+    /**
+     * @brief Retrieves the collection of WebSocket routes registered on the server.
+     *
+     * This function provides access to the internal mapping of WebSocket routes.
+     * The returned map associates each WebSocket route path with its corresponding
+     * handler function.
+     *
+     * @return A constant reference to a map where the keys are WebSocket route paths
+     *         (of type `std::string`) and the values are `ws_handler` objects that
+     *         handle the WebSocket connections.
+     */
+    [[nodiscard]] const std::map<std::string, ws_handler> &get_ws_routes() const noexcept { return ws_routes; }
+
+    /**
+     * @brief Adds a middleware to the server.
+     *
+     * This function constructs a middleware object of type Tp using the provided arguments
+     * and adds it to the list of middlewares. The middleware type Tp must inherit from
+     * network::middleware.
+     *
+     * @tparam Tp The type of the middleware to add. Must derive from network::middleware.
+     * @tparam Args The types of the arguments to forward to the middleware's constructor.
+     * @param args Arguments to forward to the middleware's constructor.
+     */
     template <typename Tp, typename... Args>
     void add_middleware(Args &&...args)
     {
@@ -124,6 +181,16 @@ namespace network
      *        Defaults to the number of hardware threads available.
      */
     ssl_server(std::string_view host = SERVER_HOST, unsigned short port = SERVER_PORT, std::size_t concurrency_hint = std::thread::hardware_concurrency());
+
+    /**
+     * @brief Load the server's certificate and private key.
+     *
+     * This function loads the server's certificate and private key from the specified files.
+     *
+     * @param cert_file The path to the certificate file.
+     * @param key_file The path to the private key file.
+     */
+    void load_certificate(std::string_view cert_file, std::string_view key_file);
 
   private:
     /**
