@@ -59,14 +59,47 @@ namespace network
 
     void server_base::do_accept() { acceptor.async_accept(asio::make_strand(io_ctx), std::bind(&server_base::on_accept, this, asio::placeholders::error, std::placeholders::_2)); }
 
+    void server_base::handle_request(server_session_base &s, std::unique_ptr<request> req)
+    {
+        // read next request if connection is keep-alive
+        if (req->is_keep_alive())
+            s.run(); // read next request
+
+        if (auto it = routes.find(req->get_verb()); it != routes.end())
+            for (const auto &r : it->second)
+                if (r.match(req->get_target()))
+                {
+                    try
+                    {
+                        for (auto &m : middlewares)
+                            m->before_request(*req);
+                        // call the route handler
+                        auto res = r.get_handler()(*req);
+                        for (auto &m : middlewares)
+                            m->after_request(*req, *res);
+                        s.enqueue(std::move(res));
+                    }
+                    catch (const std::exception &e)
+                    {
+                        LOG_ERR(e.what());
+                        s.enqueue(std::make_unique<json_response>(json::json{{"message", "Internal Server Error"}}, status_code::internal_server_error));
+                    }
+                    return;
+                }
+
+        LOG_WARN("No route for " + req->get_target());
+        json::json msg = {{"message", "Not Found"}};
+        s.enqueue(std::make_unique<json_response>(json::json(msg), status_code::not_found));
+    }
+
     server::server(std::string_view host, unsigned short port, std::size_t concurrency_hint) : server_base(host, port, concurrency_hint) {}
 
     void server::on_accept(const std::error_code &ec, asio::ip::tcp::socket socket)
     {
-        if (!ec)
-            std::make_shared<server_session>(*this, std::move(socket))->run();
-        else
+        if (ec)
             LOG_ERR("Accept error: " + ec.message());
+        else
+            std::make_shared<server_session>(*this, std::move(socket))->run();
         do_accept();
     }
 
@@ -75,18 +108,18 @@ namespace network
 
     void ssl_server::on_accept(const std::error_code &ec, asio::ip::tcp::socket socket)
     {
-        if (!ec)
+        if (ec)
+            LOG_ERR("SSL Accept error: " + ec.message());
+        else
         {
             auto session = std::make_shared<ssl_server_session>(*this, asio::ssl::stream<asio::ip::tcp::socket>(std::move(socket), ssl_ctx));
             session->handshake([this, session](const std::error_code &ec)
                                {
-                                   if (!ec)
-                                       session->run();
+                                   if (ec)
+                                       LOG_ERR("SSL Handshake error: " + ec.message());
                                    else
-                                       LOG_ERR("SSL Handshake error: " + ec.message()); });
+                                       session->run(); });
         }
-        else
-            LOG_ERR("SSL Accept error: " + ec.message());
         do_accept();
     }
 #endif

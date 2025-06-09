@@ -1,5 +1,7 @@
 #include "server_session.hpp"
 #include "server.hpp"
+#include "sha1.hpp"
+#include "base64.hpp"
 #include "logging.hpp"
 
 namespace network
@@ -9,21 +11,97 @@ namespace network
 
     void server_session_base::run()
     {
+        request_queue.emplace(std::make_unique<request>());
+        if (request_queue.size() == 1) // If this is the first request, start reading headers
+            read_until(request_queue.front()->get_buffer(), "\r\n\r\n", std::bind(&server_session_base::on_read_headers, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
     }
 
-    void server_session_base::enqueue(std::unique_ptr<request> req)
+    void server_session_base::upgrade()
     {
-        asio::post(strand, [self = shared_from_this(), req = std::move(req)]() mutable
-                   { self->request_queue.emplace(std::move(req)); });
+        auto &req = request_queue.front(); // Get the current request object
+
+        auto key_it = req->headers.find("sec-websocket-key");
+        if (key_it == req->headers.end())
+        {
+            LOG_ERR("WebSocket key not found");
+            return;
+        }
+
+        // the handshake response, the key is concatenated with the GUID and hashed with SHA-1 and then base64 encoded
+        utils::sha1 sha1(key_it->second + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
+        uint8_t digest[20];
+        sha1.get_digest_bytes(digest);
+        std::string key = utils::base64_encode(digest, 20);
+
+        // create the upgrade response
+        response_queue.emplace(std::make_unique<response>(status_code::websocket_switching_protocols, std::map<std::string, std::string>{{"Upgrade", "websocket"}, {"Connection", "Upgrade"}, {"Sec-WebSocket-Accept", key}}));
+        write(response_queue.front()->get_buffer(), std::bind(&server_session_base::on_upgrade, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
     }
 
     void server_session_base::enqueue(std::unique_ptr<response> res)
     {
-        asio::post(strand, [self = shared_from_this(), res = std::move(res)]() mutable
-                   { self->response_queue.emplace(std::move(res)); });
+        asio::post(strand, [this, self = shared_from_this(), res = std::move(res)]() mutable
+                   { response_queue.emplace(std::move(res));
+                     if (response_queue.size() == 1) // If this is the first response, start writing
+                         write(response_queue.front()->get_buffer(), std::bind(&server_session_base::on_write, shared_from_this(), std::placeholders::_1, std::placeholders::_2)); });
     }
 
+    void server_session_base::on_write(const asio::error_code &ec, std::size_t bytes_transferred) {}
+    void server_session_base::on_read_headers(const asio::error_code &ec, std::size_t bytes_transferred)
+    {
+        if (ec == asio::error::eof)
+            return; // connection closed by client
+#ifdef ENABLE_SSL
+        else if (ec == asio::ssl::error::stream_truncated)
+            return; // connection closed by client
+#endif
+        else if (ec)
+        {
+            LOG_ERR(ec.message());
+            return;
+        }
+
+        auto &req = request_queue.front(); // Get the current request object
+
+        // the buffer may contain additional bytes beyond the delimiter
+        std::size_t additional_bytes = req->get_buffer().size() - bytes_transferred;
+
+        req->parse(); // parse the request line and headers
+
+        if (req->is_upgrade()) // handle websocket upgrade request
+            return upgrade();
+
+        if (req->headers.find("content-length") != req->headers.end())
+        { // read body
+            std::size_t content_length = std::stoul(req->headers["content-length"]);
+            if (content_length > additional_bytes) // read the remaining body
+                read(req->buffer, content_length - additional_bytes, std::bind(&server_session_base::on_read_body, shared_from_this(), asio::placeholders::error, asio::placeholders::bytes_transferred));
+            else // the buffer contains the entire body
+                on_read_body(ec, bytes_transferred);
+        }
+        else if (req->headers.find("transfer-encoding") != req->headers.end() && req->headers.at("transfer-encoding") == "chunked")
+            read_chunk();
+        else // no body
+            server.handle_request(*this, std::move(req));
+    }
+    void server_session_base::on_read_body(const asio::error_code &ec, std::size_t bytes_transferred) {}
+    void server_session_base::read_chunk(std::string body) {}
+
+    ws_server_session_base::ws_server_session_base(server_base &server, asio::io_context::executor_type executor) : server(server), strand(asio::make_strand(executor)) {}
+    ws_server_session_base::~ws_server_session_base() {}
+
     server_session::server_session(server_base &server, asio::ip::tcp::socket &&socket) : server_session_base(server), socket(std::move(socket)) {}
+
+    void server_session::on_upgrade(const asio::error_code &ec, std::size_t bytes_transferred)
+    {
+        if (ec)
+        {
+            LOG_ERR(ec.message());
+            return;
+        }
+        // the upgrade response has been sent, now we can start a WebSocket session
+        std::make_shared<ws_server_session>(get_server(), std::move(socket))->run();
+    }
 
     void server_session::read(asio::streambuf &buffer, std::size_t size, std::function<void(const std::error_code &, std::size_t)> callback) { asio::async_read(socket, buffer, asio::transfer_exactly(size), callback); }
     void server_session::read_until(asio::streambuf &buffer, std::string_view delimiter, std::function<void(const std::error_code &, std::size_t)> callback) { asio::async_read_until(socket, buffer, delimiter, callback); }
@@ -31,6 +109,17 @@ namespace network
 
 #ifdef ENABLE_SSL
     ssl_server_session::ssl_server_session(server_base &server, asio::ssl::stream<asio::ip::tcp::socket> &&socket) : server_session_base(server), socket(std::move(socket)) {}
+
+    void ssl_server_session::on_upgrade(const asio::error_code &ec, std::size_t)
+    {
+        if (ec)
+        {
+            LOG_ERR(ec.message());
+            return;
+        }
+        // the upgrade response has been sent, now we can start a WebSocket session
+        std::make_shared<wss_server_session>(get_server(), std::move(socket))->run();
+    }
 
     void ssl_server_session::read(asio::streambuf &buffer, std::size_t size, std::function<void(const std::error_code &, std::size_t)> callback) { asio::async_read(socket, buffer, asio::transfer_exactly(size), callback); }
     void ssl_server_session::read_until(asio::streambuf &buffer, std::string_view delimiter, std::function<void(const std::error_code &, std::size_t)> callback) { asio::async_read_until(socket, buffer, delimiter, callback); }

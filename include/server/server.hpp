@@ -1,5 +1,10 @@
 #pragma once
 
+#include "verb.hpp"
+#include "route.hpp"
+#include "ws_handler.hpp"
+#include "server_session.hpp"
+#include "middleware.hpp"
 #include <asio.hpp>
 #ifdef ENABLE_SSL
 #include <asio/ssl.hpp>
@@ -47,18 +52,31 @@ namespace network
      */
     void stop();
 
+    template <typename Tp, typename... Args>
+    void add_middleware(Args &&...args)
+    {
+      static_assert(std::is_base_of<middleware, Tp>::value, "Middleware must inherit from network::middleware");
+      auto m = std::make_unique<Tp>(std::forward<Args>(args)...);
+      middlewares.push_back(std::move(m));
+    }
+
   protected:
     void do_accept();
 
   private:
     virtual void on_accept(const std::error_code &ec, asio::ip::tcp::socket socket) = 0;
 
+    void handle_request(server_session_base &s, std::unique_ptr<request> req);
+
   private:
-    asio::io_context io_ctx;                // The io_context is required for all I/O
-    asio::signal_set signals;               // The signal_set is used to handle signals
-    std::vector<std::thread> threads;       // The thread pool
-    const asio::ip::tcp::endpoint endpoint; // The endpoint for the server
-    asio::ip::tcp::acceptor acceptor;       // The acceptor for the server
+    asio::io_context io_ctx;                              // The io_context is required for all I/O
+    asio::signal_set signals;                             // The signal_set is used to handle signals
+    std::vector<std::thread> threads;                     // The thread pool
+    const asio::ip::tcp::endpoint endpoint;               // The endpoint for the server
+    asio::ip::tcp::acceptor acceptor;                     // The acceptor for the server
+    std::map<verb, std::vector<route>> routes;            // The routes of the server
+    std::map<std::string, ws_handler> ws_routes;          // The WebSocket routes of the server
+    std::vector<std::unique_ptr<middleware>> middlewares; // The middlewares of the server
   };
 
   class server : public server_base
