@@ -49,20 +49,22 @@ namespace network
         size_t length = len & 0x7F; // length of the payload
         if (length == 126)
             read(msg->buffer, 2, [self = shared_from_this(), &msg](const std::error_code &, std::size_t)
-                 { char buf[2];
-                                      std::istream is(&msg->buffer);
-                                      is.read(buf, 2);
-                                      size_t length = (buf[0] << 8) | buf[1];
-                                      self->read(msg->buffer, length + 4, std::bind(&ws_server_session_base::on_message, self, asio::placeholders::error, asio::placeholders::bytes_transferred)); });
+                 {
+                    char buf[2];
+                    std::istream is(&msg->buffer);
+                    is.read(buf, 2);
+                    size_t length = (buf[0] << 8) | buf[1];
+                    self->read(msg->buffer, length + 4, std::bind(&ws_server_session_base::on_message, self, asio::placeholders::error, asio::placeholders::bytes_transferred)); });
         else if (length == 127)
             read(msg->buffer, 8, [self = shared_from_this(), &msg](const std::error_code &, std::size_t)
-                 { char buf[8];
-                                      std::istream is(&msg->buffer);
-                                      is.read(buf, 8);
-                                      size_t length = 0;
-                                      for (size_t i = 0; i < 8; i++)
-                                          length = (length << 8) | buf[i];
-                                      self->read(msg->buffer, length + 4, std::bind(&ws_server_session_base::on_message, self, asio::placeholders::error, asio::placeholders::bytes_transferred)); });
+                 {
+                    char buf[8];
+                    std::istream is(&msg->buffer);
+                    is.read(buf, 8);
+                    size_t length = 0;
+                    for (size_t i = 0; i < 8; i++)
+                        length = (length << 8) | buf[i];
+                    self->read(msg->buffer, length + 4, std::bind(&ws_server_session_base::on_message, self, asio::placeholders::error, asio::placeholders::bytes_transferred)); });
         else
             read(msg->buffer, length + 4, std::bind(&ws_server_session_base::on_message, shared_from_this(), asio::placeholders::error, asio::placeholders::bytes_transferred));
     }
@@ -89,9 +91,13 @@ namespace network
             *msg->payload += is.get() ^ mask[i % 4];
 
         server.on_message(*this, *msg);
+
+        // Remove the processed message from the queue
         incoming_messages.pop();
-        if (!incoming_messages.empty())
-            read(incoming_messages.front()->buffer, 2, std::bind(&ws_server_session_base::on_read, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
+
+        // Read the next message
+        incoming_messages.emplace(std::make_unique<message>());
+        read(incoming_messages.front()->buffer, 2, std::bind(&ws_server_session_base::on_read, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
     }
 
     void ws_server_session_base::on_write(const asio::error_code &ec, std::size_t)

@@ -190,7 +190,7 @@ namespace network
                 } });
     }
 
-    client_session::client_session(async_client_base &client, std::string_view host, unsigned short port, asio::ip::tcp::socket &&socket) : client_session_base(client, host, port), socket(std::move(socket)) {}
+    client_session::client_session(async_client_base &client, std::string_view host, unsigned short port, asio::ip::tcp::socket &&socket) : client_session_base(client, host, port), socket(std::move(socket)) { client_session_base::connect(); }
     client_session::~client_session()
     { // Ensure the session is disconnected when destroyed..
         if (is_connected())
@@ -227,6 +227,7 @@ namespace network
             LOG_ERR("SSL_set_tlsext_host_name failed");
             throw std::runtime_error("SSL_set_tlsext_host_name failed");
         }
+        client_session_base::connect();
     }
     ssl_client_session::~ssl_client_session()
     { // Ensure the session is disconnected when destroyed..

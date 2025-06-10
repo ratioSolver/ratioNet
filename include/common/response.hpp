@@ -11,7 +11,7 @@ namespace network
   class server;
   class client_base;
   class client_session_base;
-  class ws_client;
+  class ws_client_session_base;
 
   /**
    * @brief Represents an HTTP response.
@@ -21,7 +21,7 @@ namespace network
     friend class server;
     friend class client_base;
     friend class client_session_base;
-    friend class ws_client;
+    friend class ws_client_session_base;
 
   public:
     /**

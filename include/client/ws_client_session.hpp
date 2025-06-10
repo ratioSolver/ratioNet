@@ -36,7 +36,12 @@ namespace network
     void set_on_close(std::function<void()> handler) { on_close_handler = handler; }
     void set_on_error(std::function<void(const std::error_code &)> handler) { on_error_handler = handler; }
 
-    void connect();
+    /**
+     * @brief Starts the WebSocket client session.
+     *
+     * This function initializes the WebSocket client session and prepares it for communication.
+     */
+    void run();
 
     void enqueue(std::unique_ptr<message> msg);
 
@@ -50,10 +55,17 @@ namespace network
 
     void close() { enqueue(std::make_unique<message>(0x88)); }
 
+    void connect();
+
+    virtual bool is_connected() const = 0;
+
+    virtual void disconnect() = 0;
+
   private:
     virtual void connect(asio::ip::basic_resolver_results<asio::ip::tcp> &endpoints, std::function<void(const asio::error_code &, const asio::ip::tcp::endpoint &)> callback) = 0;
 
     virtual void read(asio::streambuf &buffer, std::size_t size, std::function<void(const std::error_code &, std::size_t)> callback) = 0;
+    virtual void read_until(asio::streambuf &buffer, std::string_view delimiter, std::function<void(const std::error_code &, std::size_t)> callback) = 0;
     virtual void write(asio::streambuf &buffer, std::function<void(const std::error_code &, std::size_t)> callback) = 0;
 
     void on_connect(const asio::error_code &ec, const asio::ip::tcp::endpoint &endpoint);
@@ -74,6 +86,8 @@ namespace network
     std::function<void(std::string_view)> on_message_handler;      // The handler for the message event.
     std::function<void()> on_close_handler;                        // The handler for the close event.
     std::function<void(const std::error_code &)> on_error_handler; // The handler for the error event.
+    std::queue<std::unique_ptr<message>> incoming_messages;        // Queue to hold incoming WebSocket messages
+    std::queue<std::unique_ptr<message>> outgoing_messages;        // Queue to hold outgoing WebSocket messages
   };
 
   class ws_client_session : public ws_client_session_base
@@ -98,10 +112,15 @@ namespace network
      */
     ~ws_client_session() override;
 
+    bool is_connected() const override;
+
+    void disconnect() override;
+
   private:
     void connect(asio::ip::basic_resolver_results<asio::ip::tcp> &endpoints, std::function<void(const asio::error_code &, const asio::ip::tcp::endpoint &)> callback) override;
 
     void read(asio::streambuf &buffer, std::size_t size, std::function<void(const std::error_code &, std::size_t)> callback) override;
+    void read_until(asio::streambuf &buffer, std::string_view delimiter, std::function<void(const std::error_code &, std::size_t)> callback) override;
     void write(asio::streambuf &buffer, std::function<void(const std::error_code &, std::size_t)> callback) override;
 
   private:
@@ -131,10 +150,15 @@ namespace network
      */
     ~wss_client_session() override;
 
+    bool is_connected() const override;
+
+    void disconnect() override;
+
   private:
     void connect(asio::ip::basic_resolver_results<asio::ip::tcp> &endpoints, std::function<void(const asio::error_code &, const asio::ip::tcp::endpoint &)> callback) override;
 
     void read(asio::streambuf &buffer, std::size_t size, std::function<void(const std::error_code &, std::size_t)> callback) override;
+    void read_until(asio::streambuf &buffer, std::string_view delimiter, std::function<void(const std::error_code &, std::size_t)> callback) override;
     void write(asio::streambuf &buffer, std::function<void(const std::error_code &, std::size_t)> callback) override;
 
   private:
