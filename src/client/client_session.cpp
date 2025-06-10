@@ -262,6 +262,8 @@ namespace network
                             {
                                 if (ec)
                                     return callback(ec, endpoint);
+                                socket.set_verify_mode(asio::ssl::verify_peer);
+                                socket.set_verify_callback(asio::ssl::host_name_verification(host));
                                 socket.async_handshake(asio::ssl::stream_base::client, [self = shared_from_this(), callback, &endpoint](const asio::error_code &ec)
                                     { callback(ec, endpoint); }); });
     }

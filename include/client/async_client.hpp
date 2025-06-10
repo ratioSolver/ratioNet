@@ -10,10 +10,12 @@
 namespace network
 {
   class client_session_base;
+  class ws_client_session_base;
 
   class async_client_base
   {
     friend class client_session_base;
+    friend class ws_client_session_base;
 
   public:
     async_client_base();
