@@ -226,6 +226,7 @@ namespace network
     std::string version;                        // The HTTP version of the request
     std::map<std::string, std::string> headers; // The headers of the request
     asio::streambuf buffer;                     // The buffer containing the request
+    std::string accumulated_body;               // Accumulated body for chunked requests
   };
 
   class string_request : public request

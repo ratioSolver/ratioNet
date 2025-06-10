@@ -164,8 +164,9 @@ namespace network
     std::map<std::string, std::string> headers; // The headers of the response
 
   private:
-    std::string version;    // The HTTP version of the response
-    asio::streambuf buffer; // The buffer containing the response
+    std::string version;          // The HTTP version of the response
+    asio::streambuf buffer;       // The buffer containing the response
+    std::string accumulated_body; // Accumulated body for chunked responses
   };
 
   /**

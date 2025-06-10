@@ -86,18 +86,27 @@ namespace network
         }
 
         auto &res = response_queue.front().first; // Get the current response object..
-        std::istream is(&res->buffer);
         if (res->headers.find("content-type") != res->headers.end() && res->headers["content-type"].find("application/json") != std::string::npos)
         {
-            json::json body = json::load(is); // Parse JSON response
-            res = std::make_unique<json_response>(std::move(body), res->get_status_code(), std::move(res->headers), std::move(res->version));
+            if (!res->accumulated_body.empty())
+                res = std::make_unique<json_response>(json::load(res->accumulated_body), res->get_status_code(), std::move(res->headers), std::move(res->version)); // If the response is JSON, parse it..
+            else
+            {
+                std::istream is(&res->buffer);
+                res = std::make_unique<json_response>(json::load(is), res->get_status_code(), std::move(res->headers), std::move(res->version));
+            }
         }
         else
         {
-            std::string body;
-            body.reserve(res->buffer.size());
-            body.assign(asio::buffers_begin(res->buffer.data()), asio::buffers_end(res->buffer.data()));
-            res = std::make_unique<string_response>(std::move(body), res->get_status_code(), std::move(res->headers), std::move(res->version)); // Handle string response
+            if (!res->accumulated_body.empty())
+                res = std::make_unique<string_response>(std::move(res->accumulated_body), res->get_status_code(), std::move(res->headers), std::move(res->version)); // If the response is a string, use the accumulated body..
+            else
+            {
+                std::string body;
+                body.reserve(res->buffer.size());
+                body.assign(asio::buffers_begin(res->buffer.data()), asio::buffers_end(res->buffer.data()));
+                res = std::make_unique<string_response>(std::move(body), res->get_status_code(), std::move(res->headers), std::move(res->version)); // Handle string response
+            }
         }
 
         response_queue.front().second(*res); // Call the callback with the response..
@@ -106,9 +115,9 @@ namespace network
         if (!response_queue.empty())
             read_until(response_queue.front().first->buffer, "\r\n\r\n", std::bind(&client_session_base::on_read_headers, shared_from_this(), std::placeholders::_1, std::placeholders::_2)); // Start reading the next response headers..
     }
-    void client_session_base::read_chunk(std::string body)
+    void client_session_base::read_chunk()
     {
-        read_until(response_queue.front().first->buffer, "\r\n", [self = shared_from_this(), body = std::move(body)](const std::error_code &ec, std::size_t bytes_transferred)
+        read_until(response_queue.front().first->buffer, "\r\n", [self = shared_from_this()](const std::error_code &ec, std::size_t bytes_transferred)
                    {
             if (ec)
             {
@@ -121,11 +130,29 @@ namespace network
             // The buffer may contain additional bytes beyond the delimiter
             std::size_t additional_bytes = res.buffer.size() - bytes_transferred;
 
-            std::string chunk_size_str(asio::buffers_begin(res.buffer.data()), asio::buffers_begin(res.buffer.data()) + bytes_transferred);
-            res.buffer.consume(bytes_transferred); // Remove the chunk size from the buffer..
-
-            std::size_t chunk_size = std::stoul(chunk_size_str, nullptr, 16); // Convert chunk size from hex to decimal
-            if (chunk_size == 0)                                              // If chunk size is 0, read the trailing CRLF
+            std::string chunk_size;
+            std::vector<std::string> extensions;
+            std::istream is(&res.buffer);
+            while (is.peek() != '\r' && is.peek() != ';')
+                chunk_size += is.get();
+            if (is.peek() == ';')
+            {
+                is.get(); // consume ';'
+                while (is.peek() != '\r')
+                {
+                    std::string extension;
+                    while (is.peek() != ';' && is.peek() != '\r')
+                        extension += is.get();
+                    extensions.push_back(std::move(extension));
+                    if (is.peek() == ';')
+                        is.get(); // consume ';'
+                }
+            }
+            is.get(); // consume '\r'
+            is.get(); // consume '\n'
+            
+            std::size_t size = std::stoul(chunk_size, nullptr, 16);
+            if (size == 0) // If chunk size is 0, read the trailing CRLF
                 self->read_until(res.buffer, "\r\n", [self, &res](const std::error_code &ec, std::size_t bytes_transferred)
                                  {
                                      if (ec)
@@ -136,22 +163,25 @@ namespace network
                                      res.buffer.consume(2);                     // Consume the trailing CRLF
                                      self->on_read_body(ec, bytes_transferred); // Call on_read_body to process the response
                                  });
-            else if (chunk_size > additional_bytes) // If chunk size is greater than additional bytes, read the remaining chunk
-                self->read(res.buffer, chunk_size - additional_bytes, [self, chunk_size, body = std::move(body), &res](const std::error_code &ec, std::size_t)
+            else if (size > additional_bytes) // If chunk size is greater than additional bytes, read the remaining chunk
+                self->read(res.buffer, size - additional_bytes, [self, size, &res](const std::error_code &ec, std::size_t)
                            {
                                if (ec)
                                {
                                    LOG_ERR("Error reading chunk body: " << ec.message());
                                    return;
                                }
-                               std::string chunk_body(asio::buffers_begin(res.buffer.data()), asio::buffers_begin(res.buffer.data()) + chunk_size);
-                               self->read_chunk(body+chunk_body); // Read the next chunk
-                           });
+                               res.accumulated_body.reserve(res.accumulated_body.size() + size);
+                               res.accumulated_body.append(asio::buffers_begin(res.buffer.data()), asio::buffers_begin(res.buffer.data()) + size);
+                               res.buffer.consume(size + 2); // Consume the chunk body and the trailing CRLF
+                               self->read_chunk();
+                            });
             else 
                 { // The buffer contains the entire chunk, append it to the body and read the next chunk
-                    std::string chunk_body(asio::buffers_begin(res.buffer.data()), asio::buffers_begin(res.buffer.data()) + chunk_size);
-                    res.buffer.consume(2); // Consume the chunk body and the trailing CRLF
-                    self->read_chunk(body + chunk_body); // Read the next chunk
+                    res.accumulated_body.reserve(res.accumulated_body.size() + size);
+                    res.accumulated_body.append(asio::buffers_begin(res.buffer.data()), asio::buffers_begin(res.buffer.data()) + size);
+                    res.buffer.consume(size + 2); // Consume the chunk body and the trailing CRLF
+                    self->read_chunk(); // Read the next chunk
                 } });
     }
 
@@ -166,7 +196,7 @@ namespace network
 #ifdef ENABLE_SSL
     ssl_client_session::ssl_client_session(async_client_base &client, std::string_view host, unsigned short port, asio::ssl::stream<asio::ip::tcp::socket> &&socket) : client_session_base(client, host, port), socket(std::move(socket))
     {
-        if (!SSL_set_tlsext_host_name(socket.native_handle(), host.data()))
+        if (!SSL_set_tlsext_host_name(this->socket.native_handle(), host.data()))
         {
             LOG_ERR("SSL_set_tlsext_host_name failed");
             throw std::runtime_error("SSL_set_tlsext_host_name failed");

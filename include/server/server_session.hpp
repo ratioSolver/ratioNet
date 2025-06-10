@@ -64,7 +64,7 @@ namespace network
     void on_write(const asio::error_code &ec, std::size_t bytes_transferred);
     void on_read_headers(const asio::error_code &ec, std::size_t bytes_transferred);
     void on_read_body(const asio::error_code &ec, std::size_t bytes_transferred);
-    void read_chunk(std::string body = "");
+    void read_chunk();
 
   private:
     server_base &server;                                  // Reference to the server base associated with this session

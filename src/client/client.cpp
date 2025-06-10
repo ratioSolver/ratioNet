@@ -79,7 +79,6 @@ namespace network
         }
         else if (res->get_headers().find("transfer-encoding") != res->get_headers().end() && res->get_headers().at("transfer-encoding") == "chunked")
         {
-            std::string body;
             while (true)
             {
                 bytes_transferred = read_until(res->buffer, "\r\n"); // read the chunk size
@@ -134,14 +133,14 @@ namespace network
                         return nullptr;
                     }
                 }
-                body.reserve(body.size() + size);
-                body.append(asio::buffers_begin(res->buffer.data()), asio::buffers_begin(res->buffer.data()) + size);
+                res->accumulated_body.reserve(res->accumulated_body.size() + size);
+                res->accumulated_body.append(asio::buffers_begin(res->buffer.data()), asio::buffers_begin(res->buffer.data()) + size);
                 res->buffer.consume(size + 2); // consume chunk and '\r\n'
             }
             if (res->get_headers().find("content-type") != res->get_headers().end() && res->get_headers().at("content-type") == "application/json")
-                res = utils::make_u_ptr<json_response>(json::load(body), res->get_status_code(), std::move(res->headers));
+                res = utils::make_u_ptr<json_response>(json::load(res->accumulated_body), res->get_status_code(), std::move(res->headers));
             else
-                res = utils::make_u_ptr<string_response>(std::move(body), res->get_status_code(), std::move(res->headers));
+                res = utils::make_u_ptr<string_response>(std::move(res->accumulated_body), res->get_status_code(), std::move(res->headers));
         }
 
         if (res->get_headers().find("connection") != res->get_headers().end() && res->get_headers().at("connection") == "close")
