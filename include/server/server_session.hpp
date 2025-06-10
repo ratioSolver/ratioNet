@@ -46,6 +46,20 @@ namespace network
      */
     void enqueue(std::unique_ptr<response> res);
 
+    /**
+     * @brief Checks if the session is connected.
+     *
+     * This method returns true if the session is currently connected to the client.
+     *
+     * @return True if connected, false otherwise.
+     */
+    virtual bool is_connected() const = 0;
+
+    /**
+     * @brief Disconnects the current session.
+     */
+    virtual void disconnect() = 0;
+
   protected:
     request &get_next_request() { return *request_queue.front(); }
     const request &get_next_request() const { return *request_queue.front(); }
@@ -91,6 +105,10 @@ namespace network
      * @param socket The socket used to communicate with the client.
      */
     server_session(server_base &srv, asio::ip::tcp::socket &&socket);
+    ~server_session() override;
+
+    bool is_connected() const override;
+    void disconnect() override;
 
   private:
     void on_upgrade(const asio::error_code &ec, std::size_t bytes_transferred) override;
@@ -119,6 +137,7 @@ namespace network
      * @param socket The SSL socket used to communicate with the client.
      */
     ssl_server_session(server_base &srv, asio::ssl::stream<asio::ip::tcp::socket> &&socket);
+    ~ssl_server_session() override;
 
     /**
      * @brief Initiates the SSL handshake.
@@ -126,6 +145,9 @@ namespace network
      * This method is called to perform the SSL handshake with the client.
      */
     void handshake(std::function<void(const std::error_code &)> callback);
+
+    bool is_connected() const override;
+    void disconnect() override;
 
   private:
     void on_upgrade(const asio::error_code &ec, std::size_t bytes_transferred) override;

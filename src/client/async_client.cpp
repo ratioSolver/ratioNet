@@ -9,7 +9,12 @@ namespace network
         io_thrd = std::thread([this]
                               { io_ctx.run(); });
     }
-    async_client_base::~async_client_base() {}
+    async_client_base::~async_client_base()
+    {
+        io_ctx.stop(); // Stop the IO context to allow the thread to finish.
+        if (io_thrd.joinable())
+            io_thrd.join(); // Wait for the IO thread to finish.
+    }
 
     std::shared_ptr<client_session_base> async_client_base::get_session(std::string_view host, unsigned short port)
     {

@@ -217,6 +217,30 @@ namespace network
     }
 
     server_session::server_session(server_base &server, asio::ip::tcp::socket &&socket) : server_session_base(server), socket(std::move(socket)) {}
+    server_session::~server_session()
+    {
+        if (is_connected())
+            disconnect(); // Ensure the socket is closed when the session is destroyed
+    }
+
+    bool server_session::is_connected() const { return socket.is_open(); }
+
+    void server_session::disconnect()
+    {
+        asio::error_code ec;
+
+        // Gracefully shutdown the socket
+        socket.shutdown(asio::ip::tcp::socket::shutdown_both, ec);
+        if (ec && ec != asio::error::eof && ec != asio::error::not_connected)
+            LOG_ERR("Error shutting down socket: " << ec.message());
+
+        // Close the socket
+        socket.close(ec);
+        if (ec)
+            LOG_ERR("Error closing socket: " << ec.message());
+
+        LOG_DEBUG("Disconnected from client");
+    }
 
     void server_session::on_upgrade(const asio::error_code &ec, std::size_t)
     {
@@ -235,8 +259,37 @@ namespace network
 
 #ifdef ENABLE_SSL
     ssl_server_session::ssl_server_session(server_base &server, asio::ssl::stream<asio::ip::tcp::socket> &&socket) : server_session_base(server), socket(std::move(socket)) {}
+    ssl_server_session::~ssl_server_session()
+    {
+        if (is_connected())
+            disconnect(); // Ensure the socket is closed when the session is destroyed
+    }
 
     void ssl_server_session::handshake(std::function<void(const std::error_code &)> callback) { socket.async_handshake(asio::ssl::stream_base::server, callback); }
+
+    bool ssl_server_session::is_connected() const { return socket.next_layer().is_open(); }
+
+    void ssl_server_session::disconnect()
+    {
+        asio::error_code ec;
+
+        // Gracefully shutdown the SSL socket
+        socket.shutdown(ec);
+        if (ec && ec != asio::ssl::error::stream_truncated)
+            LOG_ERR("Error shutting down SSL socket: " << ec.message());
+
+        // Shutdown the underlying TCP socket
+        socket.next_layer().shutdown(asio::ip::tcp::socket::shutdown_both, ec);
+        if (ec && ec != asio::error::eof && ec != asio::error::not_connected)
+            LOG_ERR("Error shutting down TCP socket: " << ec.message());
+
+        // Close the underlying TCP socket
+        socket.next_layer().close(ec);
+        if (ec)
+            LOG_ERR("Error closing SSL socket: " << ec.message());
+
+        LOG_DEBUG("Disconnected from client");
+    }
 
     void ssl_server_session::on_upgrade(const asio::error_code &ec, std::size_t)
     {

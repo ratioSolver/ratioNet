@@ -4,8 +4,10 @@
 
 namespace network
 {
-    client_session_base::client_session_base(async_client_base &client, std::string_view host, unsigned short port) : client(client), host(host), port(port), resolver(client.io_ctx), endpoints(resolver.resolve(host, std::to_string(port))), strand(asio::make_strand(client.io_ctx)) {}
-    client_session_base::~client_session_base() {}
+    client_session_base::client_session_base(async_client_base &client, std::string_view host, unsigned short port) : client(client), host(host), port(port), resolver(client.io_ctx), endpoints(resolver.resolve(host, std::to_string(port))), strand(asio::make_strand(client.io_ctx)) { LOG_TRACE("Client session created for " << host << ":" << port); }
+    client_session_base::~client_session_base() { LOG_TRACE("Client session destroyed for " << host << ":" << port); }
+
+    void client_session_base::connect() { connect(endpoints, std::bind(&client_session_base::on_connect, shared_from_this(), std::placeholders::_1, std::placeholders::_2)); }
 
     void client_session_base::send(std::unique_ptr<request> req, std::function<void(const response &)> &&cb)
     {
@@ -25,7 +27,7 @@ namespace network
             LOG_ERR("Connection error: " << ec.message());
             return;
         }
-        LOG_INFO("Connected to " << endpoint);
+        LOG_DEBUG("Connected to " << endpoint);
         if (!request_queue.empty())
             write(request_queue.front().first->get_buffer(), std::bind(&client_session_base::on_write, shared_from_this(), std::placeholders::_1, std::placeholders::_2)); // Start writing the first request in the queue..
     }
@@ -78,7 +80,10 @@ namespace network
     void client_session_base::on_read_body(const std::error_code &ec, std::size_t)
     {
         if (ec == asio::error::eof)
-            return; // connection closed by client
+        {
+            LOG_DEBUG("Connection closed by server");
+            return; // Connection closed by server, no further action needed..
+        }
         else if (ec)
         {
             LOG_ERR(ec.message());
@@ -186,8 +191,29 @@ namespace network
     }
 
     client_session::client_session(async_client_base &client, std::string_view host, unsigned short port, asio::ip::tcp::socket &&socket) : client_session_base(client, host, port), socket(std::move(socket)) {}
+    client_session::~client_session()
+    { // Ensure the session is disconnected when destroyed..
+        if (is_connected())
+            disconnect();
+    }
 
     bool client_session::is_connected() const { return socket.is_open(); }
+    void client_session::disconnect()
+    {
+        asio::error_code ec;
+
+        // Gracefully shutdown the socket
+        socket.shutdown(asio::ip::tcp::socket::shutdown_both, ec);
+        if (ec && ec != asio::error::eof && ec != asio::error::not_connected)
+            LOG_ERR("Error shutting down socket: " << ec.message());
+
+        // Close the socket
+        socket.close(ec);
+        if (ec)
+            LOG_ERR("Error closing socket: " << ec.message());
+
+        LOG_DEBUG("Disconnected from " << host << ":" << port);
+    }
     void client_session::connect(asio::ip::basic_resolver_results<asio::ip::tcp> &endpoints, std::function<void(const asio::error_code &, const asio::ip::tcp::endpoint &)> callback) { asio::async_connect(socket, endpoints, callback); }
     void client_session::read(asio::streambuf &buffer, std::size_t size, std::function<void(const std::error_code &, std::size_t)> callback) { asio::async_read(socket, buffer, asio::transfer_exactly(size), callback); }
     void client_session::read_until(asio::streambuf &buffer, std::string_view delimiter, std::function<void(const std::error_code &, std::size_t)> callback) { asio::async_read_until(socket, buffer, delimiter, callback); }
@@ -202,8 +228,34 @@ namespace network
             throw std::runtime_error("SSL_set_tlsext_host_name failed");
         }
     }
+    ssl_client_session::~ssl_client_session()
+    { // Ensure the session is disconnected when destroyed..
+        if (is_connected())
+            disconnect();
+    }
 
     bool ssl_client_session::is_connected() const { return socket.next_layer().is_open(); }
+    void ssl_client_session::disconnect()
+    {
+        asio::error_code ec;
+
+        // Gracefully shutdown the SSL connection
+        socket.shutdown(ec);
+        if (ec && ec != asio::ssl::error::stream_truncated)
+            LOG_ERR("Error shutting down SSL connection: " << ec.message());
+
+        // Shutdown the underlying socket
+        socket.next_layer().shutdown(asio::ip::tcp::socket::shutdown_both, ec);
+        if (ec && ec != asio::error::eof && ec != asio::error::not_connected)
+            LOG_ERR("Error shutting down socket: " << ec.message());
+
+        // Close the socket
+        socket.next_layer().close(ec);
+        if (ec)
+            LOG_ERR("Error closing socket: " << ec.message());
+
+        LOG_DEBUG("Disconnected from " << host << ":" << port);
+    }
     void ssl_client_session::connect(asio::ip::basic_resolver_results<asio::ip::tcp> &endpoints, std::function<void(const asio::error_code &, const asio::ip::tcp::endpoint &)> callback)
     {
         asio::async_connect(socket.next_layer(), endpoints, [this, self = shared_from_this(), callback](const asio::error_code &ec, const asio::ip::tcp::endpoint &endpoint) mutable

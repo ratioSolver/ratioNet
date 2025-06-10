@@ -48,8 +48,34 @@ namespace network
 
     void send(std::unique_ptr<request> req, std::function<void(const response &)> &&cb);
 
-  private:
+    /**
+     * @brief Establishes a connection to the server.
+     *
+     * This function initiates the process of connecting the client session
+     * to the designated server. It should be called before attempting any
+     * communication or data exchange with the server.
+     *
+     * @throws std::runtime_error if the connection fails.
+     */
+    void connect();
+
+    /**
+     * @brief Checks if the session is currently connected to the server.
+     *
+     * This function returns true if the session is connected, false otherwise.
+     *
+     * @return True if connected, false otherwise.
+     */
     virtual bool is_connected() const = 0;
+
+    /**
+     * @brief Disconnects from the server.
+     *
+     * This function closes the connection to the server.
+     */
+    virtual void disconnect() = 0;
+
+  private:
     virtual void connect(asio::ip::basic_resolver_results<asio::ip::tcp> &endpoints, std::function<void(const asio::error_code &, const asio::ip::tcp::endpoint &)> callback) = 0;
 
     virtual void read(asio::streambuf &buffer, std::size_t size, std::function<void(const std::error_code &, std::size_t)> callback) = 0;
@@ -93,6 +119,9 @@ namespace network
      * @param socket The socket used to communicate with the server.
      */
     client_session(async_client_base &client, std::string_view host, unsigned short port, asio::ip::tcp::socket &&socket);
+    ~client_session() override;
+
+    void disconnect() override;
 
   private:
     bool is_connected() const override;
@@ -125,6 +154,9 @@ namespace network
      * @param socket The SSL socket used to communicate with the server.
      */
     ssl_client_session(async_client_base &client, std::string_view host, unsigned short port, asio::ssl::stream<asio::ip::tcp::socket> &&socket);
+    ~ssl_client_session() override;
+
+    void disconnect() override;
 
   private:
     bool is_connected() const override;
