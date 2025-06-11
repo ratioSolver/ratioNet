@@ -7,8 +7,6 @@ Whether you're developing a web server, a WebSocket application, or any other ne
 
 ## Features
 
-- **Boost.Beast Integration**: The framework is built on top of the Boost.Beast library, providing seamless integration and access to its powerful networking capabilities.
-
 - **Asynchronous Design**: All network operations are designed to be asynchronous, allowing your application to handle multiple connections concurrently without blocking.
 
 - **Customizable**: The framework is designed to be modular and customizable. You can easily extend and adapt it to your specific use cases and requirements.
