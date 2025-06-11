@@ -128,7 +128,7 @@ namespace network
         else
             LOG_WARN("No route for " + s.path);
     }
-    void server_base::on_message(ws_server_session_base &s, message &msg)
+    void server_base::on_message(ws_server_session_base &s, const message &msg)
     {
         switch (msg.get_fin_rsv_opcode() & 0x0F)
         {
@@ -136,7 +136,7 @@ namespace network
         case 0x01: // text
         case 0x02: // binary
             if (auto it = ws_routes.find(s.path); it != ws_routes.end())
-                it->second.on_message_handler(s, msg.get_payload());
+                it->second.on_message_handler(s, msg);
             else
                 LOG_WARN("No route for " + s.path);
             break;

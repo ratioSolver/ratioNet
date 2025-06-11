@@ -1,7 +1,7 @@
 #pragma once
 
+#include "message.hpp"
 #include <functional>
-#include <string_view>
 #include <system_error>
 
 namespace network
@@ -45,7 +45,7 @@ namespace network
      *
      * @param handler The handler function to be called. It takes a reference to the `ws_server_session_base` object and a constant reference to the received message.
      */
-    ws_handler &on_message(std::function<void(ws_server_session_base &, std::string_view)> &&handler) noexcept
+    ws_handler &on_message(std::function<void(ws_server_session_base &, const message &)> &&handler) noexcept
     {
       on_message_handler = std::move(handler);
       return *this;
@@ -83,9 +83,9 @@ namespace network
     }
 
   private:
-    std::function<void(ws_server_session_base &)> on_open_handler;                           // handler for the open event
-    std::function<void(ws_server_session_base &, std::string_view)> on_message_handler;      // handler for the message event
-    std::function<void(ws_server_session_base &)> on_close_handler;                          // handler for the close event
-    std::function<void(ws_server_session_base &, const std::error_code &)> on_error_handler; // handler for the error event
+    std::function<void(ws_server_session_base &)> on_open_handler;                              // handler for the open event
+    std::function<void(ws_server_session_base &, const message &)> on_message_handler; // handler for the message event
+    std::function<void(ws_server_session_base &)> on_close_handler;                             // handler for the close event
+    std::function<void(ws_server_session_base &, const std::error_code &)> on_error_handler;    // handler for the error event
   };
 } // namespace network

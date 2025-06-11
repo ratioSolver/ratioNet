@@ -129,7 +129,7 @@ namespace network
 
     void on_connect(ws_server_session_base &s);
     void on_disconnect(ws_server_session_base &s);
-    void on_message(ws_server_session_base &s, message &msg);
+    void on_message(ws_server_session_base &s, const message &msg);
     void on_error(ws_server_session_base &s, const std::error_code &ec);
 
   private:
@@ -207,4 +207,70 @@ namespace network
     asio::ssl::context ssl_ctx; // The SSL context used for secure connections
   };
 #endif
+
+  /**
+   * Parses a query string and returns a map of key-value pairs.
+   *
+   * @param query The query string to be parsed.
+   * @return A map containing the key-value pairs extracted from the query string.
+   */
+  [[nodiscard]] inline std::map<std::string, std::string> parse_query(std::string_view query)
+  {
+    std::map<std::string, std::string> params;
+
+    std::string::size_type pos = 0;
+    while (pos < query.size())
+    {
+      std::string::size_type next = query.find('&', pos);
+      std::string::size_type eq = query.find('=', pos);
+      if (eq == std::string::npos)
+        break;
+      if (next == std::string::npos)
+        next = query.size();
+      params.emplace(query.substr(pos, eq - pos), query.substr(eq + 1, next - eq - 1));
+      pos = next + 1;
+    }
+
+    return params;
+  }
+
+  /**
+   * @brief Decodes a URL-encoded string.
+   *
+   * This function takes a URL-encoded string and decodes it by converting
+   * percent-encoded characters (e.g., "%20") into their corresponding ASCII
+   * characters and replacing '+' characters with spaces.
+   *
+   * @param encoded The URL-encoded string to decode.
+   * @return A decoded string with all percent-encoded characters and '+'
+   *         characters replaced appropriately.
+   *
+   * @note The function assumes that the input string is properly URL-encoded.
+   *       If the input contains invalid percent-encoded sequences, the behavior
+   *       is undefined.
+   */
+  [[nodiscard]] inline std::string decode(const std::string &encoded)
+  {
+    std::ostringstream decoded;
+    size_t i = 0;
+    while (i < encoded.length())
+      if (encoded[i] == '%' && i + 2 < encoded.length())
+      {
+        std::string hex = encoded.substr(i + 1, 2);
+        char decodedChar = static_cast<char>(std::stoi(hex, nullptr, 16));
+        decoded << decodedChar;
+        i += 3; // Skip '%xx'
+      }
+      else if (encoded[i] == '+')
+      {
+        decoded << ' '; // '+' is space in URL encoding
+        i++;
+      }
+      else
+      {
+        decoded << encoded[i];
+        i++;
+      }
+    return decoded.str();
+  }
 } // namespace network
