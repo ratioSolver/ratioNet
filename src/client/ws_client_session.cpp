@@ -30,7 +30,7 @@ namespace network
                         connect(endpoints, std::bind(&ws_client_session_base::on_connect, self, std::placeholders::_1, std::placeholders::_2)); });
     }
 
-    void ws_client_session_base::on_connect(const asio::error_code &ec, const asio::ip::tcp::endpoint &endpoint)
+    void ws_client_session_base::on_connect(const asio::error_code &ec, [[maybe_unused]] const asio::ip::tcp::endpoint &endpoint)
     {
         if (ec)
         {
@@ -172,7 +172,7 @@ namespace network
         read(incoming_messages.front()->buffer, 2, std::bind(&ws_client_session_base::on_read, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
     }
 
-    void ws_client_session_base::on_write(const asio::error_code &ec, std::size_t bytes_transferred)
+    void ws_client_session_base::on_write(const asio::error_code &ec, [[maybe_unused]] std::size_t bytes_transferred)
     {
         if (ec)
         {
@@ -182,7 +182,7 @@ namespace network
             return;
         }
 
-        LOG_DEBUG("Sent " << bytes_transferred << " bytes");
+        LOG_TRACE("Sent " << bytes_transferred << " bytes");
 
         // Remove the message from the outgoing queue
         outgoing_messages.pop();

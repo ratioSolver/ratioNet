@@ -4,7 +4,7 @@
 
 namespace network
 {
-    cors::cors(server &srv) : middleware(srv)
+    cors::cors(server_base &srv) : middleware(srv)
     {
         for (auto &[v, rs] : srv.get_routes())
             if (v != verb::Options)
@@ -20,10 +20,10 @@ namespace network
 
     void cors::after_request(const request &, response &res) { res.add_header("Access-Control-Allow-Origin", "*"); }
 
-    utils::u_ptr<response> cors::option_route(const request &req)
+    std::unique_ptr<response> cors::option_route(const request &req)
     {
         assert(req.get_verb() == Options);
-        auto res = utils::make_u_ptr<response>(status_code::no_content);
+        auto res = std::make_unique<response>(status_code::no_content);
         res->add_header("Access-Control-Allow-Origin", "*");
         res->add_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
         res->add_header("Access-Control-Allow-Headers", "Content-Type, Authorization");

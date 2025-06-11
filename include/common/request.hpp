@@ -58,25 +58,25 @@ namespace network
      * @brief Get the HTTP verb of the request.
      * @return The HTTP verb.
      */
-    verb get_verb() const { return v; }
+    [[nodiscard]] verb get_verb() const { return v; }
 
     /**
      * @brief Get the target of the request.
      * @return The target.
      */
-    const std::string &get_target() const { return target; }
+    [[nodiscard]] const std::string &get_target() const { return target; }
 
     /**
      * @brief Get the HTTP version of the request.
      * @return The HTTP version.
      */
-    const std::string &get_version() const { return version; }
+    [[nodiscard]] const std::string &get_version() const { return version; }
 
     /**
      * @brief Get the headers of the request.
      * @return The headers.
      */
-    const std::map<std::string, std::string> &get_headers() const { return headers; }
+    [[nodiscard]] const std::map<std::string, std::string> &get_headers() const { return headers; }
 
     /**
      * @brief Overloaded stream insertion operator to write the request to an output stream.
@@ -91,7 +91,7 @@ namespace network
      *
      * @return true if the request is an upgrade request for a WebSocket connection, false otherwise.
      */
-    bool is_upgrade() const
+    [[nodiscard]] bool is_upgrade() const
     {
       auto upgrade_it = headers.find("upgrade");
       if (upgrade_it == headers.end())
@@ -110,7 +110,7 @@ namespace network
      *
      * @return true if the request is a keep-alive request, false otherwise.
      */
-    bool is_keep_alive() const
+    [[nodiscard]] bool is_keep_alive() const
     {
       auto connection_it = headers.find("connection");
       if (connection_it == headers.end())
@@ -124,7 +124,7 @@ namespace network
      * @brief Get the buffer containing the request.
      * @return The buffer.
      */
-    asio::streambuf &get_buffer()
+    [[nodiscard]] asio::streambuf &get_buffer()
     {
       std::ostream os(&buffer);
       write(os); // Write the request to the buffer

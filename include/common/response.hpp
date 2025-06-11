@@ -39,14 +39,14 @@ namespace network
      *
      * @return The status code.
      */
-    status_code get_status_code() const { return code; }
+    [[nodiscard]] status_code get_status_code() const { return code; }
 
     /**
      * @brief Gets the headers of the response.
      *
      * @return The headers.
      */
-    const std::map<std::string, std::string> &get_headers() const { return headers; }
+    [[nodiscard]] const std::map<std::string, std::string> &get_headers() const { return headers; }
 
     /**
      * @brief Adds a header to the response.
@@ -67,7 +67,7 @@ namespace network
      *
      * @return The HTTP version.
      */
-    const std::string &get_version() const { return version; }
+    [[nodiscard]] const std::string &get_version() const { return version; }
 
     /**
      * @brief Writes the response to an output stream.
@@ -83,7 +83,7 @@ namespace network
      *
      * @return The buffer.
      */
-    asio::streambuf &get_buffer()
+    [[nodiscard]] asio::streambuf &get_buffer()
     {
       std::ostream os(&buffer);
       write(os); // Write the response to the buffer

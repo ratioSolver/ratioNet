@@ -46,7 +46,8 @@ endif()
 target_link_libraries(ratioNet PUBLIC asio json)
 
 if (ENABLE_CORS)
-    target_sources(ratioNet PRIVATE src/middlewares/cors.cpp)
+    target_include_directories(ratioNet PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include/middlewares)
+    target_sources(ratioNet PUBLIC src/middlewares/cors.cpp)
     target_compile_definitions(ratioNet PUBLIC ENABLE_CORS)
 endif()
 

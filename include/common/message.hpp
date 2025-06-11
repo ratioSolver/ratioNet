@@ -40,7 +40,7 @@ namespace network
      *
      * @return true if the FIN bit is set (message is final), false otherwise.
      */
-    bool is_final() const noexcept { return (fin_rsv_opcode & 0x80) != 0; }
+    [[nodiscard]] bool is_final() const noexcept { return (fin_rsv_opcode & 0x80) != 0; }
 
     /**
      * @brief Get the opcode of the message.
@@ -51,7 +51,7 @@ namespace network
      *
      * @return The opcode of the message.
      */
-    uint8_t get_opcode() const noexcept { return fin_rsv_opcode & 0x0F; }
+    [[nodiscard]] uint8_t get_opcode() const noexcept { return fin_rsv_opcode & 0x0F; }
 
     /**
      * @brief Checks if the message is a continuation frame.
@@ -63,7 +63,7 @@ namespace network
      *
      * @return true if the message is a continuation frame, false otherwise.
      */
-    bool is_continuation() const noexcept { return get_opcode() == 0x00; }
+    [[nodiscard]] bool is_continuation() const noexcept { return get_opcode() == 0x00; }
     /**
      * @brief Checks if the message is a text frame.
      *
@@ -73,7 +73,7 @@ namespace network
      *
      * @return true if the message is a text frame, false otherwise.
      */
-    bool is_text() const noexcept { return get_opcode() == 0x01; }
+    [[nodiscard]] bool is_text() const noexcept { return get_opcode() == 0x01; }
     /**
      * @brief Checks if the message is a binary frame.
      *
@@ -83,7 +83,7 @@ namespace network
      *
      * @return true if the message is a binary frame, false otherwise.
      */
-    bool is_binary() const noexcept { return get_opcode() == 0x02; }
+    [[nodiscard]] bool is_binary() const noexcept { return get_opcode() == 0x02; }
 
     /**
      * @brief Checks if the message is a close frame.
@@ -94,7 +94,7 @@ namespace network
      *
      * @return true if the message is a close frame, false otherwise.
      */
-    bool is_close() const noexcept { return get_opcode() == 0x08; }
+    [[nodiscard]] bool is_close() const noexcept { return get_opcode() == 0x08; }
     /**
      * @brief Checks if the message is a ping frame.
      *
@@ -104,7 +104,7 @@ namespace network
      *
      * @return true if the message is a ping frame, false otherwise.
      */
-    bool is_ping() const noexcept { return get_opcode() == 0x09; }
+    [[nodiscard]] bool is_ping() const noexcept { return get_opcode() == 0x09; }
     /**
      * @brief Checks if the message is a pong frame.
      *
@@ -114,21 +114,21 @@ namespace network
      *
      * @return true if the message is a pong frame, false otherwise.
      */
-    bool is_pong() const noexcept { return get_opcode() == 0x0A; }
+    [[nodiscard]] bool is_pong() const noexcept { return get_opcode() == 0x0A; }
 
     /**
      * @brief Get the fin, rsv, and opcode of the message.
      *
      * @return The fin, rsv, and opcode of the message.
      */
-    uint8_t get_fin_rsv_opcode() const noexcept { return fin_rsv_opcode; }
+    [[nodiscard]] uint8_t get_fin_rsv_opcode() const noexcept { return fin_rsv_opcode; }
 
     /**
      * @brief Get the payload of the message.
      *
      * @return The payload of the message.
      */
-    const std::string &get_payload() const noexcept { return *payload; }
+    [[nodiscard]] const std::string &get_payload() const noexcept { return *payload; }
 
   private:
     /**
