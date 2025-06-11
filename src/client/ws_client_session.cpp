@@ -156,20 +156,19 @@ namespace network
         }
 
         auto &msg = incoming_messages.front();
-        std::istream is(&msg->buffer);
-        char mask[4]; // mask for the message
-        is.read(mask, 4);
-        for (size_t i = 0; i < bytes_transferred - 4; i++) // unmask the message
-            *msg->payload += is.get() ^ mask[i % 4];
 
-        if (on_message_handler)
-            on_message_handler(*msg->payload); // Call the on_message handler if set.
+        std::istream is(&msg->buffer);
+        std::vector<char> data(bytes_transferred);
+        is.read(data.data(), bytes_transferred);
+        msg->payload->append(data.data(), bytes_transferred);
+
+        on_message_handler(*msg);
 
         // Remove the processed message
         incoming_messages.pop();
-
         // Read the next message
         incoming_messages.emplace(std::make_unique<message>());
+
         read(incoming_messages.front()->buffer, 2, std::bind(&ws_client_session_base::on_read, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
     }
 

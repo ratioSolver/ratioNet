@@ -32,7 +32,7 @@ namespace network
     virtual ~ws_client_session_base();
 
     void set_on_open(std::function<void()> handler) { on_open_handler = handler; }
-    void set_on_message(std::function<void(std::string_view)> handler) { on_message_handler = handler; }
+    void set_on_message(std::function<void(message &)> handler) { on_message_handler = handler; }
     void set_on_close(std::function<void()> handler) { on_close_handler = handler; }
     void set_on_error(std::function<void(const std::error_code &)> handler) { on_error_handler = handler; }
 
@@ -87,7 +87,7 @@ namespace network
     asio::ip::tcp::resolver resolver;                              // The resolver used to resolve host names.
     asio::ip::basic_resolver_results<asio::ip::tcp> endpoints;     // The resolved endpoints for the server.
     std::function<void()> on_open_handler;                         // The handler for the open event.
-    std::function<void(std::string_view)> on_message_handler;      // The handler for the message event.
+    std::function<void(message &)> on_message_handler;             // The handler for the message event.
     std::function<void()> on_close_handler;                        // The handler for the close event.
     std::function<void(const std::error_code &)> on_error_handler; // The handler for the error event.
     std::queue<std::unique_ptr<message>> incoming_messages;        // Queue to hold incoming WebSocket messages

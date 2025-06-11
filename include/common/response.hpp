@@ -8,20 +8,20 @@
 
 namespace network
 {
-  class server;
   class client_base;
   class client_session_base;
   class ws_client_session_base;
+  class server_session_base;
 
   /**
    * @brief Represents an HTTP response.
    */
   class response
   {
-    friend class server;
     friend class client_base;
     friend class client_session_base;
     friend class ws_client_session_base;
+    friend class server_session_base;
 
   public:
     /**
@@ -77,6 +77,7 @@ namespace network
      */
     friend std::ostream &operator<<(std::ostream &os, const response &res) { return res.write(os); }
 
+  private:
     /**
      * @brief Gets the buffer containing the response.
      *

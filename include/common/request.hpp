@@ -6,7 +6,9 @@
 
 namespace network
 {
+  class client_base;
   class client_session_base;
+  class ws_client_session_base;
   class server_session_base;
 
   inline bool iequals(const std::string &a, const char *b)
@@ -27,7 +29,9 @@ namespace network
    */
   class request
   {
+    friend class client_base;
     friend class client_session_base;
+    friend class ws_client_session_base;
     friend class server_session_base;
 
   public:
@@ -115,6 +119,7 @@ namespace network
       return iequals(connection_it->second, "keep-alive");
     }
 
+  private:
     /**
      * @brief Get the buffer containing the request.
      * @return The buffer.

@@ -46,8 +46,8 @@ void test_ws_client()
 
     session->set_on_open([&session]
                          { LOG_INFO("Connected to server"); session->send("Hello, World!"); });
-    session->set_on_message([](std::string_view msg)
-                            { LOG_INFO("Received message: " + std::string(msg)); });
+    session->set_on_message([](network::message &msg)
+                            { LOG_INFO("Received message: " + msg.get_payload()); });
     session->set_on_close([]()
                           { LOG_INFO("Connection closed"); });
     session->set_on_error([](const std::error_code &ec)

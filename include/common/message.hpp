@@ -32,11 +32,96 @@ namespace network
     message(std::shared_ptr<std::string> payload, bool masked = false) : masked(masked), fin_rsv_opcode(0x81), payload(payload) {}
 
     /**
+     * @brief Checks if the message is marked as final.
+     *
+     * This function determines whether the FIN (final) bit is set in the
+     * fin_rsv_opcode member, indicating that this is the final fragment
+     * in a message sequence (e.g., in WebSocket frames).
+     *
+     * @return true if the FIN bit is set (message is final), false otherwise.
+     */
+    bool is_final() const noexcept { return (fin_rsv_opcode & 0x80) != 0; }
+
+    /**
+     * @brief Get the opcode of the message.
+     *
+     * The opcode is extracted from the fin_rsv_opcode member, which contains
+     * the FIN, RSV, and opcode bits. The opcode is represented by the lower
+     * 4 bits of this byte.
+     *
+     * @return The opcode of the message.
+     */
+    uint8_t get_opcode() const noexcept { return fin_rsv_opcode & 0x0F; }
+
+    /**
+     * @brief Checks if the message is a continuation frame.
+     *
+     * This function determines whether the current message's opcode
+     * indicates a continuation frame (opcode 0x00), which is typically
+     * used in protocols like WebSocket to signify that the message is
+     * a continuation of a previous fragmented message.
+     *
+     * @return true if the message is a continuation frame, false otherwise.
+     */
+    bool is_continuation() const noexcept { return get_opcode() == 0x00; }
+    /**
+     * @brief Checks if the message is a text frame.
+     *
+     * This function checks if the opcode of the message indicates that it
+     * is a text frame (opcode 0x01), which is commonly used in protocols
+     * like WebSocket to represent text data.
+     *
+     * @return true if the message is a text frame, false otherwise.
+     */
+    bool is_text() const noexcept { return get_opcode() == 0x01; }
+    /**
+     * @brief Checks if the message is a binary frame.
+     *
+     * This function checks if the opcode of the message indicates that it
+     * is a binary frame (opcode 0x02), which is commonly used in protocols
+     * like WebSocket to represent binary data.
+     *
+     * @return true if the message is a binary frame, false otherwise.
+     */
+    bool is_binary() const noexcept { return get_opcode() == 0x02; }
+
+    /**
+     * @brief Checks if the message is a close frame.
+     *
+     * This function checks if the opcode of the message indicates that it
+     * is a close frame (opcode 0x08), which is used in protocols like WebSocket
+     * to indicate that the connection should be closed.
+     *
+     * @return true if the message is a close frame, false otherwise.
+     */
+    bool is_close() const noexcept { return get_opcode() == 0x08; }
+    /**
+     * @brief Checks if the message is a ping frame.
+     *
+     * This function checks if the opcode of the message indicates that it
+     * is a ping frame (opcode 0x09), which is used in protocols like WebSocket
+     * to check the connection status.
+     *
+     * @return true if the message is a ping frame, false otherwise.
+     */
+    bool is_ping() const noexcept { return get_opcode() == 0x09; }
+    /**
+     * @brief Checks if the message is a pong frame.
+     *
+     * This function checks if the opcode of the message indicates that it
+     * is a pong frame (opcode 0x0A), which is used in protocols like WebSocket
+     * to respond to a ping frame.
+     *
+     * @return true if the message is a pong frame, false otherwise.
+     */
+    bool is_pong() const noexcept { return get_opcode() == 0x0A; }
+
+    /**
      * @brief Get the fin, rsv, and opcode of the message.
      *
      * @return The fin, rsv, and opcode of the message.
      */
-    unsigned char get_fin_rsv_opcode() const noexcept { return fin_rsv_opcode; }
+    uint8_t get_fin_rsv_opcode() const noexcept { return fin_rsv_opcode; }
 
     /**
      * @brief Get the payload of the message.
@@ -45,6 +130,7 @@ namespace network
      */
     const std::string &get_payload() const noexcept { return *payload; }
 
+  private:
     /**
      * @brief Get the buffer containing the serialized message.
      *
@@ -92,7 +178,7 @@ namespace network
 
   private:
     const bool masked = true;             // whether the message is masked
-    unsigned char fin_rsv_opcode;         // fin, rsv, and opcode for the message
+    uint8_t fin_rsv_opcode;               // fin, rsv, and opcode for the message
     asio::streambuf buffer;               // buffer for the message
     std::shared_ptr<std::string> payload; // payload of the message
   };
