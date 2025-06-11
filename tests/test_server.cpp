@@ -37,8 +37,8 @@ void test_rest_server()
 
     server.add_ws_route("/ws").on_open([](network::ws_server_session_base &s)
                                        { s.send("Hello, World!"); })
-        .on_message([](network::ws_server_session_base &s, std::string_view msg)
-                    { s.send(msg); });
+        .on_message([](network::ws_server_session_base &s, const network::message &msg)
+                    { s.send(msg.get_payload()); });
 
     std::thread t{[&server]
                   { server.start(); }};
