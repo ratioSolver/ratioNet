@@ -1,8 +1,6 @@
-// #include "server.hpp"
+#include "server.hpp"
 #include "client.hpp"
 #include "async_client.hpp"
-#include "client_session.hpp"
-// #include "ws_client.hpp"
 #include "logging.hpp"
 #include <thread>
 
@@ -27,45 +25,38 @@ void test_async_weather_client()
 }
 #endif
 
-// void test_ws_client()
-// {
-//     network::server server;
+void test_ws_client()
+{
+    network::server server;
 
-// #ifdef ENABLE_SSL
-//     server.load_certificate("cert.pem", "key.pem");
-// #endif
+    server.add_ws_route("/ws").on_open([](network::ws_server_session_base &s)
+                                       { s.send("Hello, World!"); })
+        .on_message([](network::ws_server_session_base &s, std::string_view msg)
+                    { LOG_DEBUG("Received message: " + std::string(msg));
+                      s.send(msg); })
+        .on_close([](network::ws_server_session_base &)
+                  { LOG_INFO("Connection closed"); });
 
-//     server.add_ws_route("/ws").on_open([](network::ws_session &s)
-//                                        { s.send("Hello, World!"); })
-//         .on_message([](network::ws_session &s, std::string_view msg)
-//                     { LOG_DEBUG("Received message: " + std::string(msg));
-//                       s.send(msg); })
-//         .on_close([](network::ws_session &)
-//                   { LOG_INFO("Connection closed"); });
+    std::thread st{[&server]
+                   { server.start(); }};
+    std::this_thread::sleep_for(std::chrono::seconds(2));
 
-//     std::thread st{[&server]
-//                    { server.start(); }};
-//     std::this_thread::sleep_for(std::chrono::seconds(2));
+    network::async_client client;
+    auto session = client.get_ws_session(SERVER_HOST, SERVER_PORT, "/ws");
 
-//     network::ws_client client("localhost", 8080, "/ws");
-//     client.set_on_open([&client]
-//                        { LOG_INFO("Connected to server");
-//                          client.send("Hello, World!"); });
-//     client.set_on_message([](std::string_view msg)
-//                           { LOG_INFO("Received message: " + std::string(msg)); });
-//     client.set_on_close([]()
-//                         { LOG_INFO("Connection closed"); });
-//     client.set_on_error([](const std::error_code &ec)
-//                         { LOG_ERR(ec.message()); });
-//     std::thread ct{[&client]
-//                    { client.connect(); }};
+    session->set_on_open([&session]
+                         { LOG_INFO("Connected to server"); session->send("Hello, World!"); });
+    session->set_on_message([](std::string_view msg)
+                            { LOG_INFO("Received message: " + std::string(msg)); });
+    session->set_on_close([]()
+                          { LOG_INFO("Connection closed"); });
+    session->set_on_error([](const std::error_code &ec)
+                          { LOG_ERR(ec.message()); });
 
-//     std::this_thread::sleep_for(std::chrono::seconds(5));
-//     client.disconnect();
-//     server.stop();
-//     st.join();
-//     ct.join();
-// }
+    std::this_thread::sleep_for(std::chrono::seconds(5));
+    server.stop();
+    st.join();
+}
 
 int main()
 {
@@ -73,6 +64,6 @@ int main()
     test_weather_client();
     test_async_weather_client();
 #endif
-    // test_ws_client();
+    test_ws_client();
     return 0;
 }

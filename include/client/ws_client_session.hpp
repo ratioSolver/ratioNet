@@ -23,7 +23,7 @@ namespace network
      * @param port The port number of the server.
      * @param target The target URL or path.
      */
-    ws_client_session_base(async_client_base &client, std::string_view host, unsigned short port, std::string_view target);
+    ws_client_session_base(async_client_base &client, std::string_view host, unsigned short port, std::string_view target, asio::any_io_executor executor);
     /**
      * @brief Destroys the WebSocket client base.
      *
@@ -35,13 +35,6 @@ namespace network
     void set_on_message(std::function<void(std::string_view)> handler) { on_message_handler = handler; }
     void set_on_close(std::function<void()> handler) { on_close_handler = handler; }
     void set_on_error(std::function<void(const std::error_code &)> handler) { on_error_handler = handler; }
-
-    /**
-     * @brief Starts the WebSocket client session.
-     *
-     * This function initializes the WebSocket client session and prepares it for communication.
-     */
-    void run();
 
     void enqueue(std::unique_ptr<message> msg);
 
@@ -62,6 +55,16 @@ namespace network
     virtual void disconnect() = 0;
 
   private:
+    /**
+     * @brief Checks if the session is currently connecting to the server.
+     *
+     * This function returns true if the session is in the process of connecting,
+     * false otherwise.
+     *
+     * @return True if connecting, false otherwise.
+     */
+    virtual bool is_connecting() const = 0;
+
     virtual void connect(asio::ip::basic_resolver_results<asio::ip::tcp> &endpoints, std::function<void(const asio::error_code &, const asio::ip::tcp::endpoint &)> callback) = 0;
 
     virtual void read(asio::streambuf &buffer, std::size_t size, std::function<void(const std::error_code &, std::size_t)> callback) = 0;
@@ -75,10 +78,11 @@ namespace network
     void on_write(const asio::error_code &ec, std::size_t bytes_transferred);
 
   protected:
-    async_client_base &client; // Reference to the async client base associated with this WebSocket client.
-    const std::string host;    // The host name of the server.
-    const unsigned short port; // The port number of the server.
-    const std::string target;  // The target URL or path.
+    async_client_base &client;      // Reference to the async client base associated with this WebSocket client.
+    const std::string host;         // The host name of the server.
+    const unsigned short port;      // The port number of the server.
+    const std::string target;       // The target URL or path.
+    asio::any_io_executor executor; // The executor used for asynchronous operations
   private:
     asio::ip::tcp::resolver resolver;                              // The resolver used to resolve host names.
     asio::ip::basic_resolver_results<asio::ip::tcp> endpoints;     // The resolved endpoints for the server.
@@ -117,6 +121,7 @@ namespace network
     void disconnect() override;
 
   private:
+    bool is_connecting() const override { return connecting; } // Check if the session is currently connecting
     void connect(asio::ip::basic_resolver_results<asio::ip::tcp> &endpoints, std::function<void(const asio::error_code &, const asio::ip::tcp::endpoint &)> callback) override;
 
     void read(asio::streambuf &buffer, std::size_t size, std::function<void(const std::error_code &, std::size_t)> callback) override;
@@ -125,6 +130,7 @@ namespace network
 
   private:
     asio::ip::tcp::socket socket; // The socket used to communicate with the server.
+    bool connecting{false};       // Flag to track if a connection attempt is in progress
   };
 
 #ifdef ENABLE_SSL
@@ -155,6 +161,7 @@ namespace network
     void disconnect() override;
 
   private:
+    bool is_connecting() const override { return connecting; } // Check if the session is currently connecting
     void connect(asio::ip::basic_resolver_results<asio::ip::tcp> &endpoints, std::function<void(const asio::error_code &, const asio::ip::tcp::endpoint &)> callback) override;
 
     void read(asio::streambuf &buffer, std::size_t size, std::function<void(const std::error_code &, std::size_t)> callback) override;
@@ -163,6 +170,7 @@ namespace network
 
   private:
     asio::ssl::stream<asio::ip::tcp::socket> socket; // The SSL socket used to communicate with the server.
+    bool connecting{false};                          // Flag to track if a connection attempt is in progress
   };
 #endif
 } // namespace network

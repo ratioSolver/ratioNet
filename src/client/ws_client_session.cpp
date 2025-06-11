@@ -5,24 +5,30 @@
 
 namespace network
 {
-    ws_client_session_base::ws_client_session_base(async_client_base &client, std::string_view host, unsigned short port, std::string_view target) : client(client), host(host), port(port), target(target), resolver(client.io_ctx), endpoints(resolver.resolve(host, std::to_string(port))) {}
+    ws_client_session_base::ws_client_session_base(async_client_base &client, std::string_view host, unsigned short port, std::string_view target, asio::any_io_executor executor) : client(client), host(host), port(port), target(target), executor(executor), resolver(client.io_ctx), endpoints(resolver.resolve(host, std::to_string(port))) {}
     ws_client_session_base::~ws_client_session_base() {}
 
-    void ws_client_session_base::run()
+    void ws_client_session_base::enqueue(std::unique_ptr<message> msg)
     {
-        LOG_TRACE("WebSocket client session started for " << host << ":" << port);
-        if (on_open_handler)
-            on_open_handler(); // Call the on_open handler if set.
-        // Start reading messages from the WebSocket server.
-        incoming_messages.emplace(std::make_unique<message>());
-        // Start reading the first two bytes to determine the message type and size
-        read(incoming_messages.front()->buffer, 2, std::bind(&ws_client_session_base::on_read, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
-        // If there are any messages to send, start writing them.
-        if (!outgoing_messages.empty())
-            write(outgoing_messages.front()->get_buffer(), std::bind(&ws_client_session_base::on_write, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
+        asio::post(executor, [this, self = shared_from_this(), msg = std::move(msg)]() mutable
+                   {
+                    outgoing_messages.emplace(std::move(msg));
+                    if (!is_connected())
+                    {
+                        if (!is_connecting()) // If not already connecting, initiate a connection
+                            connect();
+                    }
+                    else if (outgoing_messages.size() == 1) // If already connected and this is the first message, start writing
+                        write(outgoing_messages.front()->get_buffer(), std::bind(&ws_client_session_base::on_write, self, std::placeholders::_1, std::placeholders::_2)); });
     }
 
-    void ws_client_session_base::connect() { connect(endpoints, std::bind(&ws_client_session_base::on_connect, shared_from_this(), std::placeholders::_1, std::placeholders::_2)); }
+    void ws_client_session_base::connect()
+    {
+        asio::post(executor, [this, self = shared_from_this()]()
+                   {
+                    if (!is_connecting()) // If not already connecting, initiate a connection
+                        connect(endpoints, std::bind(&ws_client_session_base::on_connect, self, std::placeholders::_1, std::placeholders::_2)); });
+    }
 
     void ws_client_session_base::on_connect(const asio::error_code &ec, const asio::ip::tcp::endpoint &endpoint)
     {
@@ -50,7 +56,7 @@ namespace network
         hdrs["Sec-WebSocket-Version"] = "13";
 
         auto req = std::make_shared<request>(verb::Get, std::string(target), "HTTP/1.1", std::move(hdrs));
-        write(req->get_buffer(), [self = shared_from_this(), req](const std::error_code &ec, std::size_t)
+        write(req->get_buffer(), [this, self = shared_from_this(), req](const std::error_code &ec, std::size_t)
               {
             if (ec)
             {
@@ -59,7 +65,7 @@ namespace network
             }
 
             auto res = std::make_shared<response>();
-            self->read_until(res->buffer, "\r\n\r\n", [self, res](const std::error_code &ec, std::size_t)
+            read_until(res->buffer, "\r\n\r\n", [this, self, res](const std::error_code &ec, std::size_t)
             {
                 if (ec)
                 {
@@ -75,8 +81,17 @@ namespace network
                     return;
                 }
 
-                LOG_DEBUG("Handshake successful, connected to " << self->host << ":" << self->port);
-                self->run(); // Start the session after successful handshake
+                LOG_DEBUG("Handshake successful, connected to " << host << ":" << port);
+                if (on_open_handler)
+                    on_open_handler(); // Call the on_open handler if set.
+
+                // Start reading messages from the WebSocket server.
+                incoming_messages.emplace(std::make_unique<message>());
+                // Start reading the first two bytes to determine the message type and size
+                read(incoming_messages.front()->buffer, 2, std::bind(&ws_client_session_base::on_read, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
+                // If there are any messages to send, start writing them.
+                if (!outgoing_messages.empty())
+                    write(outgoing_messages.front()->get_buffer(), std::bind(&ws_client_session_base::on_write, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
             }); });
     }
 
@@ -105,15 +120,15 @@ namespace network
         is.read(&len, 1);
         size_t length = len & 0x7F; // length of the payload
         if (length == 126)          // Extended payload length
-            read(msg->buffer, 2, [self = shared_from_this(), &msg](const std::error_code &, std::size_t)
+            read(msg->buffer, 2, [this, self = shared_from_this(), &msg](const std::error_code &, std::size_t)
                  {
                     char buf[2];
                     std::istream is(&msg->buffer);
                     is.read(buf, 2);
                     size_t length = (buf[0] << 8) | buf[1];
-                    self->read(msg->buffer, length, std::bind(&ws_client_session_base::on_message, self, std::placeholders::_1, std::placeholders::_2)); });
+                    read(msg->buffer, length, std::bind(&ws_client_session_base::on_message, self, std::placeholders::_1, std::placeholders::_2)); });
         else if (length == 127) // Extended payload length (64-bit)
-            read(msg->buffer, 8, [self = shared_from_this(), &msg](const std::error_code &, std::size_t)
+            read(msg->buffer, 8, [this, self = shared_from_this(), &msg](const std::error_code &, std::size_t)
                  {
                     char buf[8];
                     std::istream is(&msg->buffer);
@@ -121,7 +136,7 @@ namespace network
                     size_t length = 0;
                     for (size_t i = 0; i < 8; i++)
                         length = (length << 8) | buf[i];
-                    self->read(msg->buffer, length, std::bind(&ws_client_session_base::on_message, self, std::placeholders::_1, std::placeholders::_2)); });
+                    read(msg->buffer, length, std::bind(&ws_client_session_base::on_message, self, std::placeholders::_1, std::placeholders::_2)); });
         else // Normal payload length
             read(msg->buffer, length, std::bind(&ws_client_session_base::on_message, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
     }
@@ -178,14 +193,14 @@ namespace network
             write(outgoing_messages.front()->get_buffer(), std::bind(&ws_client_session_base::on_write, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
     }
 
-    ws_client_session::ws_client_session(async_client_base &client, std::string_view host, unsigned short port, std::string_view target, asio::ip::tcp::socket &&socket) : ws_client_session_base(client, host, port, target), socket(std::move(socket)) { ws_client_session_base::connect(); }
+    ws_client_session::ws_client_session(async_client_base &client, std::string_view host, unsigned short port, std::string_view target, asio::ip::tcp::socket &&socket) : ws_client_session_base(client, host, port, target, socket.get_executor()), socket(std::move(socket)) {}
     ws_client_session::~ws_client_session()
     { // Ensure the session is disconnected when destroyed.
         if (is_connected())
             disconnect();
     }
 
-    bool ws_client_session::is_connected() const { return socket.is_open(); }
+    bool ws_client_session::is_connected() const { return socket.is_open() && !connecting; }
 
     void ws_client_session::disconnect()
     {
@@ -204,21 +219,30 @@ namespace network
         LOG_DEBUG("Disconnected from " << host << ":" << port);
     }
 
-    void ws_client_session::connect(asio::ip::basic_resolver_results<asio::ip::tcp> &endpoints, std::function<void(const asio::error_code &, const asio::ip::tcp::endpoint &)> callback) { asio::async_connect(socket, endpoints, callback); }
+    void ws_client_session::connect(asio::ip::basic_resolver_results<asio::ip::tcp> &endpoints, std::function<void(const asio::error_code &, const asio::ip::tcp::endpoint &)> callback)
+    {
+        connecting = true; // Set the connecting flag to true before starting the connection
+        asio::async_connect(socket, endpoints, [this, self = shared_from_this(), callback](const asio::error_code &ec, const asio::ip::tcp::endpoint &endpoint) mutable
+                            {
+                                if (ec)
+                                    return callback(ec, endpoint);
+                                LOG_DEBUG("Connected to " << endpoint);
+                                connecting = false; // Reset connecting flag after successful connection
+                                callback(ec, endpoint); });
+    }
 
     void ws_client_session::read(asio::streambuf &buffer, std::size_t size, std::function<void(const std::error_code &, std::size_t)> callback) { asio::async_read(socket, buffer, asio::transfer_exactly(size), callback); }
     void ws_client_session::read_until(asio::streambuf &buffer, std::string_view delimiter, std::function<void(const std::error_code &, std::size_t)> callback) { asio::async_read_until(socket, buffer, delimiter, callback); }
     void ws_client_session::write(asio::streambuf &buffer, std::function<void(const std::error_code &, std::size_t)> callback) { asio::async_write(socket, buffer, callback); }
 
 #ifdef ENABLE_SSL
-    wss_client_session::wss_client_session(async_client_base &client, std::string_view host, unsigned short port, std::string_view target, asio::ssl::stream<asio::ip::tcp::socket> &&socket) : ws_client_session_base(client, host, port, target), socket(std::move(socket))
+    wss_client_session::wss_client_session(async_client_base &client, std::string_view host, unsigned short port, std::string_view target, asio::ssl::stream<asio::ip::tcp::socket> &&socket) : ws_client_session_base(client, host, port, target, socket.get_executor()), socket(std::move(socket))
     {
         if (!SSL_set_tlsext_host_name(socket.native_handle(), host.data()))
         {
             LOG_ERR("SSL_set_tlsext_host_name failed");
             throw std::runtime_error("SSL_set_tlsext_host_name failed");
         }
-        ws_client_session_base::connect();
     }
     wss_client_session::~wss_client_session()
     { // Ensure the session is disconnected when destroyed.
@@ -226,7 +250,7 @@ namespace network
             disconnect();
     }
 
-    bool wss_client_session::is_connected() const { return socket.next_layer().is_open(); }
+    bool wss_client_session::is_connected() const { return socket.next_layer().is_open() && !connecting; }
 
     void wss_client_session::disconnect()
     {
@@ -252,14 +276,24 @@ namespace network
 
     void wss_client_session::connect(asio::ip::basic_resolver_results<asio::ip::tcp> &endpoints, std::function<void(const asio::error_code &, const asio::ip::tcp::endpoint &)> callback)
     {
+        connecting = true; // Set the connecting flag to true before starting the connection
         asio::async_connect(socket.next_layer(), endpoints, [this, self = shared_from_this(), callback](const asio::error_code &ec, const asio::ip::tcp::endpoint &endpoint) mutable
                             {
                                 if (ec)
                                     return callback(ec, endpoint);
+                                LOG_DEBUG("Connected to " << endpoint);
                                 socket.set_verify_mode(asio::ssl::verify_peer);
                                 socket.set_verify_callback(asio::ssl::host_name_verification(host));
-                                socket.async_handshake(asio::ssl::stream_base::client, [self = shared_from_this(), callback, &endpoint](const asio::error_code &ec)
-                                                       { callback(ec, endpoint); }); });
+                                socket.async_handshake(asio::ssl::stream_base::client, [this, self, callback, &endpoint](const asio::error_code &ec)
+                                {
+                                    if (ec)
+                                    {
+                                        LOG_ERR("SSL handshake failed: " << ec.message());
+                                        return callback(ec, endpoint);
+                                    }
+                                    LOG_DEBUG("SSL handshake successful with " << endpoint);
+                                    connecting = false; // Reset connecting flag after successful handshake
+                                    callback(ec, endpoint); }); });
     }
 
     void wss_client_session::read(asio::streambuf &buffer, std::size_t size, std::function<void(const std::error_code &, std::size_t)> callback) { asio::async_read(socket.next_layer(), buffer, asio::transfer_exactly(size), callback); }

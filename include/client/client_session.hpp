@@ -78,6 +78,16 @@ namespace network
   private:
     virtual void connect(asio::ip::basic_resolver_results<asio::ip::tcp> &endpoints, std::function<void(const asio::error_code &, const asio::ip::tcp::endpoint &)> callback) = 0;
 
+    /**
+     * @brief Checks if the session is currently connecting to the server.
+     *
+     * This function returns true if the session is in the process of connecting,
+     * false otherwise.
+     *
+     * @return True if connecting, false otherwise.
+     */
+    virtual bool is_connecting() const = 0;
+
     virtual void read(asio::streambuf &buffer, std::size_t size, std::function<void(const std::error_code &, std::size_t)> callback) = 0;
     virtual void read_until(asio::streambuf &buffer, std::string_view delimiter, std::function<void(const std::error_code &, std::size_t)> callback) = 0;
     virtual void write(asio::streambuf &buffer, std::function<void(const std::error_code &, std::size_t)> callback) = 0;
@@ -121,10 +131,11 @@ namespace network
     client_session(async_client_base &client, std::string_view host, unsigned short port, asio::ip::tcp::socket &&socket);
     ~client_session() override;
 
+    bool is_connected() const override;
     void disconnect() override;
 
   private:
-    bool is_connected() const override;
+    bool is_connecting() const override { return connecting; } // Check if the session is currently connecting
     void connect(asio::ip::basic_resolver_results<asio::ip::tcp> &endpoints, std::function<void(const asio::error_code &, const asio::ip::tcp::endpoint &)> callback) override;
 
     void read(asio::streambuf &buffer, std::size_t size, std::function<void(const std::error_code &, std::size_t)> callback) override;
@@ -133,6 +144,7 @@ namespace network
 
   private:
     asio::ip::tcp::socket socket; // The socket used to communicate with the server.
+    bool connecting{false};       // Flag to track if a connection attempt is in progress
   };
 
 #ifdef ENABLE_SSL
@@ -156,10 +168,11 @@ namespace network
     ssl_client_session(async_client_base &client, std::string_view host, unsigned short port, asio::ssl::stream<asio::ip::tcp::socket> &&socket);
     ~ssl_client_session() override;
 
+    bool is_connected() const override;
     void disconnect() override;
 
   private:
-    bool is_connected() const override;
+    bool is_connecting() const override { return connecting; } // Check if the session is currently connecting
     void connect(asio::ip::basic_resolver_results<asio::ip::tcp> &endpoints, std::function<void(const asio::error_code &, const asio::ip::tcp::endpoint &)> callback) override;
 
     void read(asio::streambuf &buffer, std::size_t size, std::function<void(const std::error_code &, std::size_t)> callback) override;
@@ -168,6 +181,7 @@ namespace network
 
   private:
     asio::ssl::stream<asio::ip::tcp::socket> socket; // The SSL socket used to communicate with the server.
+    bool connecting{false};                          // Flag to track if a connection attempt is in progress
   };
 #endif
 } // namespace network

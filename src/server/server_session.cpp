@@ -44,7 +44,7 @@ namespace network
         asio::post(strand, [this, self = shared_from_this(), res = std::move(res)]() mutable
                    { response_queue.emplace(std::move(res));
                      if (response_queue.size() == 1) // If this is the first response, start writing
-                         write(get_next_response().get_buffer(), std::bind(&server_session_base::on_write, shared_from_this(), std::placeholders::_1, std::placeholders::_2)); });
+                         write(get_next_response().get_buffer(), std::bind(&server_session_base::on_write, self, std::placeholders::_1, std::placeholders::_2)); });
     }
 
     void server_session_base::on_write(const asio::error_code &ec, std::size_t)

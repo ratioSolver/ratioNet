@@ -7,27 +7,35 @@ namespace network
     client_session_base::client_session_base(async_client_base &client, std::string_view host, unsigned short port) : client(client), host(host), port(port), resolver(client.io_ctx), endpoints(resolver.resolve(host, std::to_string(port))), strand(asio::make_strand(client.io_ctx)) { LOG_TRACE("Client session created for " << host << ":" << port); }
     client_session_base::~client_session_base() { LOG_TRACE("Client session destroyed for " << host << ":" << port); }
 
-    void client_session_base::connect() { connect(endpoints, std::bind(&client_session_base::on_connect, shared_from_this(), std::placeholders::_1, std::placeholders::_2)); }
+    void client_session_base::connect()
+    {
+        asio::post(strand, [this, self = shared_from_this()]()
+                   {
+                    if (!is_connecting()) // If not already connecting, initiate a connection
+                        connect(endpoints, std::bind(&client_session_base::on_connect, self, std::placeholders::_1, std::placeholders::_2)); });
+    }
 
     void client_session_base::send(std::unique_ptr<request> req, std::function<void(const response &)> &&cb)
     {
-        asio::post(strand, [self = shared_from_this(), req = std::move(req), cb = std::move(cb)]() mutable
+        asio::post(strand, [this, self = shared_from_this(), req = std::move(req), cb = std::move(cb)]() mutable
                    {
-                    self->request_queue.emplace(std::move(req), std::move(cb));
-                    if (!self->is_connected()) // If not connected, initiate connection..
-                        self->connect(self->endpoints, std::bind(&client_session_base::on_connect, self, std::placeholders::_1, std::placeholders::_2));
-                    else if (self->request_queue.size() == 1) // If already connected and this is the first request, start processing
-                        self->write(self->request_queue.front().first->get_buffer(), std::bind(&client_session_base::on_write, self, std::placeholders::_1, std::placeholders::_2)); });
+                    request_queue.emplace(std::move(req), std::move(cb));
+                    if (!is_connected())
+                    {
+                        if (!is_connecting()) // If not already connecting, initiate a connection
+                            connect(endpoints, std::bind(&client_session_base::on_connect, self, std::placeholders::_1, std::placeholders::_2));
+                    }
+                    else if (request_queue.size() == 1) // If already connected and this is the first request, start processing
+                        write(request_queue.front().first->get_buffer(), std::bind(&client_session_base::on_write, self, std::placeholders::_1, std::placeholders::_2)); });
     }
 
-    void client_session_base::on_connect(const asio::error_code &ec, const asio::ip::tcp::endpoint &endpoint)
+    void client_session_base::on_connect(const asio::error_code &ec, const asio::ip::tcp::endpoint &)
     {
         if (ec)
         {
             LOG_ERR("Connection error: " << ec.message());
             return;
         }
-        LOG_DEBUG("Connected to " << endpoint);
         if (!request_queue.empty())
             write(request_queue.front().first->get_buffer(), std::bind(&client_session_base::on_write, shared_from_this(), std::placeholders::_1, std::placeholders::_2)); // Start writing the first request in the queue..
     }
@@ -122,7 +130,7 @@ namespace network
     }
     void client_session_base::read_chunk()
     {
-        read_until(response_queue.front().first->buffer, "\r\n", [self = shared_from_this()](const std::error_code &ec, std::size_t bytes_transferred)
+        read_until(response_queue.front().first->buffer, "\r\n", [this, self = shared_from_this()](const std::error_code &ec, std::size_t bytes_transferred)
                    {
             if (ec)
             {
@@ -130,7 +138,7 @@ namespace network
                 return;
             }
             
-            auto &res = *self->response_queue.front().first; // Get the current response object..
+            auto &res = *response_queue.front().first; // Get the current response object..
 
             // The buffer may contain additional bytes beyond the delimiter
             std::size_t additional_bytes = res.buffer.size() - bytes_transferred;
@@ -158,7 +166,7 @@ namespace network
             
             std::size_t size = std::stoul(chunk_size, nullptr, 16);
             if (size == 0) // If chunk size is 0, read the trailing CRLF
-                self->read_until(res.buffer, "\r\n", [self, &res](const std::error_code &ec, std::size_t bytes_transferred)
+                read_until(res.buffer, "\r\n", [this, self, &res](const std::error_code &ec, std::size_t bytes_transferred)
                                  {
                                      if (ec)
                                      {
@@ -166,10 +174,10 @@ namespace network
                                          return;
                                      }
                                      res.buffer.consume(2);                     // Consume the trailing CRLF
-                                     self->on_read_body(ec, bytes_transferred); // Call on_read_body to process the response
+                                     on_read_body(ec, bytes_transferred); // Call on_read_body to process the response
                                  });
             else if (size > additional_bytes) // If chunk size is greater than additional bytes, read the remaining chunk
-                self->read(res.buffer, size - additional_bytes, [self, size, &res](const std::error_code &ec, std::size_t)
+                read(res.buffer, size - additional_bytes, [this, self, size, &res](const std::error_code &ec, std::size_t)
                            {
                                if (ec)
                                {
@@ -179,25 +187,25 @@ namespace network
                                res.accumulated_body.reserve(res.accumulated_body.size() + size);
                                res.accumulated_body.append(asio::buffers_begin(res.buffer.data()), asio::buffers_begin(res.buffer.data()) + size);
                                res.buffer.consume(size + 2); // Consume the chunk body and the trailing CRLF
-                               self->read_chunk();
+                               read_chunk();
                             });
             else 
                 { // The buffer contains the entire chunk, append it to the body and read the next chunk
                     res.accumulated_body.reserve(res.accumulated_body.size() + size);
                     res.accumulated_body.append(asio::buffers_begin(res.buffer.data()), asio::buffers_begin(res.buffer.data()) + size);
                     res.buffer.consume(size + 2); // Consume the chunk body and the trailing CRLF
-                    self->read_chunk(); // Read the next chunk
+                    read_chunk(); // Read the next chunk
                 } });
     }
 
-    client_session::client_session(async_client_base &client, std::string_view host, unsigned short port, asio::ip::tcp::socket &&socket) : client_session_base(client, host, port), socket(std::move(socket)) { client_session_base::connect(); }
+    client_session::client_session(async_client_base &client, std::string_view host, unsigned short port, asio::ip::tcp::socket &&socket) : client_session_base(client, host, port), socket(std::move(socket)) {}
     client_session::~client_session()
     { // Ensure the session is disconnected when destroyed..
         if (is_connected())
             disconnect();
     }
 
-    bool client_session::is_connected() const { return socket.is_open(); }
+    bool client_session::is_connected() const { return socket.is_open() && !connecting; }
     void client_session::disconnect()
     {
         asio::error_code ec;
@@ -214,7 +222,17 @@ namespace network
 
         LOG_DEBUG("Disconnected from " << host << ":" << port);
     }
-    void client_session::connect(asio::ip::basic_resolver_results<asio::ip::tcp> &endpoints, std::function<void(const asio::error_code &, const asio::ip::tcp::endpoint &)> callback) { asio::async_connect(socket, endpoints, callback); }
+    void client_session::connect(asio::ip::basic_resolver_results<asio::ip::tcp> &endpoints, std::function<void(const asio::error_code &, const asio::ip::tcp::endpoint &)> callback)
+    {
+        connecting = true; // Set connecting to true to prevent multiple connection attempts
+        asio::async_connect(socket, endpoints, [this, self = shared_from_this(), callback](const asio::error_code &ec, const asio::ip::tcp::endpoint &endpoint) mutable
+                            {
+                                if (ec)
+                                    return callback(ec, endpoint);
+                                LOG_DEBUG("Connected to " << endpoint);
+                                connecting = false; // Reset connecting flag after successful connection
+                                callback(ec, endpoint); }); // Call the callback with the endpoint
+    }
     void client_session::read(asio::streambuf &buffer, std::size_t size, std::function<void(const std::error_code &, std::size_t)> callback) { asio::async_read(socket, buffer, asio::transfer_exactly(size), callback); }
     void client_session::read_until(asio::streambuf &buffer, std::string_view delimiter, std::function<void(const std::error_code &, std::size_t)> callback) { asio::async_read_until(socket, buffer, delimiter, callback); }
     void client_session::write(asio::streambuf &buffer, std::function<void(const std::error_code &, std::size_t)> callback) { asio::async_write(socket, buffer, callback); }
@@ -227,7 +245,6 @@ namespace network
             LOG_ERR("SSL_set_tlsext_host_name failed");
             throw std::runtime_error("SSL_set_tlsext_host_name failed");
         }
-        client_session_base::connect();
     }
     ssl_client_session::~ssl_client_session()
     { // Ensure the session is disconnected when destroyed..
@@ -235,7 +252,7 @@ namespace network
             disconnect();
     }
 
-    bool ssl_client_session::is_connected() const { return socket.next_layer().is_open(); }
+    bool ssl_client_session::is_connected() const { return socket.next_layer().is_open() && !connecting; }
     void ssl_client_session::disconnect()
     {
         asio::error_code ec;
@@ -259,14 +276,24 @@ namespace network
     }
     void ssl_client_session::connect(asio::ip::basic_resolver_results<asio::ip::tcp> &endpoints, std::function<void(const asio::error_code &, const asio::ip::tcp::endpoint &)> callback)
     {
+        connecting = true; // Set connecting to true to prevent multiple connection attempts
         asio::async_connect(socket.next_layer(), endpoints, [this, self = shared_from_this(), callback](const asio::error_code &ec, const asio::ip::tcp::endpoint &endpoint) mutable
                             {
                                 if (ec)
                                     return callback(ec, endpoint);
+                                LOG_DEBUG("Connected to " << endpoint);
                                 socket.set_verify_mode(asio::ssl::verify_peer);
                                 socket.set_verify_callback(asio::ssl::host_name_verification(host));
-                                socket.async_handshake(asio::ssl::stream_base::client, [self = shared_from_this(), callback, &endpoint](const asio::error_code &ec)
-                                    { callback(ec, endpoint); }); });
+                                socket.async_handshake(asio::ssl::stream_base::client, [this, self, callback, &endpoint](const asio::error_code &ec)
+                                    {
+                                        if (ec)
+                                        {
+                                            LOG_ERR("SSL handshake failed: " << ec.message());
+                                            return callback(ec, endpoint);
+                                        }
+                                        LOG_DEBUG("SSL handshake successful with " << endpoint);
+                                        connecting = false; // Reset connecting flag after successful handshake
+                                        callback(ec, endpoint); }); });
     }
     void ssl_client_session::read(asio::streambuf &buffer, std::size_t size, std::function<void(const std::error_code &, std::size_t)> callback) { asio::async_read(socket, buffer, asio::transfer_exactly(size), callback); }
     void ssl_client_session::read_until(asio::streambuf &buffer, std::string_view delimiter, std::function<void(const std::error_code &, std::size_t)> callback) { asio::async_read_until(socket, buffer, delimiter, callback); }

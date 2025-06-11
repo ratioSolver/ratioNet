@@ -24,7 +24,21 @@ namespace network
 
         // Create a new session if not found.
         auto session = create_session(host, port);
+        session->connect(); // Initiate connection.
         sessions[key] = session;
+        return session;
+    }
+
+    std::shared_ptr<ws_client_session_base> async_client_base::get_ws_session(std::string_view host, unsigned short port, std::string_view target)
+    {
+        std::string key = std::string(host) + ":" + std::to_string(port) + target.data();
+        if (auto it = ws_sessions.find(key); it != ws_sessions.end())
+            return it->second; // Return existing WebSocket session if found.
+
+        // Create a new WebSocket session if not found.
+        auto session = create_ws_session(host, port, target);
+        session->connect(); // Initiate connection.
+        ws_sessions[key] = session;
         return session;
     }
 
@@ -32,9 +46,13 @@ namespace network
 
     std::shared_ptr<client_session_base> async_client::create_session(std::string_view host, unsigned short port) { return std::make_shared<client_session>(*this, host, port, asio::ip::tcp::socket(io_ctx)); }
 
+    std::shared_ptr<ws_client_session_base> async_client::create_ws_session(std::string_view host, unsigned short port, std::string_view target) { return std::make_shared<ws_client_session>(*this, host, port, target, asio::ip::tcp::socket(io_ctx)); }
+
 #ifdef ENABLE_SSL
     ssl_async_client::ssl_async_client() : async_client_base(), ssl_ctx(asio::ssl::context::TLS_VERSION) { ssl_ctx.set_default_verify_paths(); }
 
     std::shared_ptr<client_session_base> ssl_async_client::create_session(std::string_view host, unsigned short port) { return std::make_shared<ssl_client_session>(*this, host, port, asio::ssl::stream<asio::ip::tcp::socket>(asio::ip::tcp::socket(io_ctx), ssl_ctx)); }
+
+    std::shared_ptr<ws_client_session_base> ssl_async_client::create_ws_session(std::string_view host, unsigned short port, std::string_view target) { return std::make_shared<wss_client_session>(*this, host, port, target, asio::ssl::stream<asio::ip::tcp::socket>(asio::ip::tcp::socket(io_ctx), ssl_ctx)); }
 #endif
 } // namespace network
