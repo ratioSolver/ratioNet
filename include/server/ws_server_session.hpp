@@ -114,6 +114,7 @@ namespace network
     asio::ip::tcp::socket socket; // The socket used to communicate with the client.
   };
 
+#ifdef ENABLE_SSL
   class wss_server_session : public ws_server_session_base
   {
   public:
@@ -132,4 +133,5 @@ namespace network
   private:
     asio::ssl::stream<asio::ip::tcp::socket> socket; // The SSL socket used to communicate with the client.
   };
+#endif
 } // namespace network
