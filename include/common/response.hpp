@@ -292,8 +292,14 @@ namespace network
       fs.seekg(0, std::ios::end);
       headers["content-length"] = std::to_string(fs.tellg());
 
-      auto ext = file.substr(file.find_last_of('.') + 1);
-      headers["content-type"] = network::mime_types.at(ext);
+      if (headers.find("content-type") == headers.end())
+      { // If content-type is not set, try to determine it from the file extension..
+        auto ext = file.substr(file.find_last_of('.') + 1);
+        if (auto ct_it = mime_types.find(ext); ct_it != mime_types.end())
+          headers["content-type"] = ct_it->second;
+        else // Default content type if not found..
+          headers["content-type"] = "plain/text";
+      }
     }
 
     /**

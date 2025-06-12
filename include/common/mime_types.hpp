@@ -5,6 +5,11 @@
 
 namespace network
 {
+  /**
+   * @brief A map of common file extensions to their corresponding MIME types.
+   *
+   * This map is used to determine the MIME type of a file based on its extension.
+   */
   const std::unordered_map<std::string, std::string> mime_types{
       {"shtml", "text/html"},
       {"htm", "text/html"},
@@ -19,6 +24,7 @@ namespace network
       {"rss", "application/rss+xml"},
       {"mml", "text/mathml"},
       {"txt", "text/plain"},
+      {"md", "text/markdown"},
       {"jad", "text/vnd.sun.j2me.app-descriptor"},
       {"wml", "text/vnd.wap.wml"},
       {"htc", "text/x-component"},

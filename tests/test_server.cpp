@@ -10,6 +10,7 @@
  * This function initializes a network server and sets up several routes:
  * - A root route ("/") that returns an HTML response with "Hello, World!".
  * - A JSON route ("/json") that returns a JSON response with a message "Hello, World!".
+ * - A file route ("/file") that serves a file named "test.zip".
  * - A WebSocket route ("/ws") that returns an HTML page with a WebSocket client script.
  *
  * The WebSocket route ("/ws") also sets up handlers for WebSocket events:
@@ -34,6 +35,8 @@ void test_rest_server()
                         ws.onclose = function() { document.body.innerHTML += "<p>Disconnected!</p>"; };
                         ws.onerror = function() { document.body.innerHTML += "<p>Error!</p>"; };
                         </script></body></html>)"); });
+    server.add_route(network::verb::Get, "/file", [](network::request &)
+                     { return std::make_unique<network::file_response>("test.zip"); });
 
     server.add_ws_route("/ws").on_open([](network::ws_server_session_base &s)
                                        { s.send("Hello, World!"); })
@@ -83,8 +86,8 @@ void test_ssl_server()
 
     server.add_ws_route("/ws").on_open([](network::ws_server_session_base &s)
                                        { s.send("Hello, World!"); })
-        .on_message([](network::ws_server_session_base &s, std::string_view msg)
-                    { s.send(msg); });
+        .on_message([](network::ws_server_session_base &s, const network::message &msg)
+                    { s.send(msg.get_payload()); });
 
     std::thread t{[&server]
                   { server.start(); }};
