@@ -155,21 +155,21 @@ namespace network
             return;
         }
 
-        auto &msg = incoming_messages.front();
+        // Read the next message
+        auto new_msg = std::make_unique<message>();
+        read(new_msg->buffer, 2, std::bind(&ws_client_session_base::on_read, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
+        incoming_messages.emplace(std::move(new_msg));
 
+        // Process the current message
+        auto &msg = incoming_messages.front();
         std::istream is(&msg->buffer);
         std::vector<char> data(bytes_transferred);
         is.read(data.data(), bytes_transferred);
         msg->payload->append(data.data(), bytes_transferred);
 
         on_message_handler(*msg);
-
         // Remove the processed message
         incoming_messages.pop();
-        // Read the next message
-        incoming_messages.emplace(std::make_unique<message>());
-
-        read(incoming_messages.front()->buffer, 2, std::bind(&ws_client_session_base::on_read, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
     }
 
     void ws_client_session_base::on_write(const asio::error_code &ec, [[maybe_unused]] std::size_t bytes_transferred)

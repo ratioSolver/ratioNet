@@ -83,6 +83,12 @@ namespace network
             return;
         }
 
+        // Read the next message
+        auto new_msg = std::make_unique<message>();
+        read(new_msg->buffer, 2, std::bind(&ws_server_session_base::on_read, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
+        incoming_messages.emplace(std::move(new_msg));
+
+        // Process the current message
         auto &msg = incoming_messages.front();
         std::istream is(&msg->buffer);
         char mask[4]; // mask for the message
@@ -91,13 +97,8 @@ namespace network
             *msg->payload += is.get() ^ mask[i % 4];
 
         server.on_message(*this, *msg);
-
         // Remove the processed message from the queue
         incoming_messages.pop();
-
-        // Read the next message
-        incoming_messages.emplace(std::make_unique<message>());
-        read(incoming_messages.front()->buffer, 2, std::bind(&ws_server_session_base::on_read, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
     }
 
     void ws_server_session_base::on_write(const asio::error_code &ec, std::size_t)
