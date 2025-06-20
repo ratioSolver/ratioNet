@@ -62,7 +62,7 @@ namespace network
 
   protected:
     request &get_current_request() { return *current_request; }
-    const request &get_next_request() const { return *current_request; }
+    const request &get_current_request() const { return *current_request; }
     response &get_next_response() { return *response_queue.front(); }
     const response &get_next_response() const { return *response_queue.front(); }
 
