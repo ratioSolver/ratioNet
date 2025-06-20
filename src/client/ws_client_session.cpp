@@ -86,9 +86,9 @@ namespace network
                     on_open_handler(); // Call the on_open handler if set.
 
                 // Start reading messages from the WebSocket server.
-                incoming_messages.emplace(std::make_unique<message>());
+                current_message = std::make_unique<message>();
                 // Start reading the first two bytes to determine the message type and size
-                read(incoming_messages.front()->buffer, 2, std::bind(&ws_client_session_base::on_read, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
+                read(current_message->buffer, 2, std::bind(&ws_client_session_base::on_read, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
                 // If there are any messages to send, start writing them.
                 if (!outgoing_messages.empty())
                     write(outgoing_messages.front()->get_buffer(), std::bind(&ws_client_session_base::on_write, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
@@ -112,33 +112,32 @@ namespace network
             return;
         }
 
-        auto &msg = incoming_messages.front();
-        std::istream is(&msg->buffer);
-        is.read(reinterpret_cast<char *>(&msg->fin_rsv_opcode), 1);
+        std::istream is(&current_message->buffer);
+        is.read(reinterpret_cast<char *>(&current_message->fin_rsv_opcode), 1);
 
         char len; // second byte of the message
         is.read(&len, 1);
         size_t length = len & 0x7F; // length of the payload
         if (length == 126)          // Extended payload length
-            read(msg->buffer, 2, [this, self = shared_from_this(), &msg](const std::error_code &, std::size_t)
+            read(current_message->buffer, 2, [this, self = shared_from_this()](const std::error_code &, std::size_t)
                  {
                     char buf[2];
-                    std::istream is(&msg->buffer);
+                    std::istream is(&current_message->buffer);
                     is.read(buf, 2);
                     size_t length = (buf[0] << 8) | buf[1];
-                    read(msg->buffer, length, std::bind(&ws_client_session_base::on_message, self, std::placeholders::_1, std::placeholders::_2)); });
+                    read(current_message->buffer, length, std::bind(&ws_client_session_base::on_message, self, std::placeholders::_1, std::placeholders::_2)); });
         else if (length == 127) // Extended payload length (64-bit)
-            read(msg->buffer, 8, [this, self = shared_from_this(), &msg](const std::error_code &, std::size_t)
+            read(current_message->buffer, 8, [this, self = shared_from_this()](const std::error_code &, std::size_t)
                  {
                     char buf[8];
-                    std::istream is(&msg->buffer);
+                    std::istream is(&current_message->buffer);
                     is.read(buf, 8);
                     size_t length = 0;
                     for (size_t i = 0; i < 8; i++)
                         length = (length << 8) | buf[i];
-                    read(msg->buffer, length, std::bind(&ws_client_session_base::on_message, self, std::placeholders::_1, std::placeholders::_2)); });
+                    read(current_message->buffer, length, std::bind(&ws_client_session_base::on_message, self, std::placeholders::_1, std::placeholders::_2)); });
         else // Normal payload length
-            read(msg->buffer, length, std::bind(&ws_client_session_base::on_message, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
+            read(current_message->buffer, length, std::bind(&ws_client_session_base::on_message, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
     }
 
     void ws_client_session_base::on_message(const asio::error_code &ec, std::size_t bytes_transferred)
@@ -155,21 +154,16 @@ namespace network
             return;
         }
 
-        // Read the next message
-        auto new_msg = std::make_unique<message>();
-        read(new_msg->buffer, 2, std::bind(&ws_client_session_base::on_read, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
-        incoming_messages.emplace(std::move(new_msg));
-
         // Process the current message
-        auto &msg = incoming_messages.front();
-        std::istream is(&msg->buffer);
+        std::istream is(&current_message->buffer);
         std::vector<char> data(bytes_transferred);
         is.read(data.data(), bytes_transferred);
-        msg->payload->append(data.data(), bytes_transferred);
+        current_message->payload->append(data.data(), bytes_transferred);
 
-        on_message_handler(*msg);
-        // Remove the processed message
-        incoming_messages.pop();
+        on_message_handler(*current_message);
+
+        current_message = std::make_unique<message>(); // Prepare for the next message
+        read(current_message->buffer, 2, std::bind(&ws_client_session_base::on_read, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
     }
 
     void ws_client_session_base::on_write(const asio::error_code &ec, [[maybe_unused]] std::size_t bytes_transferred)

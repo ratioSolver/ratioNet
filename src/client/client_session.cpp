@@ -36,6 +36,7 @@ namespace network
             LOG_ERR("Connection error: " << ec.message());
             return;
         }
+
         if (!request_queue.empty())
             write(request_queue.front().first->get_buffer(), std::bind(&client_session_base::on_write, shared_from_this(), std::placeholders::_1, std::placeholders::_2)); // Start writing the first request in the queue..
     }
@@ -49,12 +50,12 @@ namespace network
             LOG_ERR("Error on write: " << ec.message());
             return;
         }
+
         if (!request_queue.empty())
             write(request_queue.front().first->get_buffer(), std::bind(&client_session_base::on_write, shared_from_this(), std::placeholders::_1, std::placeholders::_2)); // Write the next request in the queue..
 
-        response_queue.emplace(std::make_unique<response>(), std::move(cb)); // Prepare a response object for the next read operation..
-        if (response_queue.size() == 1)                                      // If this is the first response, start reading headers..
-            read_until(response_queue.front().first->buffer, "\r\n\r\n", std::bind(&client_session_base::on_read_headers, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
+        current_response = std::make_pair(std::make_unique<response>(), std::move(cb)); // Prepare a response object for the current request..
+        read_until(current_response.first->buffer, "\r\n\r\n", std::bind(&client_session_base::on_read_headers, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
     }
 
     void client_session_base::on_read_headers(const asio::error_code &ec, std::size_t bytes_transferred)
@@ -65,25 +66,23 @@ namespace network
             return;
         }
 
-        auto &res = *response_queue.front().first; // Get the current response object..
-
         // the buffer may contain additional bytes beyond the delimiter
-        std::size_t additional_bytes = res.buffer.size() - bytes_transferred;
+        std::size_t additional_bytes = current_response.first->buffer.size() - bytes_transferred;
 
-        res.parse(); // Parse the headers from the buffer..
+        current_response.first->parse(); // Parse the headers from the buffer..
 
-        if (res.headers.find("content-length") != res.headers.end())
+        if (current_response.first->headers.find("content-length") != current_response.first->headers.end())
         { // If the response has a content-length header, read the body..
-            std::size_t content_length = std::stoul(res.headers["content-length"]);
+            std::size_t content_length = std::stoul(current_response.first->headers["content-length"]);
             if (content_length > additional_bytes) // If the content length is greater than the additional bytes, read the remaining body..
-                read(res.buffer, content_length - additional_bytes, std::bind(&client_session_base::on_read_body, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
+                read(current_response.first->buffer, content_length - additional_bytes, std::bind(&client_session_base::on_read_body, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
             else // If the buffer contains the entire body, process it immediately..
                 on_read_body(ec, bytes_transferred);
         }
-        else if (res.headers.find("transfer-encoding") != res.headers.end() && res.headers.at("transfer-encoding") == "chunked")
+        else if (current_response.first->headers.find("transfer-encoding") != current_response.first->headers.end() && current_response.first->headers.at("transfer-encoding") == "chunked")
             read_chunk(); // Handle chunked transfer encoding..
         else
-            response_queue.front().second(res); // Call the callback with the response..
+            current_response.second(*current_response.first); // If no content-length or transfer-encoding, call the callback with the response..
     }
     void client_session_base::on_read_body(const std::error_code &ec, std::size_t)
     {
@@ -98,54 +97,47 @@ namespace network
             return;
         }
 
-        auto &res = response_queue.front().first; // Get the current response object..
-        if (res->headers.find("content-type") != res->headers.end() && res->headers["content-type"].find("application/json") != std::string::npos)
+        if (current_response.first->headers.find("content-type") != current_response.first->headers.end() && current_response.first->headers["content-type"].find("application/json") != std::string::npos)
         {
-            if (!res->accumulated_body.empty())
-                res = std::make_unique<json_response>(json::load(res->accumulated_body), res->get_status_code(), std::move(res->headers), std::move(res->version)); // If the response is JSON, parse it..
+            if (!current_response.first->accumulated_body.empty())
+                current_response.first = std::make_unique<json_response>(json::load(current_response.first->accumulated_body), current_response.first->get_status_code(), std::move(current_response.first->headers), std::move(current_response.first->version)); // If the response is JSON, parse it..
             else
             {
-                std::istream is(&res->buffer);
-                res = std::make_unique<json_response>(json::load(is), res->get_status_code(), std::move(res->headers), std::move(res->version));
+                std::istream is(&current_response.first->buffer);
+                current_response.first = std::make_unique<json_response>(json::load(is), current_response.first->get_status_code(), std::move(current_response.first->headers), std::move(current_response.first->version));
             }
         }
         else
         {
-            if (!res->accumulated_body.empty())
-                res = std::make_unique<string_response>(std::move(res->accumulated_body), res->get_status_code(), std::move(res->headers), std::move(res->version)); // If the response is a string, use the accumulated body..
+            if (!current_response.first->accumulated_body.empty())
+                current_response.first = std::make_unique<string_response>(std::move(current_response.first->accumulated_body), current_response.first->get_status_code(), std::move(current_response.first->headers), std::move(current_response.first->version)); // If the response is a string, use the accumulated body..
             else
             {
                 std::string body;
-                body.reserve(res->buffer.size());
-                body.assign(asio::buffers_begin(res->buffer.data()), asio::buffers_end(res->buffer.data()));
-                res = std::make_unique<string_response>(std::move(body), res->get_status_code(), std::move(res->headers), std::move(res->version)); // Handle string response
+                body.reserve(current_response.first->buffer.size());
+                body.assign(asio::buffers_begin(current_response.first->buffer.data()), asio::buffers_end(current_response.first->buffer.data()));
+                current_response.first = std::make_unique<string_response>(std::move(body), current_response.first->get_status_code(), std::move(current_response.first->headers), std::move(current_response.first->version)); // Handle string response
             }
         }
 
-        response_queue.front().second(*res); // Call the callback with the response..
-
-        response_queue.pop(); // Remove the response from the queue after processing..
-        if (!response_queue.empty())
-            read_until(response_queue.front().first->buffer, "\r\n\r\n", std::bind(&client_session_base::on_read_headers, shared_from_this(), std::placeholders::_1, std::placeholders::_2)); // Start reading the next response headers..
+        current_response.second(*current_response.first); // Call the callback with the parsed response..
     }
     void client_session_base::read_chunk()
     {
-        read_until(response_queue.front().first->buffer, "\r\n", [this, self = shared_from_this()](const std::error_code &ec, std::size_t bytes_transferred)
+        read_until(current_response.first->buffer, "\r\n", [this, self = shared_from_this()](const std::error_code &ec, std::size_t bytes_transferred)
                    {
             if (ec)
             {
                 LOG_ERR("Error reading chunk: " << ec.message());
                 return;
             }
-            
-            auto &res = *response_queue.front().first; // Get the current response object..
 
             // The buffer may contain additional bytes beyond the delimiter
-            std::size_t additional_bytes = res.buffer.size() - bytes_transferred;
+            std::size_t additional_bytes = current_response.first->buffer.size() - bytes_transferred;
 
             std::string chunk_size;
             std::vector<std::string> extensions;
-            std::istream is(&res.buffer);
+            std::istream is(&current_response.first->buffer);
             while (is.peek() != '\r' && is.peek() != ';')
                 chunk_size += is.get();
             if (is.peek() == ';')
@@ -166,34 +158,34 @@ namespace network
             
             std::size_t size = std::stoul(chunk_size, nullptr, 16);
             if (size == 0) // If chunk size is 0, read the trailing CRLF
-                read_until(res.buffer, "\r\n", [this, self, &res](const std::error_code &ec, std::size_t bytes_transferred)
+                read_until(current_response.first->buffer, "\r\n", [this, self](const std::error_code &ec, std::size_t bytes_transferred)
                                  {
                                      if (ec)
                                      {
                                          LOG_ERR("Error reading trailing CRLF: " << ec.message());
                                          return;
                                      }
-                                     res.buffer.consume(2);                     // Consume the trailing CRLF
+                                     current_response.first->buffer.consume(2);                     // Consume the trailing CRLF
                                      on_read_body(ec, bytes_transferred); // Call on_read_body to process the response
                                  });
             else if (size > additional_bytes) // If chunk size is greater than additional bytes, read the remaining chunk
-                read(res.buffer, size - additional_bytes, [this, self, size, &res](const std::error_code &ec, std::size_t)
+                read(current_response.first->buffer, size - additional_bytes, [this, self, size](const std::error_code &ec, std::size_t)
                            {
                                if (ec)
                                {
                                    LOG_ERR("Error reading chunk body: " << ec.message());
                                    return;
                                }
-                               res.accumulated_body.reserve(res.accumulated_body.size() + size);
-                               res.accumulated_body.append(asio::buffers_begin(res.buffer.data()), asio::buffers_begin(res.buffer.data()) + size);
-                               res.buffer.consume(size + 2); // Consume the chunk body and the trailing CRLF
+                               current_response.first->accumulated_body.reserve(current_response.first->accumulated_body.size() + size);
+                               current_response.first->accumulated_body.append(asio::buffers_begin(current_response.first->buffer.data()), asio::buffers_begin(current_response.first->buffer.data()) + size);
+                               current_response.first->buffer.consume(size + 2); // Consume the chunk body and the trailing CRLF
                                read_chunk();
                             });
             else 
                 { // The buffer contains the entire chunk, append it to the body and read the next chunk
-                    res.accumulated_body.reserve(res.accumulated_body.size() + size);
-                    res.accumulated_body.append(asio::buffers_begin(res.buffer.data()), asio::buffers_begin(res.buffer.data()) + size);
-                    res.buffer.consume(size + 2); // Consume the chunk body and the trailing CRLF
+                    current_response.first->accumulated_body.reserve(current_response.first->accumulated_body.size() + size);
+                    current_response.first->accumulated_body.append(asio::buffers_begin(current_response.first->buffer.data()), asio::buffers_begin(current_response.first->buffer.data()) + size);
+                    current_response.first->buffer.consume(size + 2); // Consume the chunk body and the trailing CRLF
                     read_chunk(); // Read the next chunk
                 } });
     }

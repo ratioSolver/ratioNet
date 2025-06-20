@@ -106,9 +106,9 @@ namespace network
     asio::ip::tcp::resolver resolver;                          // The resolver used to resolve host names.
     asio::ip::basic_resolver_results<asio::ip::tcp> endpoints; // The resolved endpoints for the server.
   private:
-    asio::strand<asio::io_context::executor_type> strand;                                                   // Strand to ensure thread-safe operations within the session
-    std::queue<std::pair<std::unique_ptr<request>, std::function<void(const response &)>>> request_queue;   // Queue to hold outgoing requests
-    std::queue<std::pair<std::unique_ptr<response>, std::function<void(const response &)>>> response_queue; // Queue to hold incoming responses
+    asio::strand<asio::io_context::executor_type> strand;                                                 // Strand to ensure thread-safe operations within the session
+    std::queue<std::pair<std::unique_ptr<request>, std::function<void(const response &)>>> request_queue; // Queue to hold outgoing requests
+    std::pair<std::unique_ptr<response>, std::function<void(const response &)>> current_response;         // Current response being processed
   };
 
   /**

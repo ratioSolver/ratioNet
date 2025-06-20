@@ -11,9 +11,9 @@ namespace network
     {
         LOG_TRACE("WebSocket server session started");
         server.on_connect(*this);
-        incoming_messages.emplace(std::make_unique<message>());
+        current_message = std::make_unique<message>();
         // Start reading the first two bytes to determine the message type and size
-        read(incoming_messages.front()->buffer, 2, std::bind(&ws_server_session_base::on_read, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
+        read(current_message->buffer, 2, std::bind(&ws_server_session_base::on_read, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
     }
 
     void ws_server_session_base::enqueue(std::unique_ptr<message> msg)
@@ -39,34 +39,32 @@ namespace network
             return;
         }
 
-        auto &msg = incoming_messages.front();
-
-        std::istream is(&msg->buffer);
-        is.read(reinterpret_cast<char *>(&msg->fin_rsv_opcode), 1);
+        std::istream is(&current_message->buffer);
+        is.read(reinterpret_cast<char *>(&current_message->fin_rsv_opcode), 1);
 
         char len; // second byte of the message
         is.read(&len, 1);
         size_t length = len & 0x7F; // length of the payload
         if (length == 126)
-            read(msg->buffer, 2, [self = shared_from_this(), &msg](const std::error_code &, std::size_t)
+            read(current_message->buffer, 2, [this, self = shared_from_this()](const std::error_code &, std::size_t)
                  {
                     char buf[2];
-                    std::istream is(&msg->buffer);
+                    std::istream is(&current_message->buffer);
                     is.read(buf, 2);
                     size_t length = (buf[0] << 8) | buf[1];
-                    self->read(msg->buffer, length + 4, std::bind(&ws_server_session_base::on_message, self, asio::placeholders::error, asio::placeholders::bytes_transferred)); });
+                    self->read(current_message->buffer, length + 4, std::bind(&ws_server_session_base::on_message, self, asio::placeholders::error, asio::placeholders::bytes_transferred)); });
         else if (length == 127)
-            read(msg->buffer, 8, [self = shared_from_this(), &msg](const std::error_code &, std::size_t)
+            read(current_message->buffer, 8, [this, self = shared_from_this()](const std::error_code &, std::size_t)
                  {
                     char buf[8];
-                    std::istream is(&msg->buffer);
+                    std::istream is(&current_message->buffer);
                     is.read(buf, 8);
                     size_t length = 0;
                     for (size_t i = 0; i < 8; i++)
                         length = (length << 8) | buf[i];
-                    self->read(msg->buffer, length + 4, std::bind(&ws_server_session_base::on_message, self, asio::placeholders::error, asio::placeholders::bytes_transferred)); });
+                    self->read(current_message->buffer, length + 4, std::bind(&ws_server_session_base::on_message, self, asio::placeholders::error, asio::placeholders::bytes_transferred)); });
         else
-            read(msg->buffer, length + 4, std::bind(&ws_server_session_base::on_message, shared_from_this(), asio::placeholders::error, asio::placeholders::bytes_transferred));
+            read(current_message->buffer, length + 4, std::bind(&ws_server_session_base::on_message, shared_from_this(), asio::placeholders::error, asio::placeholders::bytes_transferred));
     }
 
     void ws_server_session_base::on_message(const asio::error_code &ec, std::size_t bytes_transferred)
@@ -83,22 +81,17 @@ namespace network
             return;
         }
 
-        // Read the next message
-        auto new_msg = std::make_unique<message>();
-        read(new_msg->buffer, 2, std::bind(&ws_server_session_base::on_read, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
-        incoming_messages.emplace(std::move(new_msg));
-
         // Process the current message
-        auto &msg = incoming_messages.front();
-        std::istream is(&msg->buffer);
+        std::istream is(&current_message->buffer);
         char mask[4]; // mask for the message
         is.read(mask, 4);
         for (size_t i = 0; i < bytes_transferred - 4; i++) // unmask the message
-            *msg->payload += is.get() ^ mask[i % 4];
+            *current_message->payload += is.get() ^ mask[i % 4];
 
-        server.on_message(*this, *msg);
-        // Remove the processed message from the queue
-        incoming_messages.pop();
+        server.on_message(*this, *current_message);
+
+        current_message = std::make_unique<message>(); // Prepare for the next message
+        read(current_message->buffer, 2, std::bind(&ws_server_session_base::on_read, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
     }
 
     void ws_server_session_base::on_write(const asio::error_code &ec, std::size_t)

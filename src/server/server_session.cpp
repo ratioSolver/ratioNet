@@ -12,14 +12,13 @@ namespace network
 
     void server_session_base::run()
     {
-        request_queue.emplace(std::make_unique<request>());
-        if (request_queue.size() == 1) // If this is the first request, start reading headers
-            read_until(get_next_request().buffer, "\r\n\r\n", std::bind(&server_session_base::on_read_headers, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
+        current_request = std::make_unique<request>(); // Initialize the current request
+        read_until(current_request->buffer, "\r\n\r\n", std::bind(&server_session_base::on_read_headers, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
     }
 
     void server_session_base::upgrade()
     {
-        auto &req = get_next_request(); // Get the current request object
+        auto &req = *current_request; // Get the current request object
 
         auto key_it = req.headers.find("sec-websocket-key");
         if (key_it == req.headers.end())
@@ -74,7 +73,7 @@ namespace network
             return;
         }
 
-        auto &req = get_next_request(); // Get the current request object
+        auto &req = *current_request; // Get the current request object
 
         // the buffer may contain additional bytes beyond the delimiter
         std::size_t additional_bytes = req.buffer.size() - bytes_transferred;
@@ -94,13 +93,13 @@ namespace network
         }
         else if (req.headers.find("transfer-encoding") != req.headers.end() && req.headers.at("transfer-encoding") == "chunked")
             read_chunk();
-        else
-        { // no body
-            server.handle_request(*this, req);
 
-            request_queue.pop();        // Remove the request that has been processed
-            if (!request_queue.empty()) // If there are more requests to process, start reading the next one
-                read_until(get_next_request().buffer, "\r\n\r\n", std::bind(&server_session_base::on_read_headers, shared_from_this(), asio::placeholders::error, asio::placeholders::bytes_transferred));
+        server.handle_request(*this, req); // Handle the request with the server
+
+        if (req.is_keep_alive())
+        { // If the request is keep-alive, prepare for the next request
+            current_request = std::make_unique<request>();
+            read_until(current_request->buffer, "\r\n\r\n", std::bind(&server_session_base::on_read_headers, shared_from_this(), asio::placeholders::error, asio::placeholders::bytes_transferred));
         }
     }
     void server_session_base::on_read_body(const asio::error_code &ec, std::size_t)
@@ -113,40 +112,40 @@ namespace network
             return;
         }
 
-        auto &req = request_queue.front(); // Get the current request object
-
-        if (req->headers.find("content-type") != req->headers.end() && req->headers["content-type"].find("application/json") != std::string::npos)
+        if (current_request->headers.find("content-type") != current_request->headers.end() && current_request->headers["content-type"].find("application/json") != std::string::npos)
         {
-            if (!req->accumulated_body.empty())
-                req = std::make_unique<json_request>(req->v, std::move(req->target), std::move(req->version), std::move(req->headers), json::load(req->accumulated_body));
+            if (!current_request->accumulated_body.empty())
+                current_request = std::make_unique<json_request>(current_request->v, std::move(current_request->target), std::move(current_request->version), std::move(current_request->headers), json::load(current_request->accumulated_body));
             else
             {
-                std::istream is(&req->buffer);
-                req = std::make_unique<json_request>(req->v, std::move(req->target), std::move(req->version), std::move(req->headers), json::load(is));
+                std::istream is(&current_request->buffer);
+                current_request = std::make_unique<json_request>(current_request->v, std::move(current_request->target), std::move(current_request->version), std::move(current_request->headers), json::load(is));
             }
         }
         else
         {
-            if (!req->accumulated_body.empty())
-                req = std::make_unique<string_request>(req->v, std::move(req->target), std::move(req->version), std::move(req->headers), std::move(req->accumulated_body));
+            if (!current_request->accumulated_body.empty())
+                current_request = std::make_unique<string_request>(current_request->v, std::move(current_request->target), std::move(current_request->version), std::move(current_request->headers), std::move(current_request->accumulated_body));
             else
             {
                 std::string body;
-                body.reserve(req->buffer.size());
-                body.assign(asio::buffers_begin(req->buffer.data()), asio::buffers_end(req->buffer.data()));
-                req = std::make_unique<string_request>(req->v, std::move(req->target), std::move(req->version), std::move(req->headers), std::move(body));
+                body.reserve(current_request->buffer.size());
+                body.assign(asio::buffers_begin(current_request->buffer.data()), asio::buffers_end(current_request->buffer.data()));
+                current_request = std::make_unique<string_request>(current_request->v, std::move(current_request->target), std::move(current_request->version), std::move(current_request->headers), std::move(body));
             }
         }
 
-        server.handle_request(*this, *req);
+        server.handle_request(*this, *current_request); // Handle the request with the server
 
-        request_queue.pop();        // Remove the request that has been processed
-        if (!request_queue.empty()) // If there are more requests to process, start reading the next one
-            read_until(get_next_request().buffer, "\r\n\r\n", std::bind(&server_session_base::on_read_headers, shared_from_this(), asio::placeholders::error, asio::placeholders::bytes_transferred));
+        if (current_request->is_keep_alive())
+        { // If the request is keep-alive, prepare for the next request
+            current_request = std::make_unique<request>();
+            read_until(current_request->buffer, "\r\n\r\n", std::bind(&server_session_base::on_read_headers, shared_from_this(), asio::placeholders::error, asio::placeholders::bytes_transferred));
+        }
     }
     void server_session_base::read_chunk()
     {
-        auto &req = get_next_request(); // Get the current request object
+        auto &req = *current_request; // Get the current request object
         read_until(req.get_buffer(), "\r\n", [self = shared_from_this(), &req](const std::error_code &ec, std::size_t bytes_transferred)
                    {
             if (ec)
@@ -154,9 +153,8 @@ namespace network
                 LOG_ERR("Error reading chunk: " << ec.message());
                 return;
             }
-
             
-            auto &req = *self->request_queue.front(); // Get the current response object..
+            auto &req = *self->current_request; // Get the current response object..
 
             // The buffer may contain additional bytes beyond the delimiter
             std::size_t additional_bytes = req.buffer.size() - bytes_transferred;
@@ -250,7 +248,7 @@ namespace network
             return;
         }
         // the upgrade response has been sent, now we can start a WebSocket session
-        std::make_shared<ws_server_session>(get_server(), get_next_request().get_target(), std::move(socket))->run();
+        std::make_shared<ws_server_session>(get_server(), get_current_request().get_target(), std::move(socket))->run();
     }
 
     void server_session::read(asio::streambuf &buffer, std::size_t size, std::function<void(const std::error_code &, std::size_t)> callback) { asio::async_read(socket, buffer, asio::transfer_exactly(size), callback); }
@@ -299,7 +297,7 @@ namespace network
             return;
         }
         // the upgrade response has been sent, now we can start a WebSocket session
-        std::make_shared<wss_server_session>(get_server(), get_next_request().get_target(), std::move(socket))->run();
+        std::make_shared<wss_server_session>(get_server(), get_current_request().get_target(), std::move(socket))->run();
     }
 
     void ssl_server_session::read(asio::streambuf &buffer, std::size_t size, std::function<void(const std::error_code &, std::size_t)> callback) { asio::async_read(socket, buffer, asio::transfer_exactly(size), callback); }

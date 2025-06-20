@@ -61,8 +61,8 @@ namespace network
     virtual void disconnect() = 0;
 
   protected:
-    request &get_next_request() { return *request_queue.front(); }
-    const request &get_next_request() const { return *request_queue.front(); }
+    request &get_current_request() { return *current_request; }
+    const request &get_next_request() const { return *current_request; }
     response &get_next_response() { return *response_queue.front(); }
     const response &get_next_response() const { return *response_queue.front(); }
 
@@ -83,7 +83,7 @@ namespace network
   private:
     server_base &server;                                  // Reference to the server base associated with this session
     asio::strand<asio::io_context::executor_type> strand; // Strand to ensure thread-safe operations within the session
-    std::queue<std::unique_ptr<request>> request_queue;   // Queue to hold incoming requests
+    std::unique_ptr<request> current_request;             // Pointer to the current request being processed
     std::queue<std::unique_ptr<response>> response_queue; // Queue to hold outgoing responses
   };
 

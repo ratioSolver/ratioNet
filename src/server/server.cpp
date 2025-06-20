@@ -83,10 +83,6 @@ namespace network
 
     void server_base::handle_request(server_session_base &s, request &req)
     {
-        // read next request if connection is keep-alive
-        if (req.is_keep_alive())
-            s.run(); // read next request
-
         if (auto it = routes.find(req.get_verb()); it != routes.end())
             for (const auto &r : it->second)
                 if (r.match(req.get_target()))
