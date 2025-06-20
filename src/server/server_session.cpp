@@ -20,8 +20,8 @@ namespace network
     {
         auto &req = *current_request; // Get the current request object
 
-        auto key_it = req.headers.find("sec-websocket-key");
-        if (key_it == req.headers.end())
+        auto key_it = current_request->headers.find("sec-websocket-key");
+        if (key_it == current_request->headers.end())
         {
             LOG_ERR("WebSocket key not found");
             return;
@@ -73,33 +73,33 @@ namespace network
             return;
         }
 
-        auto &req = *current_request; // Get the current request object
-
         // the buffer may contain additional bytes beyond the delimiter
-        std::size_t additional_bytes = req.buffer.size() - bytes_transferred;
+        std::size_t additional_bytes = current_request->buffer.size() - bytes_transferred;
 
-        req.parse(); // parse the request line and headers
+        current_request->parse(); // parse the request line and headers
 
-        if (req.is_upgrade()) // handle websocket upgrade request
+        if (current_request->is_upgrade()) // handle websocket upgrade request
             return upgrade();
 
-        if (req.headers.find("content-length") != req.headers.end())
+        if (current_request->headers.find("content-length") != current_request->headers.end())
         { // read body
-            std::size_t content_length = std::stoul(req.headers["content-length"]);
+            std::size_t content_length = std::stoul(current_request->headers["content-length"]);
             if (content_length > additional_bytes) // read the remaining body
-                read(req.buffer, content_length - additional_bytes, std::bind(&server_session_base::on_read_body, shared_from_this(), asio::placeholders::error, asio::placeholders::bytes_transferred));
+                read(current_request->buffer, content_length - additional_bytes, std::bind(&server_session_base::on_read_body, shared_from_this(), asio::placeholders::error, asio::placeholders::bytes_transferred));
             else // the buffer contains the entire body
                 on_read_body(ec, bytes_transferred);
         }
-        else if (req.headers.find("transfer-encoding") != req.headers.end() && req.headers.at("transfer-encoding") == "chunked")
+        else if (current_request->headers.find("transfer-encoding") != current_request->headers.end() && current_request->headers.at("transfer-encoding") == "chunked")
             read_chunk();
+        else
+        {
+            server.handle_request(*this, *current_request); // Handle the request with the server
 
-        server.handle_request(*this, req); // Handle the request with the server
-
-        if (req.is_keep_alive())
-        { // If the request is keep-alive, prepare for the next request
-            current_request = std::make_unique<request>();
-            read_until(current_request->buffer, "\r\n\r\n", std::bind(&server_session_base::on_read_headers, shared_from_this(), asio::placeholders::error, asio::placeholders::bytes_transferred));
+            if (current_request->is_keep_alive())
+            { // If the request is keep-alive, prepare for the next request
+                current_request = std::make_unique<request>();
+                read_until(current_request->buffer, "\r\n\r\n", std::bind(&server_session_base::on_read_headers, shared_from_this(), asio::placeholders::error, asio::placeholders::bytes_transferred));
+            }
         }
     }
     void server_session_base::on_read_body(const asio::error_code &ec, std::size_t)
@@ -145,23 +145,20 @@ namespace network
     }
     void server_session_base::read_chunk()
     {
-        auto &req = *current_request; // Get the current request object
-        read_until(req.get_buffer(), "\r\n", [self = shared_from_this(), &req](const std::error_code &ec, std::size_t bytes_transferred)
+        read_until(current_request->get_buffer(), "\r\n", [this, self = shared_from_this()](const std::error_code &ec, std::size_t bytes_transferred)
                    {
             if (ec)
             {
                 LOG_ERR("Error reading chunk: " << ec.message());
                 return;
             }
-            
-            auto &req = *self->current_request; // Get the current response object..
 
             // The buffer may contain additional bytes beyond the delimiter
-            std::size_t additional_bytes = req.buffer.size() - bytes_transferred;
+            std::size_t additional_bytes = current_request->buffer.size() - bytes_transferred;
 
             std::string chunk_size;
             std::vector<std::string> extensions;
-            std::istream is(&req.buffer);
+            std::istream is(&current_request->buffer);
             while (is.peek() != '\r' && is.peek() != ';')
                 chunk_size += is.get();
             if (is.peek() == ';')
@@ -182,34 +179,34 @@ namespace network
 
             std::size_t size = std::stoul(chunk_size, nullptr, 16);
             if (size == 0)                                              // If chunk size is 0, read the trailing CRLF
-                self->read_until(req.buffer, "\r\n", [self, &req](const std::error_code &ec, std::size_t bytes_transferred)
+                self->read_until(current_request->buffer, "\r\n", [this, self](const std::error_code &ec, std::size_t bytes_transferred)
                                  {
                                      if (ec)
                                      {
                                          LOG_ERR("Error reading trailing CRLF: " << ec.message());
                                          return;
                                      }
-                                     req.buffer.consume(2); // Consume the trailing CRLF
+                                     current_request->buffer.consume(2); // Consume the trailing CRLF
                                      self->on_read_body(ec, bytes_transferred);             // Call on_read_body to process the response
                                  });
             else if (size > additional_bytes) // If chunk size is greater than additional bytes, read the remaining chunk
-                self->read(req.buffer, size - additional_bytes, [self, size, &req](const std::error_code &ec, std::size_t)
+                self->read(current_request->buffer, size - additional_bytes, [this, self, size](const std::error_code &ec, std::size_t)
                            {
                                if (ec)
                                {
                                    LOG_ERR("Error reading chunk body: " << ec.message());
                                    return;
                                }
-                               req.accumulated_body.reserve(req.accumulated_body.size() + size);
-                               req.accumulated_body.append(asio::buffers_begin(req.buffer.data()), asio::buffers_begin(req.buffer.data()) + size);
-                               req.buffer.consume(size + 2); // Consume the chunk body and the trailing CRLF
+                               current_request->accumulated_body.reserve(current_request->accumulated_body.size() + size);
+                               current_request->accumulated_body.append(asio::buffers_begin(current_request->buffer.data()), asio::buffers_begin(current_request->buffer.data()) + size);
+                               current_request->buffer.consume(size + 2); // Consume the chunk body and the trailing CRLF
                                self->read_chunk(); // Read the next chunk
                            });
             else 
                 { // The buffer contains the entire chunk, append it to the body and read the next chunk
-                    req.accumulated_body.reserve(req.accumulated_body.size() + size);
-                    req.accumulated_body.append(asio::buffers_begin(req.buffer.data()), asio::buffers_begin(req.buffer.data()) + size);
-                    req.buffer.consume(size + 2); // Consume the chunk body and the trailing CRLF
+                    current_request->accumulated_body.reserve(current_request->accumulated_body.size() + size);
+                    current_request->accumulated_body.append(asio::buffers_begin(current_request->buffer.data()), asio::buffers_begin(current_request->buffer.data()) + size);
+                    current_request->buffer.consume(size + 2); // Consume the chunk body and the trailing CRLF
                     self->read_chunk(); // Read the next chunk
                 } });
     }
