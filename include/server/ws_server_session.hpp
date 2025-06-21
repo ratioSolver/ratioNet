@@ -97,6 +97,7 @@ namespace network
     server_base &server;                                    // Reference to the server base associated with this WebSocket session
     std::string path;                                       // The path for the WebSocket session
     asio::any_io_executor executor;                         // The executor used for asynchronous operations
+    asio::streambuf buffer;                                 // Buffer for reading data
     std::unique_ptr<message> current_message;               // Pointer to the current message being processed
     std::queue<std::unique_ptr<message>> outgoing_messages; // Queue to hold outgoing WebSocket messages
   };

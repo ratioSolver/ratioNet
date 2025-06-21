@@ -42,13 +42,88 @@ namespace network
 
     /**
      * @brief Constructor.
+     *
      * @param v The HTTP verb of the request.
      * @param trgt The target of the request.
      * @param ver The HTTP version of the request.
      * @param hdrs The headers of the request.
      */
     request(verb v, std::string_view trgt, std::string_view ver, std::map<std::string, std::string> &&hdrs) : v(v), target(trgt), version(ver), headers(hdrs) {}
+    /**
+     * @brief Constructs a request from a stream buffer.
+     *
+     * @param buf The stream buffer containing the request data.
+     */
+    explicit request(asio::streambuf &buf)
+    {
+      std::istream is(&buf);
+      switch (is.get())
+      {
+      case 'D':
+        if (is.get() == 'E' && is.get() == 'L' && is.get() == 'E' && is.get() == 'T' && is.get() == 'E')
+          v = Delete;
+        break;
+      case 'G':
+        if (is.get() == 'E' && is.get() == 'T')
+          v = Get;
+        break;
+      case 'O':
+        if (is.get() == 'P' && is.get() == 'T' && is.get() == 'I' && is.get() == 'O' && is.get() == 'N' && is.get() == 'S')
+          v = Options;
+        break;
+      case 'P':
+        switch (is.get())
+        {
+        case 'O':
+          if (is.get() == 'S' && is.get() == 'T')
+            v = Post;
+          break;
+        case 'U':
+          if (is.get() == 'T')
+            v = Put;
+          break;
+        }
+        break;
+      }
+      is.get(); // consume space
 
+      while (is.peek() != ' ')
+        target += static_cast<char>(is.get());
+      is.get(); // consume space
+
+      while (is.peek() != '\r')
+        version += static_cast<char>(is.get());
+      is.get(); // consume '\r'
+      is.get(); // consume '\n'
+
+      // Read headers
+      std::string line;
+      while (std::getline(is, line))
+      {
+        if (!line.empty() && line.back() == '\r')
+          line.pop_back(); // Remove trailing '\r' if present (for CRLF line endings)
+
+        if (line.empty())
+          break; // Empty line signals end of headers
+
+        auto colon = line.find(':');
+        if (colon != std::string::npos)
+        {
+          std::string header = line.substr(0, colon);
+          std::string value = line.substr(colon + 1);
+
+          // trim leading spaces
+          size_t start = value.find_first_not_of(" ");
+          if (start != std::string::npos)
+            value = value.substr(start);
+
+          std::transform(header.begin(), header.end(), header.begin(), [](unsigned char c)
+                         { return std::tolower(c); });
+
+          headers.emplace(std::move(header), std::move(value));
+        }
+      }
+    }
     /**
      * @brief Destructor.
      */
@@ -129,83 +204,6 @@ namespace network
       std::ostream os(&buffer);
       write(os); // Write the request to the buffer
       return buffer;
-    }
-
-    /**
-     * @brief Parses the request.
-     *
-     * This function is responsible for parsing the request.
-     * It performs the necessary operations to extract relevant information from the request.
-     */
-    void parse()
-    {
-      std::istream is(&buffer);
-      switch (is.get())
-      {
-      case 'D':
-        if (is.get() == 'E' && is.get() == 'L' && is.get() == 'E' && is.get() == 'T' && is.get() == 'E')
-          v = Delete;
-        break;
-      case 'G':
-        if (is.get() == 'E' && is.get() == 'T')
-          v = Get;
-        break;
-      case 'O':
-        if (is.get() == 'P' && is.get() == 'T' && is.get() == 'I' && is.get() == 'O' && is.get() == 'N' && is.get() == 'S')
-          v = Options;
-        break;
-      case 'P':
-        switch (is.get())
-        {
-        case 'O':
-          if (is.get() == 'S' && is.get() == 'T')
-            v = Post;
-          break;
-        case 'U':
-          if (is.get() == 'T')
-            v = Put;
-          break;
-        }
-        break;
-      }
-      is.get(); // consume space
-
-      while (is.peek() != ' ')
-        target += static_cast<char>(is.get());
-      is.get(); // consume space
-
-      while (is.peek() != '\r')
-        version += static_cast<char>(is.get());
-      is.get(); // consume '\r'
-      is.get(); // consume '\n'
-
-      // Read headers
-      std::string line;
-      while (std::getline(is, line))
-      {
-        if (!line.empty() && line.back() == '\r')
-          line.pop_back(); // Remove trailing '\r' if present (for CRLF line endings)
-
-        if (line.empty())
-          break; // Empty line signals end of headers
-
-        auto colon = line.find(':');
-        if (colon != std::string::npos)
-        {
-          std::string header = line.substr(0, colon);
-          std::string value = line.substr(colon + 1);
-
-          // trim leading spaces
-          size_t start = value.find_first_not_of(" ");
-          if (start != std::string::npos)
-            value = value.substr(start);
-
-          std::transform(header.begin(), header.end(), header.begin(), [](unsigned char c)
-                         { return std::tolower(c); });
-
-          headers.emplace(std::move(header), std::move(value));
-        }
-      }
     }
 
   protected:

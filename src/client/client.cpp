@@ -21,12 +21,12 @@ namespace network
             LOG_ERR(ec.message());
             return nullptr;
         }
-        auto res = utils::make_u_ptr<response>();
+        asio::streambuf buffer;
 
         std::size_t bytes_transferred = 0;
         while (true)
         {
-            bytes_transferred = read_until(res->buffer, "\r\n\r\n");
+            bytes_transferred = read_until(buffer, "\r\n\r\n");
             if (ec == asio::error::eof)
             { // connection closed by server
                 LOG_DEBUG("Connection closed by server");
@@ -49,23 +49,23 @@ namespace network
         }
 
         // the buffer may contain additional bytes beyond the delimiter
-        std::size_t additional_bytes = res->buffer.size() - bytes_transferred;
+        std::size_t additional_bytes = buffer.size() - bytes_transferred;
 
-        res->parse();
+        auto res = utils::make_u_ptr<response>(buffer);
 
         if (res->get_headers().find("content-length") != res->get_headers().end())
         {
             auto len = std::stoul(res->get_headers().at("content-length"));
             if (len > additional_bytes)
             { // read the remaining body
-                read(res->buffer, len - additional_bytes);
+                read(buffer, len - additional_bytes);
                 if (ec)
                 {
                     LOG_ERR(ec.message());
                     return nullptr;
                 }
             }
-            std::istream is(&res->buffer);
+            std::istream is(&buffer);
             if (res->get_headers().find("content-type") != res->get_headers().end() && res->get_headers().at("content-type") == "application/json")
                 res = utils::make_u_ptr<json_response>(json::load(is), res->get_status_code(), std::move(res->headers));
             else
@@ -81,18 +81,18 @@ namespace network
         {
             while (true)
             {
-                bytes_transferred = read_until(res->buffer, "\r\n"); // read the chunk size
+                bytes_transferred = read_until(buffer, "\r\n"); // read the chunk size
                 if (ec)
                 {
                     LOG_ERR(ec.message());
                     return nullptr;
                 }
                 // the buffer may contain additional bytes beyond the delimiter
-                additional_bytes = res->buffer.size() - bytes_transferred;
+                additional_bytes = buffer.size() - bytes_transferred;
 
                 std::string chunk_size;
                 std::vector<std::string> extensions;
-                std::istream is(&res->buffer);
+                std::istream is(&buffer);
                 while (is.peek() != '\r' && is.peek() != ';')
                     chunk_size += is.get();
                 if (is.peek() == ';')
@@ -115,18 +115,18 @@ namespace network
                 if (size == 0)
                 {
                     // read the trailing CRLF
-                    read_until(res->buffer, "\r\n");
+                    read_until(buffer, "\r\n");
                     if (ec)
                     {
                         LOG_ERR(ec.message());
                         return nullptr;
                     }
-                    res->buffer.consume(2); // consume '\r\n'
+                    buffer.consume(2); // consume '\r\n'
                     break;
                 }
                 else if (size > additional_bytes)
                 { // read the remaining chunk
-                    read(res->buffer, (size - additional_bytes) + 2);
+                    read(buffer, (size - additional_bytes) + 2);
                     if (ec)
                     {
                         LOG_ERR(ec.message());
@@ -134,8 +134,8 @@ namespace network
                     }
                 }
                 res->accumulated_body.reserve(res->accumulated_body.size() + size);
-                res->accumulated_body.append(asio::buffers_begin(res->buffer.data()), asio::buffers_begin(res->buffer.data()) + size);
-                res->buffer.consume(size + 2); // consume chunk and '\r\n'
+                res->accumulated_body.append(asio::buffers_begin(buffer.data()), asio::buffers_begin(buffer.data()) + size);
+                buffer.consume(size + 2); // consume chunk and '\r\n'
             }
             if (res->get_headers().find("content-type") != res->get_headers().end() && res->get_headers().at("content-type") == "application/json")
                 res = utils::make_u_ptr<json_response>(json::load(res->accumulated_body), res->get_status_code(), std::move(res->headers));

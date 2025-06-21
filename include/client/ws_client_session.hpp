@@ -90,6 +90,7 @@ namespace network
     std::function<void(message &)> on_message_handler;             // The handler for the message event.
     std::function<void()> on_close_handler;                        // The handler for the close event.
     std::function<void(const std::error_code &)> on_error_handler; // The handler for the error event.
+    asio::streambuf buffer;                                        // Buffer for reading data
     std::unique_ptr<message> current_message;                      // Pointer to the current message being processed
     std::queue<std::unique_ptr<message>> outgoing_messages;        // Queue to hold outgoing WebSocket messages
   };

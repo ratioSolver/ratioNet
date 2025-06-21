@@ -107,6 +107,7 @@ namespace network
     asio::ip::basic_resolver_results<asio::ip::tcp> endpoints; // The resolved endpoints for the server.
   private:
     asio::strand<asio::io_context::executor_type> strand;                                                 // Strand to ensure thread-safe operations within the session
+    asio::streambuf buffer;                                                                               // Buffer for reading data
     std::queue<std::pair<std::unique_ptr<request>, std::function<void(const response &)>>> request_queue; // Queue to hold outgoing requests
     std::unique_ptr<response> current_response = std::make_unique<response>();                            // Pointer to the current response being processed
     std::queue<std::function<void(const response &)>> callback_queue;                                     // Queue to hold callbacks for responses

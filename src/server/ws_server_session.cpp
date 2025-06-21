@@ -13,7 +13,7 @@ namespace network
         server.on_connect(*this);
         current_message = std::make_unique<message>();
         // Start reading the first two bytes to determine the message type and size
-        read(current_message->buffer, 2, std::bind(&ws_server_session_base::on_read, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
+        read(buffer, 2, std::bind(&ws_server_session_base::on_read, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
     }
 
     void ws_server_session_base::enqueue(std::unique_ptr<message> msg)
@@ -39,32 +39,34 @@ namespace network
             return;
         }
 
-        std::istream is(&current_message->buffer);
+        current_message = std::make_unique<message>(); // Prepare for the next message
+
+        std::istream is(&buffer);
         is.read(reinterpret_cast<char *>(&current_message->fin_rsv_opcode), 1);
 
         char len; // second byte of the message
         is.read(&len, 1);
         size_t length = len & 0x7F; // length of the payload
         if (length == 126)
-            read(current_message->buffer, 2, [this, self = shared_from_this()](const std::error_code &, std::size_t)
+            read(buffer, 2, [this, self = shared_from_this()](const std::error_code &, std::size_t)
                  {
                     char buf[2];
-                    std::istream is(&current_message->buffer);
+                    std::istream is(&buffer);
                     is.read(buf, 2);
                     size_t length = (buf[0] << 8) | buf[1];
-                    self->read(current_message->buffer, length + 4, std::bind(&ws_server_session_base::on_message, self, asio::placeholders::error, asio::placeholders::bytes_transferred)); });
+                    self->read(buffer, length + 4, std::bind(&ws_server_session_base::on_message, self, asio::placeholders::error, asio::placeholders::bytes_transferred)); });
         else if (length == 127)
-            read(current_message->buffer, 8, [this, self = shared_from_this()](const std::error_code &, std::size_t)
+            read(buffer, 8, [this, self = shared_from_this()](const std::error_code &, std::size_t)
                  {
                     char buf[8];
-                    std::istream is(&current_message->buffer);
+                    std::istream is(&buffer);
                     is.read(buf, 8);
                     size_t length = 0;
                     for (size_t i = 0; i < 8; i++)
                         length = (length << 8) | buf[i];
-                    self->read(current_message->buffer, length + 4, std::bind(&ws_server_session_base::on_message, self, asio::placeholders::error, asio::placeholders::bytes_transferred)); });
+                    self->read(buffer, length + 4, std::bind(&ws_server_session_base::on_message, self, asio::placeholders::error, asio::placeholders::bytes_transferred)); });
         else
-            read(current_message->buffer, length + 4, std::bind(&ws_server_session_base::on_message, shared_from_this(), asio::placeholders::error, asio::placeholders::bytes_transferred));
+            read(buffer, length + 4, std::bind(&ws_server_session_base::on_message, shared_from_this(), asio::placeholders::error, asio::placeholders::bytes_transferred));
     }
 
     void ws_server_session_base::on_message(const asio::error_code &ec, std::size_t bytes_transferred)
@@ -82,7 +84,7 @@ namespace network
         }
 
         // Process the current message
-        std::istream is(&current_message->buffer);
+        std::istream is(&buffer);
         char mask[4]; // mask for the message
         is.read(mask, 4);
         for (size_t i = 0; i < bytes_transferred - 4; i++) // unmask the message
@@ -90,8 +92,7 @@ namespace network
 
         server.on_message(*this, *current_message);
 
-        current_message = std::make_unique<message>(); // Prepare for the next message
-        read(current_message->buffer, 2, std::bind(&ws_server_session_base::on_read, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
+        read(buffer, 2, std::bind(&ws_server_session_base::on_read, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
     }
 
     void ws_server_session_base::on_write(const asio::error_code &ec, std::size_t)

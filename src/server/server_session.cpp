@@ -10,7 +10,7 @@ namespace network
     server_session_base::server_session_base(server_base &server) : server(server), strand(asio::make_strand(server.io_ctx)) {}
     server_session_base::~server_session_base() {}
 
-    void server_session_base::run() { read_until(current_request->buffer, "\r\n\r\n", std::bind(&server_session_base::on_read_headers, shared_from_this(), std::placeholders::_1, std::placeholders::_2)); }
+    void server_session_base::run() { read_until(buffer, "\r\n\r\n", std::bind(&server_session_base::on_read_headers, shared_from_this(), std::placeholders::_1, std::placeholders::_2)); }
 
     void server_session_base::upgrade()
     {
@@ -68,9 +68,9 @@ namespace network
         }
 
         // the buffer may contain additional bytes beyond the delimiter
-        std::size_t additional_bytes = current_request->buffer.size() - bytes_transferred;
+        std::size_t additional_bytes = buffer.size() - bytes_transferred;
 
-        current_request->parse(); // parse the request line and headers
+        current_request = std::make_unique<request>(buffer); // Create a new request object from the buffer
 
         if (current_request->is_upgrade()) // handle websocket upgrade request
             return upgrade();
@@ -79,7 +79,7 @@ namespace network
         { // read body
             std::size_t content_length = std::stoul(current_request->headers["content-length"]);
             if (content_length > additional_bytes) // read the remaining body
-                read(current_request->buffer, content_length - additional_bytes, std::bind(&server_session_base::on_read_body, shared_from_this(), asio::placeholders::error, asio::placeholders::bytes_transferred));
+                read(buffer, content_length - additional_bytes, std::bind(&server_session_base::on_read_body, shared_from_this(), asio::placeholders::error, asio::placeholders::bytes_transferred));
             else // the buffer contains the entire body
                 on_read_body(ec, bytes_transferred);
         }
@@ -90,10 +90,7 @@ namespace network
             server.handle_request(*this, *current_request); // Handle the request with the server
 
             if (current_request->is_keep_alive())
-            { // If the request is keep-alive, prepare for the next request
-                current_request = std::make_unique<request>();
-                read_until(current_request->buffer, "\r\n\r\n", std::bind(&server_session_base::on_read_headers, shared_from_this(), asio::placeholders::error, asio::placeholders::bytes_transferred));
-            }
+                read_until(buffer, "\r\n\r\n", std::bind(&server_session_base::on_read_headers, shared_from_this(), asio::placeholders::error, asio::placeholders::bytes_transferred));
         }
     }
     void server_session_base::on_read_body(const asio::error_code &ec, std::size_t)
@@ -106,40 +103,34 @@ namespace network
             return;
         }
 
-        if (current_request->headers.find("content-type") != current_request->headers.end() && current_request->headers["content-type"].find("application/json") != std::string::npos)
+        if (current_request->accumulated_body.empty())
         {
-            if (!current_request->accumulated_body.empty())
-                current_request = std::make_unique<json_request>(current_request->v, std::move(current_request->target), std::move(current_request->version), std::move(current_request->headers), json::load(current_request->accumulated_body));
+            std::size_t content_length = std::stoul(current_request->headers["content-length"]);
+            std::string body;
+            body.reserve(content_length);
+            body.assign(asio::buffers_begin(buffer.data()), asio::buffers_begin(buffer.data()) + content_length);
+            buffer.consume(content_length); // Consume the body from the buffer
+            if (current_request->headers.find("content-type") != current_request->headers.end() && current_request->headers["content-type"].find("application/json") != std::string::npos)
+                current_request = std::make_unique<json_request>(current_request->v, std::move(current_request->target), std::move(current_request->version), std::move(current_request->headers), json::load(body));
             else
-            {
-                std::istream is(&current_request->buffer);
-                current_request = std::make_unique<json_request>(current_request->v, std::move(current_request->target), std::move(current_request->version), std::move(current_request->headers), json::load(is));
-            }
+                current_request = std::make_unique<string_request>(current_request->v, std::move(current_request->target), std::move(current_request->version), std::move(current_request->headers), std::move(body));
         }
         else
         {
-            if (!current_request->accumulated_body.empty())
-                current_request = std::make_unique<string_request>(current_request->v, std::move(current_request->target), std::move(current_request->version), std::move(current_request->headers), std::move(current_request->accumulated_body));
+            if (current_request->headers.find("content-type") != current_request->headers.end() && current_request->headers["content-type"].find("application/json") != std::string::npos)
+                current_request = std::make_unique<json_request>(current_request->v, std::move(current_request->target), std::move(current_request->version), std::move(current_request->headers), json::load(current_request->accumulated_body));
             else
-            {
-                std::string body;
-                body.reserve(current_request->buffer.size());
-                body.assign(asio::buffers_begin(current_request->buffer.data()), asio::buffers_end(current_request->buffer.data()));
-                current_request = std::make_unique<string_request>(current_request->v, std::move(current_request->target), std::move(current_request->version), std::move(current_request->headers), std::move(body));
-            }
+                current_request = std::make_unique<string_request>(current_request->v, std::move(current_request->target), std::move(current_request->version), std::move(current_request->headers), std::move(current_request->accumulated_body));
         }
 
         server.handle_request(*this, *current_request); // Handle the request with the server
 
         if (current_request->is_keep_alive())
-        { // If the request is keep-alive, prepare for the next request
-            current_request = std::make_unique<request>();
-            read_until(current_request->buffer, "\r\n\r\n", std::bind(&server_session_base::on_read_headers, shared_from_this(), asio::placeholders::error, asio::placeholders::bytes_transferred));
-        }
+            read_until(buffer, "\r\n\r\n", std::bind(&server_session_base::on_read_headers, shared_from_this(), asio::placeholders::error, asio::placeholders::bytes_transferred));
     }
     void server_session_base::read_chunk()
     {
-        read_until(current_request->get_buffer(), "\r\n", [this, self = shared_from_this()](const std::error_code &ec, std::size_t bytes_transferred)
+        read_until(buffer, "\r\n", [this, self = shared_from_this()](const std::error_code &ec, std::size_t bytes_transferred)
                    {
             if (ec)
             {
@@ -148,11 +139,11 @@ namespace network
             }
 
             // The buffer may contain additional bytes beyond the delimiter
-            std::size_t additional_bytes = current_request->buffer.size() - bytes_transferred;
+            std::size_t additional_bytes = buffer.size() - bytes_transferred;
 
             std::string chunk_size;
             std::vector<std::string> extensions;
-            std::istream is(&current_request->buffer);
+            std::istream is(&buffer);
             while (is.peek() != '\r' && is.peek() != ';')
                 chunk_size += is.get();
             if (is.peek() == ';')
@@ -173,18 +164,18 @@ namespace network
 
             std::size_t size = std::stoul(chunk_size, nullptr, 16);
             if (size == 0)                                              // If chunk size is 0, read the trailing CRLF
-                self->read_until(current_request->buffer, "\r\n", [this, self](const std::error_code &ec, std::size_t bytes_transferred)
+                self->read_until(buffer, "\r\n", [this, self](const std::error_code &ec, std::size_t bytes_transferred)
                                  {
                                      if (ec)
                                      {
                                          LOG_ERR("Error reading trailing CRLF: " << ec.message());
                                          return;
                                      }
-                                     current_request->buffer.consume(2); // Consume the trailing CRLF
+                                     buffer.consume(2); // Consume the trailing CRLF
                                      self->on_read_body(ec, bytes_transferred);             // Call on_read_body to process the response
                                  });
             else if (size > additional_bytes) // If chunk size is greater than additional bytes, read the remaining chunk
-                self->read(current_request->buffer, size - additional_bytes, [this, self, size](const std::error_code &ec, std::size_t)
+                self->read(buffer, size - additional_bytes, [this, self, size](const std::error_code &ec, std::size_t)
                            {
                                if (ec)
                                {
@@ -192,15 +183,15 @@ namespace network
                                    return;
                                }
                                current_request->accumulated_body.reserve(current_request->accumulated_body.size() + size);
-                               current_request->accumulated_body.append(asio::buffers_begin(current_request->buffer.data()), asio::buffers_begin(current_request->buffer.data()) + size);
-                               current_request->buffer.consume(size + 2); // Consume the chunk body and the trailing CRLF
+                               current_request->accumulated_body.append(asio::buffers_begin(buffer.data()), asio::buffers_begin(buffer.data()) + size);
+                               buffer.consume(size + 2); // Consume the chunk body and the trailing CRLF
                                self->read_chunk(); // Read the next chunk
                            });
             else 
                 { // The buffer contains the entire chunk, append it to the body and read the next chunk
                     current_request->accumulated_body.reserve(current_request->accumulated_body.size() + size);
-                    current_request->accumulated_body.append(asio::buffers_begin(current_request->buffer.data()), asio::buffers_begin(current_request->buffer.data()) + size);
-                    current_request->buffer.consume(size + 2); // Consume the chunk body and the trailing CRLF
+                    current_request->accumulated_body.append(asio::buffers_begin(buffer.data()), asio::buffers_begin(buffer.data()) + size);
+                    buffer.consume(size + 2); // Consume the chunk body and the trailing CRLF
                     self->read_chunk(); // Read the next chunk
                 } });
     }

@@ -32,6 +32,56 @@ namespace network
      * @param ver The HTTP version of the response.
      */
     response(status_code code = status_code::ok, std::map<std::string, std::string> &&hdrs = {}, std::string &&ver = "HTTP/1.1") : code(code), headers(hdrs), version(ver) {}
+    /**
+     * @brief Constructs a response object from a stream buffer.
+     *
+     * @param buff The stream buffer containing the response data.
+     */
+    explicit response(asio::streambuf &buff)
+    {
+      std::istream is(&buff);
+
+      std::string c_version;
+      while (is.peek() != ' ')
+        c_version += static_cast<char>(is.get());
+      version = std::move(c_version);
+      is.get(); // consume ' '
+      std::string c_code;
+      while (is.peek() != ' ' && is.peek() != '\r')
+        c_code += static_cast<char>(is.get());
+      code = static_cast<status_code>(std::stoi(c_code));
+      if (is.peek() == ' ')
+      {
+        is.get(); // consume ' '
+        std::string c_reason;
+        while (is.peek() != '\r')
+          c_reason += static_cast<char>(is.get());
+      }
+      is.get(); // consume '\r'
+      is.get(); // consume '\n'
+
+      while (is.peek() != '\r')
+      {
+        std::string header, value;
+        while (is.peek() != ':')
+          header += static_cast<char>(is.get());
+        is.get(); // consume ':'
+        is.get(); // consume space
+        while (is.peek() != '\r')
+          value += static_cast<char>(is.get());
+        is.get(); // consume '\r'
+        is.get(); // consume '\n'
+
+        // convert header to lowercase
+        std::transform(header.begin(), header.end(), header.begin(), [](unsigned char c)
+                       { return std::tolower(c); });
+
+        // add header to the map
+        headers.emplace(std::move(header), std::move(value));
+      }
+      is.get(); // consume '\r'
+      is.get(); // consume '\n'
+    }
     virtual ~response() = default;
 
     /**
@@ -88,58 +138,6 @@ namespace network
       std::ostream os(&buffer);
       write(os); // Write the response to the buffer
       return buffer;
-    }
-
-    /**
-     * @brief Parses the response.
-     *
-     * This function is responsible for parsing the response.
-     * It performs the necessary operations to extract relevant information from the response.
-     */
-    void parse()
-    {
-      std::istream is(&buffer);
-
-      std::string c_version;
-      while (is.peek() != ' ')
-        c_version += static_cast<char>(is.get());
-      version = std::move(c_version);
-      is.get(); // consume ' '
-      std::string c_code;
-      while (is.peek() != ' ' && is.peek() != '\r')
-        c_code += static_cast<char>(is.get());
-      code = static_cast<status_code>(std::stoi(c_code));
-      if (is.peek() == ' ')
-      {
-        is.get(); // consume ' '
-        std::string c_reason;
-        while (is.peek() != '\r')
-          c_reason += static_cast<char>(is.get());
-      }
-      is.get(); // consume '\r'
-      is.get(); // consume '\n'
-
-      while (is.peek() != '\r')
-      {
-        std::string header, value;
-        while (is.peek() != ':')
-          header += static_cast<char>(is.get());
-        is.get(); // consume ':'
-        is.get(); // consume space
-        while (is.peek() != '\r')
-          value += static_cast<char>(is.get());
-        is.get(); // consume '\r'
-        is.get(); // consume '\n'
-
-        // convert header to lowercase
-        std::transform(header.begin(), header.end(), header.begin(), [](unsigned char c)
-                       { return std::tolower(c); });
-
-        // add header to the map
-        headers.emplace(std::move(header), std::move(value));
-      }
-      is.get(); // consume '\r'
-      is.get(); // consume '\n'
     }
 
   protected:
