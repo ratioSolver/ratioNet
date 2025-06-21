@@ -81,10 +81,10 @@ namespace network
     void read_chunk();
 
   private:
-    server_base &server;                                  // Reference to the server base associated with this session
-    asio::strand<asio::io_context::executor_type> strand; // Strand to ensure thread-safe operations within the session
-    std::unique_ptr<request> current_request;             // Pointer to the current request being processed
-    std::queue<std::unique_ptr<response>> response_queue; // Queue to hold outgoing responses
+    server_base &server;                                                    // Reference to the server base associated with this session
+    asio::strand<asio::io_context::executor_type> strand;                   // Strand to ensure thread-safe operations within the session
+    std::unique_ptr<request> current_request = std::make_unique<request>(); // Pointer to the current request being processed
+    std::queue<std::unique_ptr<response>> response_queue;                   // Queue to hold outgoing responses
   };
 
   /**

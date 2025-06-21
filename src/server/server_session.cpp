@@ -10,16 +10,10 @@ namespace network
     server_session_base::server_session_base(server_base &server) : server(server), strand(asio::make_strand(server.io_ctx)) {}
     server_session_base::~server_session_base() {}
 
-    void server_session_base::run()
-    {
-        current_request = std::make_unique<request>(); // Initialize the current request
-        read_until(current_request->buffer, "\r\n\r\n", std::bind(&server_session_base::on_read_headers, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
-    }
+    void server_session_base::run() { read_until(current_request->buffer, "\r\n\r\n", std::bind(&server_session_base::on_read_headers, shared_from_this(), std::placeholders::_1, std::placeholders::_2)); }
 
     void server_session_base::upgrade()
     {
-        auto &req = *current_request; // Get the current request object
-
         auto key_it = current_request->headers.find("sec-websocket-key");
         if (key_it == current_request->headers.end())
         {
