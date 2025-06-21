@@ -45,7 +45,7 @@ void test_rest_server()
 
     std::thread t{[&server]
                   { server.start(); }};
-    std::this_thread::sleep_for(std::chrono::seconds(20));
+    std::this_thread::sleep_for(std::chrono::seconds(5));
     server.stop();
     t.join();
 }
@@ -91,7 +91,7 @@ void test_ssl_server()
 
     std::thread t{[&server]
                   { server.start(); }};
-    std::this_thread::sleep_for(std::chrono::seconds(20));
+    std::this_thread::sleep_for(std::chrono::seconds(5));
     server.stop();
     t.join();
 }
@@ -132,7 +132,7 @@ void test_cors_server()
 
     std::thread t{[&server]
                   { server.start(); }};
-    std::this_thread::sleep_for(std::chrono::seconds(20));
+    std::this_thread::sleep_for(std::chrono::seconds(5));
     server.stop();
     t.join();
 }
@@ -149,7 +149,7 @@ void test_cors_middleware()
 
     std::thread t{[&server]
                   { server.start(); }};
-    std::this_thread::sleep_for(std::chrono::seconds(20));
+    std::this_thread::sleep_for(std::chrono::seconds(5));
     server.stop();
     t.join();
 }
