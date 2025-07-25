@@ -90,7 +90,11 @@ namespace network
                     try
                     {
                         for (auto &m : middlewares)
-                            m->before_request(req);
+                            if (auto res = m->before_request(req); res)
+                            {
+                                s.enqueue(std::move(res));
+                                return;
+                            }
                         // call the route handler
                         auto res = r.get_handler()(req);
                         for (auto &m : middlewares)

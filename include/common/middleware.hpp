@@ -1,6 +1,7 @@
 #pragma once
 
 #include "verb.hpp"
+#include <memory>
 
 namespace network
 {
@@ -20,7 +21,7 @@ namespace network
   private:
     virtual void added_route(verb, const route &) {}
 
-    virtual void before_request(const request &) {}
+    virtual std::unique_ptr<response> before_request(const request &) { return nullptr; }
     virtual void after_request(const request &, response &) {}
 
   protected:
