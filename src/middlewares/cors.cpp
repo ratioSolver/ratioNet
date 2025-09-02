@@ -20,7 +20,7 @@ namespace network
 
     void cors::after_request(const request &, response &res) { res.add_header("Access-Control-Allow-Origin", "*"); }
 
-    std::unique_ptr<response> cors::option_route(const request &req)
+    std::unique_ptr<response> cors::option_route([[maybe_unused]] const request &req)
     {
         assert(req.get_verb() == Options);
         auto res = std::make_unique<response>(status_code::no_content);
