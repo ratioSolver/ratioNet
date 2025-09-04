@@ -32,6 +32,17 @@ namespace network
     virtual ~client_session_base();
 
     /**
+     * @brief Sends a request asynchronously and invokes a callback upon receiving the response.
+     *
+     * This function takes ownership of the provided request object and sends it to the server.
+     * Once a response is received, the specified callback function is called with the response.
+     *
+     * @param req A unique pointer to the request object to be sent.
+     * @param cb A callback function that will be invoked with the received response.
+     */
+    void send(std::unique_ptr<request> req, std::function<void(const response &)> &&cb);
+
+    /**
      * @brief Sends a GET request asynchronously.
      *
      * This method sends a GET request to the specified target resource on the server.
@@ -40,13 +51,66 @@ namespace network
      * @param cb A callback function to be called with the response once it is received.
      * @param hdrs Optional headers to include in the request.
      */
-    void get(std::string_view target, std::function<void(const response &)> &&cb, std::map<std::string, std::string> &&hdrs = {})
-    {
-      hdrs["Host"] = std::string(host) + ":" + std::to_string(port);
-      send(std::make_unique<request>(verb::Get, target, "HTTP/1.1", std::move(hdrs)), std::move(cb));
-    }
+    void get(std::string_view target, std::function<void(const response &)> &&cb, std::multimap<std::string, std::string> &&hdrs = {}) { send(std::make_unique<request>(verb::Get, target, "HTTP/1.1", std::move(hdrs)), std::move(cb)); }
 
-    void send(std::unique_ptr<request> req, std::function<void(const response &)> &&cb);
+    /**
+     * @brief Sends a PUT request with a string body asynchronously.
+     *
+     * This method sends a POST request to the specified target resource on the server with the provided body.
+     *
+     * @param target The target resource on the server.
+     * @param body The body of the POST request.
+     * @param cb A callback function to be called with the response once it is received.
+     * @param hdrs Optional headers to include in the request.
+     */
+    void post(std::string_view target, std::string &&body, std::function<void(const response &)> &&cb, std::multimap<std::string, std::string> &&hdrs = {}) { send(std::make_unique<string_request>(verb::Post, target, "HTTP/1.1", std::move(hdrs), std::move(body)), std::move(cb)); }
+
+    /**
+     * @brief Sends a POST request with a JSON body asynchronously.
+     *
+     * This method sends a POST request to the specified target resource on the server with the provided JSON body.
+     *
+     * @param target The target resource on the server.
+     * @param body The JSON body of the POST request.
+     * @param cb A callback function to be called with the response once it is received.
+     * @param hdrs Optional headers to include in the request.
+     */
+    void post(std::string_view target, json::json &&body, std::function<void(const response &)> &&cb, std::multimap<std::string, std::string> &&hdrs = {}) { send(std::make_unique<json_request>(verb::Post, target, "HTTP/1.1", std::move(hdrs), std::move(body)), std::move(cb)); }
+
+    /**
+     * @brief Sends a PUT request with a string body asynchronously.
+     *
+     * This method sends a PUT request to the specified target resource on the server with the provided body.
+     *
+     * @param target The target resource on the server.
+     * @param body The body of the PUT request.
+     * @param cb A callback function to be called with the response once it is received.
+     * @param hdrs Optional headers to include in the request.
+     */
+    void put(std::string_view target, std::string &&body, std::function<void(const response &)> &&cb, std::multimap<std::string, std::string> &&hdrs = {}) { send(std::make_unique<string_request>(verb::Put, target, "HTTP/1.1", std::move(hdrs), std::move(body)), std::move(cb)); }
+
+    /**
+     * @brief Sends a PUT request with a JSON body asynchronously.
+     *
+     * This method sends a PUT request to the specified target resource on the server with the provided JSON body.
+     *
+     * @param target The target resource on the server.
+     * @param body The JSON body of the PUT request.
+     * @param cb A callback function to be called with the response once it is received.
+     * @param hdrs Optional headers to include in the request.
+     */
+    void put(std::string_view target, json::json &&body, std::function<void(const response &)> &&cb, std::multimap<std::string, std::string> &&hdrs = {}) { send(std::make_unique<json_request>(verb::Put, target, "HTTP/1.1", std::move(hdrs), std::move(body)), std::move(cb)); }
+
+    /**
+     * @brief Sends a DELETE request asynchronously.
+     *
+     * This method sends a DELETE request to the specified target resource on the server.
+     *
+     * @param target The target resource on the server.
+     * @param cb A callback function to be called with the response once it is received.
+     * @param hdrs Optional headers to include in the request.
+     */
+    void del(std::string_view target, std::function<void(const response &)> &&cb, std::multimap<std::string, std::string> &&hdrs = {}) { send(std::make_unique<request>(verb::Delete, target, "HTTP/1.1", std::move(hdrs)), std::move(cb)); }
 
     /**
      * @brief Establishes a connection to the server.

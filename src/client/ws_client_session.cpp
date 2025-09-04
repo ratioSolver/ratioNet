@@ -48,12 +48,12 @@ namespace network
         for (auto &byte : random_bytes)
             byte = static_cast<unsigned char>(dist(gen));
 
-        std::map<std::string, std::string> hdrs;
-        hdrs["Host"] = host + ":" + std::to_string(port);
-        hdrs["Upgrade"] = "websocket";
-        hdrs["Connection"] = "Upgrade";
-        hdrs["Sec-WebSocket-Key"] = utils::base64_encode(random_bytes.data(), random_bytes.size());
-        hdrs["Sec-WebSocket-Version"] = "13";
+        std::multimap<std::string, std::string> hdrs;
+        hdrs.emplace("Host", host + ":" + std::to_string(port));
+        hdrs.emplace("Upgrade", "websocket");
+        hdrs.emplace("Connection", "Upgrade");
+        hdrs.emplace("Sec-WebSocket-Key", utils::base64_encode(random_bytes.data(), random_bytes.size()));
+        hdrs.emplace("Sec-WebSocket-Version", "13");
 
         auto req = std::make_shared<request>(verb::Get, std::string(target), "HTTP/1.1", std::move(hdrs));
         write(req->get_buffer(), [this, self = shared_from_this(), req](const std::error_code &ec, std::size_t)

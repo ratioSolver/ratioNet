@@ -48,7 +48,7 @@ namespace network
      * @param ver The HTTP version of the request.
      * @param hdrs The headers of the request.
      */
-    request(verb v, std::string_view trgt, std::string_view ver, std::map<std::string, std::string> &&hdrs) : v(v), target(trgt), version(ver), headers(hdrs) {}
+    request(verb v, std::string_view trgt, std::string_view ver, std::multimap<std::string, std::string> &&hdrs) : v(v), target(trgt), version(ver), headers(hdrs) {}
     /**
      * @brief Constructs a request from a stream buffer.
      *
@@ -151,7 +151,7 @@ namespace network
      * @brief Get the headers of the request.
      * @return The headers.
      */
-    [[nodiscard]] const std::map<std::string, std::string> &get_headers() const { return headers; }
+    [[nodiscard]] const std::multimap<std::string, std::string> &get_headers() const { return headers; }
 
     /**
      * @brief Overloaded stream insertion operator to write the request to an output stream.
@@ -224,18 +224,18 @@ namespace network
     void add_header(std::string_view header, std::string_view value) { headers.emplace(std::move(header), std::move(value)); }
 
   private:
-    verb v;                                     // The HTTP verb of the request
-    std::string target;                         // The target of the request
-    std::string version;                        // The HTTP version of the request
-    std::map<std::string, std::string> headers; // The headers of the request
-    asio::streambuf buffer;                     // The buffer containing the request
-    std::string accumulated_body;               // Accumulated body for chunked requests
+    verb v;                                          // The HTTP verb of the request
+    std::string target;                              // The target of the request
+    std::string version;                             // The HTTP version of the request
+    std::multimap<std::string, std::string> headers; // The headers of the request
+    asio::streambuf buffer;                          // The buffer containing the request
+    std::string accumulated_body;                    // Accumulated body for chunked requests
   };
 
   class string_request : public request
   {
   public:
-    string_request(verb v, std::string_view trgt, std::string_view ver, std::map<std::string, std::string> &&hdrs, std::string &&b) : request(v, std::move(trgt), std::move(ver), std::move(hdrs)), body(std::move(b))
+    string_request(verb v, std::string_view trgt, std::string_view ver, std::multimap<std::string, std::string> &&hdrs, std::string &&b) : request(v, std::move(trgt), std::move(ver), std::move(hdrs)), body(std::move(b))
     {
       add_header("content-type", "text/plain");
       add_header("content-length", std::to_string(body.size()));
@@ -257,7 +257,7 @@ namespace network
   class json_request : public request
   {
   public:
-    json_request(verb v, std::string_view trgt, std::string_view ver, std::map<std::string, std::string> &&hdrs, json::json &&b) : request(v, std::move(trgt), std::move(ver), std::move(hdrs)), body(b), str_body(body.dump())
+    json_request(verb v, std::string_view trgt, std::string_view ver, std::multimap<std::string, std::string> &&hdrs, json::json &&b) : request(v, std::move(trgt), std::move(ver), std::move(hdrs)), body(b), str_body(body.dump())
     {
       add_header("content-type", "application/json");
       add_header("content-length", std::to_string(str_body.size()));

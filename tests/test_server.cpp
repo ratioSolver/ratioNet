@@ -111,24 +111,13 @@ void test_cors_server()
 {
     network::server server;
     server.add_route(network::verb::Get, "/json", [](network::request &)
-                     {
-                        std::map<std::string, std::string> headers;
-                        headers["Access-Control-Allow-Origin"] = "*";
-                        return std::make_unique<network::json_response>(json::json{{"message", "Hello, World!"}}, network::ok, std::move(headers)); });
+                     { return std::make_unique<network::json_response>(json::json{{"message", "Hello, World!"}}, network::ok, std::multimap<std::string, std::string>{{"Access-Control-Allow-Origin", "*"}}); });
 
     server.add_route(network::verb::Post, "/json", [](network::request &)
-                     {
-                        std::map<std::string, std::string> headers;
-                        headers["Access-Control-Allow-Origin"] = "*";
-                        return std::make_unique<network::json_response>(json::json{{"message", "Hello, World!"}}, network::ok, std::move(headers)); });
+                     { return std::make_unique<network::json_response>(json::json{{"message", "Hello, World!"}}, network::ok, std::multimap<std::string, std::string>{{"Access-Control-Allow-Origin", "*"}}); });
 
     server.add_route(network::verb::Options, "/json", [](network::request &)
-                     {
-                        std::map<std::string, std::string> headers;
-                        headers["Access-Control-Allow-Origin"] = "*";
-                        headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS";
-                        headers["Access-Control-Allow-Headers"] = "Content-Type";
-                        return std::make_unique<network::response>(network::ok, std::move(headers)); });
+                     { return std::make_unique<network::response>(network::ok, std::multimap<std::string, std::string>{{"Access-Control-Allow-Origin", "*"}, {"Access-Control-Allow-Methods", "GET, POST, OPTIONS"}, {"Access-Control-Allow-Headers", "Content-Type"}}); });
 
     std::thread t{[&server]
                   { server.start(); }};

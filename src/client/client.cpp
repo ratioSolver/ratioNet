@@ -5,8 +5,10 @@ namespace network
 {
     client_base::client_base(std::string_view host, unsigned short port) : host(host), port(port), io_ctx(), resolver(io_ctx), endpoints(resolver.resolve(host, std::to_string(port))) {}
 
-    utils::u_ptr<response> client_base::send(utils::u_ptr<request> req)
+    std::unique_ptr<response> client_base::send(std::unique_ptr<request> req)
     {
+        req->add_header("Host", host + ":" + std::to_string(port));
+
         if (!is_connected())
             connect(endpoints);
         if (ec)
@@ -51,11 +53,11 @@ namespace network
         // the buffer may contain additional bytes beyond the delimiter
         std::size_t additional_bytes = buffer.size() - bytes_transferred;
 
-        auto res = utils::make_u_ptr<response>(buffer);
+        auto res = std::make_unique<response>(buffer);
 
-        if (res->get_headers().find("content-length") != res->get_headers().end())
-        {
-            auto len = std::stoul(res->get_headers().at("content-length"));
+        if (auto cl_range = res->get_headers().equal_range("content-length"); cl_range.first != cl_range.second)
+        { // read body based on content-length
+            auto len = std::stoul(cl_range.first->second);
             if (len > additional_bytes)
             { // read the remaining body
                 read(buffer, len - additional_bytes);
@@ -65,19 +67,20 @@ namespace network
                     return nullptr;
                 }
             }
+
             std::istream is(&buffer);
-            if (res->get_headers().find("content-type") != res->get_headers().end() && res->get_headers().at("content-type") == "application/json")
-                res = utils::make_u_ptr<json_response>(json::load(is), res->get_status_code(), std::move(res->headers));
+            if (auto ct_range = res->get_headers().equal_range("content-type"); ct_range.first != ct_range.second && ct_range.first->second == "application/json")
+                res = std::make_unique<json_response>(json::load(is), res->get_status_code(), std::move(res->headers));
             else
             {
                 std::string body;
                 body.reserve(len);
                 while (is.peek() != EOF)
                     body += is.get();
-                res = utils::make_u_ptr<string_response>(std::move(body), res->get_status_code(), std::move(res->headers));
+                res = std::make_unique<string_response>(std::move(body), res->get_status_code(), std::move(res->headers));
             }
         }
-        else if (res->get_headers().find("transfer-encoding") != res->get_headers().end() && res->get_headers().at("transfer-encoding") == "chunked")
+        else if (auto te_range = res->get_headers().equal_range("transfer-encoding"); te_range.first != te_range.second && te_range.first->second == "chunked")
         {
             while (true)
             {
@@ -137,13 +140,13 @@ namespace network
                 res->accumulated_body.append(asio::buffers_begin(buffer.data()), asio::buffers_begin(buffer.data()) + size);
                 buffer.consume(size + 2); // consume chunk and '\r\n'
             }
-            if (res->get_headers().find("content-type") != res->get_headers().end() && res->get_headers().at("content-type") == "application/json")
-                res = utils::make_u_ptr<json_response>(json::load(res->accumulated_body), res->get_status_code(), std::move(res->headers));
+            if (auto ct_range = res->get_headers().equal_range("content-type"); ct_range.first != ct_range.second && ct_range.first->second == "application/json")
+                res = std::make_unique<json_response>(json::load(res->accumulated_body), res->get_status_code(), std::move(res->headers));
             else
-                res = utils::make_u_ptr<string_response>(std::move(res->accumulated_body), res->get_status_code(), std::move(res->headers));
+                res = std::make_unique<string_response>(std::move(res->accumulated_body), res->get_status_code(), std::move(res->headers));
         }
 
-        if (res->get_headers().find("connection") != res->get_headers().end() && res->get_headers().at("connection") == "close")
+        if (auto connection = res->get_headers().equal_range("connection"); connection.first != connection.second && connection.first->second == "close")
             disconnect(); // close the connection
         return res;
     }

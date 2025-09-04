@@ -31,7 +31,7 @@ namespace network
      * @param hdrs The headers of the response.
      * @param ver The HTTP version of the response.
      */
-    response(status_code code = status_code::ok, std::map<std::string, std::string> &&hdrs = {}, std::string &&ver = "HTTP/1.1") : code(code), headers(hdrs), version(ver) {}
+    response(status_code code = status_code::ok, std::multimap<std::string, std::string> &&hdrs = {}, std::string &&ver = "HTTP/1.1") : code(code), headers(hdrs), version(ver) {}
     /**
      * @brief Constructs a response object from a stream buffer.
      *
@@ -96,7 +96,7 @@ namespace network
      *
      * @return The headers.
      */
-    [[nodiscard]] const std::map<std::string, std::string> &get_headers() const { return headers; }
+    [[nodiscard]] const std::multimap<std::string, std::string> &get_headers() const { return headers; }
 
     /**
      * @brief Adds a header to the response.
@@ -104,13 +104,7 @@ namespace network
      * @param key The header key.
      * @param value The header value.
      */
-    void add_header(std::string &&key, std::string &&value)
-    {
-      // convert key to lowercase
-      std::transform(key.begin(), key.end(), key.begin(), [](unsigned char c)
-                     { return std::tolower(c); });
-      headers.emplace(std::move(key), std::move(value));
-    }
+    void add_header(std::string_view header, std::string_view value) { headers.emplace(std::move(header), std::move(value)); }
 
     /**
      * @brief Gets the HTTP version of the response.
@@ -160,7 +154,7 @@ namespace network
     status_code code; // The status code of the response
 
   protected:
-    std::map<std::string, std::string> headers; // The headers of the response
+    std::multimap<std::string, std::string> headers; // The headers of the response
 
   private:
     std::string version;          // The HTTP version of the response
@@ -184,10 +178,10 @@ namespace network
      * @param hdrs The headers of the response. Default is an empty map.
      * @param ver The version of the response. Default is "HTTP/1.1".
      */
-    string_response(std::string &&b, status_code code = status_code::ok, std::map<std::string, std::string> &&hdrs = {}, std::string &&ver = "HTTP/1.1") : response(code, std::move(hdrs), std::move(ver)), body(std::move(b))
+    string_response(std::string &&b, status_code code = status_code::ok, std::multimap<std::string, std::string> &&hdrs = {}, std::string &&ver = "HTTP/1.1") : response(code, std::move(hdrs), std::move(ver)), body(std::move(b))
     {
-      headers["content-type"] = "text/plain";
-      headers["content-length"] = std::to_string(body.size());
+      add_header("content-type", "text/plain");
+      add_header("content-length", std::to_string(body.size()));
     }
 
     /**
@@ -230,10 +224,10 @@ namespace network
      * @param hdrs The headers of the response (default: empty map).
      * @param ver The HTTP version of the response (default: "HTTP/1.1").
      */
-    html_response(std::string &&b, status_code code = status_code::ok, std::map<std::string, std::string> &&hdrs = {}, std::string &&ver = "HTTP/1.1") : response(code, std::move(hdrs), std::move(ver)), body(std::move(b))
+    html_response(std::string &&b, status_code code = status_code::ok, std::multimap<std::string, std::string> &&hdrs = {}, std::string &&ver = "HTTP/1.1") : response(code, std::move(hdrs), std::move(ver)), body(std::move(b))
     {
-      headers["content-type"] = "text/html";
-      headers["content-length"] = std::to_string(body.size());
+      add_header("content-type", "text/html");
+      add_header("content-length", std::to_string(body.size()));
     }
 
     /**
@@ -281,22 +275,22 @@ namespace network
      *
      * @throws std::invalid_argument If the file cannot be opened.
      */
-    file_response(std::string &&f, status_code code = status_code::ok, std::map<std::string, std::string> &&hdrs = {}, std::string &&ver = "HTTP/1.1") : response(code, std::move(hdrs), std::move(ver)), file(std::move(f))
+    file_response(std::string &&f, status_code code = status_code::ok, std::multimap<std::string, std::string> &&hdrs = {}, std::string &&ver = "HTTP/1.1") : response(code, std::move(hdrs), std::move(ver)), file(std::move(f))
     {
       std::ifstream fs(file, std::ios::binary);
       if (!fs)
         throw std::invalid_argument("Could not open file: " + file);
 
       fs.seekg(0, std::ios::end);
-      headers["content-length"] = std::to_string(fs.tellg());
+      add_header("content-length", std::to_string(fs.tellg()));
 
       if (headers.find("content-type") == headers.end())
       { // If content-type is not set, try to determine it from the file extension..
         auto ext = file.substr(file.find_last_of('.') + 1);
         if (auto ct_it = mime_types.find(ext); ct_it != mime_types.end())
-          headers["content-type"] = ct_it->second;
+          add_header("content-type", ct_it->second);
         else // Default content type if not found..
-          headers["content-type"] = "plain/text";
+          add_header("content-type", "text/plain");
       }
     }
 
@@ -346,10 +340,10 @@ namespace network
      * @param hdrs The headers of the response. Default is an empty map.
      * @param ver The version of the HTTP protocol. Default is "HTTP/1.1".
      */
-    json_response(json::json &&b, status_code code = status_code::ok, std::map<std::string, std::string> &&hdrs = {}, std::string &&ver = "HTTP/1.1") : response(code, std::move(hdrs), std::move(ver)), body(std::move(b)), str_body(body.dump())
+    json_response(json::json &&b, status_code code = status_code::ok, std::multimap<std::string, std::string> &&hdrs = {}, std::string &&ver = "HTTP/1.1") : response(code, std::move(hdrs), std::move(ver)), body(std::move(b)), str_body(body.dump())
     {
-      headers["content-type"] = "application/json";
-      headers["content-length"] = std::to_string(str_body.size());
+      add_header("content-type", "application/json");
+      add_header("content-length", std::to_string(str_body.size()));
     }
     /**
      * @brief Constructs a `json_response` object with the given JSON body, status code, headers, and version.
@@ -359,10 +353,10 @@ namespace network
      * @param hdrs The headers of the response. Default is an empty map.
      * @param ver The version of the HTTP protocol. Default is "HTTP/1.1".
      */
-    json_response(const json::json &b, status_code code = status_code::ok, std::map<std::string, std::string> &&hdrs = {}, std::string &&ver = "HTTP/1.1") : response(code, std::move(hdrs), std::move(ver)), body(b), str_body(body.dump())
+    json_response(const json::json &b, status_code code = status_code::ok, std::multimap<std::string, std::string> &&hdrs = {}, std::string &&ver = "HTTP/1.1") : response(code, std::move(hdrs), std::move(ver)), body(b), str_body(body.dump())
     {
-      headers["content-type"] = "application/json";
-      headers["content-length"] = std::to_string(str_body.size());
+      add_header("content-type", "application/json");
+      add_header("content-length", std::to_string(str_body.size()));
     }
 
     /**
