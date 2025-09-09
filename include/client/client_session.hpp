@@ -102,6 +102,30 @@ namespace network
     void put(std::string_view target, json::json &&body, std::function<void(const response &)> &&cb, std::multimap<std::string, std::string> &&hdrs = {}) { send(std::make_unique<json_request>(verb::Put, target, "HTTP/1.1", std::move(hdrs), std::move(body)), std::move(cb)); }
 
     /**
+     * @brief Sends a PATCH request with a string body asynchronously.
+     *
+     * This method sends a PATCH request to the specified target resource on the server with the provided body.
+     *
+     * @param target The target resource on the server.
+     * @param body The body of the PATCH request.
+     * @param cb A callback function to be called with the response once it is received.
+     * @param hdrs Optional headers to include in the request.
+     */
+    void patch(std::string_view target, std::string &&body, std::function<void(const response &)> &&cb, std::multimap<std::string, std::string> &&hdrs = {}) { send(std::make_unique<string_request>(verb::Patch, target, "HTTP/1.1", std::move(hdrs), std::move(body)), std::move(cb)); }
+
+    /**
+     * @brief Sends a PATCH request with a JSON body asynchronously.
+     *
+     * This method sends a PATCH request to the specified target resource on the server with the provided JSON body.
+     *
+     * @param target The target resource on the server.
+     * @param body The JSON body of the PATCH request.
+     * @param cb A callback function to be called with the response once it is received.
+     * @param hdrs Optional headers to include in the request.
+     */
+    void patch(std::string_view target, json::json &&body, std::function<void(const response &)> &&cb, std::multimap<std::string, std::string> &&hdrs = {}) { send(std::make_unique<json_request>(verb::Patch, target, "HTTP/1.1", std::move(hdrs), std::move(body)), std::move(cb)); }
+
+    /**
      * @brief Sends a DELETE request asynchronously.
      *
      * This method sends a DELETE request to the specified target resource on the server.

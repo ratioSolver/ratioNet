@@ -9,6 +9,7 @@ namespace network
     Get,
     Post,
     Put,
+    Patch,
     Delete,
     Options
   };
@@ -23,6 +24,8 @@ namespace network
       return "POST";
     case Put:
       return "PUT";
+    case Patch:
+      return "PATCH";
     case Delete:
       return "DELETE";
     case Options:

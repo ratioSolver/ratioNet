@@ -73,6 +73,26 @@ namespace network
     std::unique_ptr<response> put(std::string &&target, json::json &&body, std::multimap<std::string, std::string> &&hdrs = {}) { return send(std::make_unique<json_request>(verb::Put, std::move(target), "HTTP/1.1", std::move(hdrs), std::move(body))); }
 
     /**
+     * Sends a PATCH request to the specified target resource on the server with optional headers and body.
+     *
+     * @param target The target URL or path.
+     * @param body The body of the request.
+     * @param hdrs The optional headers to include in the request.
+     * @return A unique pointer to the response object.
+     */
+    std::unique_ptr<response> patch(std::string &&target, std::string &&body, std::multimap<std::string, std::string> &&hdrs = {}) { return send(std::make_unique<string_request>(verb::Patch, std::move(target), "HTTP/1.1", std::move(hdrs), std::move(body))); }
+
+    /**
+     * Sends a PATCH request to the specified target resource on the server with optional headers and JSON body.
+     *
+     * @param target The target URL or path.
+     * @param body The body of the request.
+     * @param hdrs The optional headers to include in the request.
+     * @return A unique pointer to the response object.
+     */
+    std::unique_ptr<response> patch(std::string &&target, json::json &&body, std::multimap<std::string, std::string> &&hdrs = {}) { return send(std::make_unique<json_request>(verb::Patch, std::move(target), "HTTP/1.1", std::move(hdrs), std::move(body))); }
+
+    /**
      * Sends a DELETE request to the specified target resource on the server with optional headers.
      *
      * @param target The target URL or path.
