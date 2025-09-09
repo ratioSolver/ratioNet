@@ -25,7 +25,7 @@ namespace network
         assert(req.get_verb() == Options);
         auto res = std::make_unique<response>(status_code::no_content);
         res->add_header("Access-Control-Allow-Origin", "*");
-        res->add_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+        res->add_header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
         res->add_header("Access-Control-Allow-Headers", "Content-Type, Authorization");
         return res;
     }
