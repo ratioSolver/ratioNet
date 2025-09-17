@@ -18,7 +18,11 @@ namespace network
             srv.add_route(Options, r.get_pattern(), std::bind(&cors::option_route, this, std::placeholders::_1));
     }
 
-    void cors::after_request(const request &, response &res) { res.add_header("Access-Control-Allow-Origin", "*"); }
+    void cors::after_request(const request &req, response &res)
+    {
+        if (req.get_verb() != Options)
+            res.add_header("Access-Control-Allow-Origin", "*");
+    }
 
     std::unique_ptr<response> cors::option_route([[maybe_unused]] const request &req)
     {
