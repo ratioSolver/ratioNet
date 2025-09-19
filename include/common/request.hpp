@@ -66,6 +66,10 @@ namespace network
       case 'P':
         switch (is.get())
         {
+        case 'A':
+          if (is.get() == 'T' && is.get() == 'C' && is.get() == 'H')
+            v = Patch;
+          break;
         case 'O':
           if (is.get() == 'S' && is.get() == 'T')
             v = Post;
