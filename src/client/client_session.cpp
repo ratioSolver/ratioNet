@@ -68,15 +68,15 @@ namespace network
 
         current_response = std::make_unique<response>(buffer); // Create a new response object from the buffer..
 
-        if (auto cl_range = current_response->headers.equal_range("content-length"); cl_range.first != cl_range.second)
+        if (auto cl_i = current_response->headers.find("content-length"); cl_i != current_response->headers.end())
         { // If the response has a content-length header, read the body..
-            std::size_t content_length = std::stoul(cl_range.first->second);
+            std::size_t content_length = std::stoul(cl_i->second);
             if (content_length > additional_bytes) // If the content length is greater than the additional bytes, read the remaining body..
                 read(buffer, content_length - additional_bytes, std::bind(&client_session_base::on_read_body, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
             else // If the buffer contains the entire body, process it immediately..
                 on_read_body(ec, bytes_transferred);
         }
-        else if (auto te_range = current_response->headers.equal_range("transfer-encoding"); te_range.first != te_range.second && te_range.first->second == "chunked")
+        else if (current_response->is_chunked())
             read_chunk(); // Handle chunked transfer encoding..
         else
         {
@@ -101,19 +101,19 @@ namespace network
 
         if (current_response->accumulated_body.empty())
         {
-            std::size_t content_length = std::stoul(current_response->headers.equal_range("content-length").first->second);
+            std::size_t content_length = std::stoul(current_response->headers.find("content-length")->second);
             std::string body;
             body.reserve(content_length);
             body.assign(asio::buffers_begin(buffer.data()), asio::buffers_begin(buffer.data()) + content_length);
             buffer.consume(content_length); // Consume the body from the buffer
-            if (auto ct_range = current_response->headers.equal_range("content-type"); ct_range.first != ct_range.second && ct_range.first->second == "application/json")
+            if (current_response->is_json())
                 current_response = std::make_unique<json_response>(json::load(body), current_response->get_status_code(), std::move(current_response->headers), std::move(current_response->version)); // If the response is JSON, parse it..
             else
                 current_response = std::make_unique<string_response>(std::move(body), current_response->get_status_code(), std::move(current_response->headers), std::move(current_response->version)); // Handle string response
         }
         else
         {
-            if (auto ct_range = current_response->headers.equal_range("content-type"); ct_range.first != ct_range.second && ct_range.first->second == "application/json")
+            if (current_response->is_json())
                 current_response = std::make_unique<json_response>(json::load(current_response->accumulated_body), current_response->get_status_code(), std::move(current_response->headers), std::move(current_response->version)); // If the response is JSON, parse it..
             else
                 current_response = std::make_unique<string_response>(std::move(current_response->accumulated_body), current_response->get_status_code(), std::move(current_response->headers), std::move(current_response->version)); // Handle string response

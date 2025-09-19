@@ -75,15 +75,15 @@ namespace network
         if (current_request->is_upgrade()) // handle websocket upgrade request
             return upgrade();
 
-        if (auto cl_range = current_request->headers.equal_range("content-length"); cl_range.first != cl_range.second)
+        if (auto cl_i = current_request->headers.find("content-length"); cl_i != current_request->headers.end())
         { // read body
-            std::size_t content_length = std::stoul(cl_range.first->second);
+            std::size_t content_length = std::stoul(cl_i->second);
             if (content_length > additional_bytes) // read the remaining body
                 read(buffer, content_length - additional_bytes, std::bind(&server_session_base::on_read_body, shared_from_this(), asio::placeholders::error, asio::placeholders::bytes_transferred));
             else // the buffer contains the entire body
                 on_read_body(ec, bytes_transferred);
         }
-        else if (auto te_range = current_request->headers.equal_range("transfer-encoding"); te_range.first != te_range.second && te_range.first->second == "chunked")
+        else if (current_request->is_chunked()) // read chunked body
             read_chunk();
         else
         { // Handle the request with the server
@@ -105,19 +105,19 @@ namespace network
 
         if (current_request->accumulated_body.empty())
         {
-            std::size_t content_length = std::stoul(current_request->headers.equal_range("content-length").first->second);
+            std::size_t content_length = std::stoul(current_request->headers.find("content-length")->second);
             std::string body;
             body.reserve(content_length);
             body.assign(asio::buffers_begin(buffer.data()), asio::buffers_begin(buffer.data()) + content_length);
             buffer.consume(content_length); // Consume the body from the buffer
-            if (current_request->headers.equal_range("content-type").first->second == "application/json")
+            if (current_request->is_json())
                 current_request = std::make_unique<json_request>(current_request->v, std::move(current_request->target), std::move(current_request->version), std::move(current_request->headers), json::load(body));
             else
                 current_request = std::make_unique<string_request>(current_request->v, std::move(current_request->target), std::move(current_request->version), std::move(current_request->headers), std::move(body));
         }
         else
         {
-            if (current_request->headers.equal_range("content-type").first->second == "application/json")
+            if (current_request->is_json())
                 current_request = std::make_unique<json_request>(current_request->v, std::move(current_request->target), std::move(current_request->version), std::move(current_request->headers), json::load(current_request->accumulated_body));
             else
                 current_request = std::make_unique<string_request>(current_request->v, std::move(current_request->target), std::move(current_request->version), std::move(current_request->headers), std::move(current_request->accumulated_body));

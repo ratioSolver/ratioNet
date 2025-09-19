@@ -11,14 +11,6 @@ namespace network
   class ws_client_session_base;
   class server_session_base;
 
-  inline bool iequals(const std::string &a, const char *b)
-  {
-    if (a.size() != std::strlen(b))
-      return false;
-    return std::equal(a.begin(), a.end(), b, [](unsigned char c1, unsigned char c2)
-                      { return std::tolower(c1) == std::tolower(c2); });
-  }
-
   namespace placeholders
   {
     static constexpr auto &request = std::placeholders::_1;
@@ -106,22 +98,8 @@ namespace network
         if (line.empty())
           break; // Empty line signals end of headers
 
-        auto colon = line.find(':');
-        if (colon != std::string::npos)
-        {
-          std::string header = line.substr(0, colon);
-          std::string value = line.substr(colon + 1);
-
-          // trim leading spaces
-          size_t start = value.find_first_not_of(" ");
-          if (start != std::string::npos)
-            value = value.substr(start);
-
-          std::transform(header.begin(), header.end(), header.begin(), [](unsigned char c)
-                         { return std::tolower(c); });
-
-          headers.emplace(std::move(header), std::move(value));
-        }
+        if (auto colon = line.find(':'); colon != std::string::npos)
+          add_header(line.substr(0, colon), line.substr(colon + 1));
       }
     }
     /**
@@ -154,12 +132,29 @@ namespace network
     [[nodiscard]] const std::multimap<std::string, std::string> &get_headers() const { return headers; }
 
     /**
-     * @brief Overloaded stream insertion operator to write the request to an output stream.
-     * @param os The output stream to write to.
-     * @param req The request to write.
-     * @return The output stream after writing.
+     * @brief Adds a header to the request.
+     *
+     * @param header The header key.
+     * @param value The header value.
      */
-    friend std::ostream &operator<<(std::ostream &os, const request &req) { return req.write(os); }
+    void add_header(std::string_view header, std::string_view value)
+    {
+      // Normalize header to lowercase
+      std::string header_str(header);
+      std::transform(header_str.begin(), header_str.end(), header_str.begin(), [](unsigned char c)
+                     { return std::tolower(c); });
+
+      // Trim whitespace from value
+      std::string value_str(value);
+      size_t start = value_str.find_first_not_of(" \t");
+      size_t end = value_str.find_last_not_of(" \t");
+      if (start != std::string::npos && end != std::string::npos)
+        value_str = value_str.substr(start, end - start + 1);
+      else // value is all whitespace
+        value_str.clear();
+
+      headers.emplace(std::move(header_str), std::move(value_str));
+    }
 
     /**
      * Checks if the request is an upgrade request for a WebSocket connection.
@@ -175,7 +170,10 @@ namespace network
       if (connection_it == headers.end())
         return false;
       // Case-insensitive compare for 'websocket' and 'upgrade'
-      return iequals(upgrade_it->second, "websocket") && iequals(connection_it->second, "upgrade");
+      return std::equal(upgrade_it->second.begin(), upgrade_it->second.end(), "websocket", [](char a, char b)
+                        { return std::tolower(a) == std::tolower(b); }) &&
+             std::equal(connection_it->second.begin(), connection_it->second.end(), "upgrade", [](char a, char b)
+                        { return std::tolower(a) == std::tolower(b); });
     }
 
     /**
@@ -190,9 +188,48 @@ namespace network
       auto connection_it = headers.find("connection");
       if (connection_it == headers.end())
         return false;
-      // Case-insensitive compare for 'keep-alive'
-      return iequals(connection_it->second, "keep-alive");
+      return std::equal(connection_it->second.begin(), connection_it->second.end(), "keep-alive", [](char a, char b)
+                        { return std::tolower(a) == std::tolower(b); });
     }
+
+    /**
+     * Checks if the request uses chunked transfer encoding.
+     * A request is considered chunked if it contains the "Transfer-Encoding" header
+     * with a value of "chunked".
+     *
+     * @return true if the request uses chunked transfer encoding, false otherwise.
+     */
+    [[nodiscard]] bool is_chunked() const
+    {
+      auto te_it = headers.find("transfer-encoding");
+      if (te_it == headers.end())
+        return false;
+      return std::equal(te_it->second.begin(), te_it->second.end(), "chunked", [](char a, char b)
+                        { return std::tolower(a) == std::tolower(b); });
+    }
+
+    /**
+     * Checks if the request has a JSON content type.
+     * A request is considered to have a JSON content type if it contains the "Content-Type" header
+     * with a value of "application/json".
+     *
+     * @return true if the request has a JSON content type, false otherwise.
+     */
+    [[nodiscard]] bool is_json() const
+    {
+      auto ct_it = headers.find("content-type");
+      if (ct_it == headers.end())
+        return false;
+      return ct_it->second.find("application/json") != std::string::npos;
+    }
+
+    /**
+     * @brief Overloaded stream insertion operator to write the request to an output stream.
+     * @param os The output stream to write to.
+     * @param req The request to write.
+     * @return The output stream after writing.
+     */
+    friend std::ostream &operator<<(std::ostream &os, const request &req) { return req.write(os); }
 
   private:
     /**
@@ -220,8 +257,6 @@ namespace network
       os << "\r\n";
       return os;
     }
-
-    void add_header(std::string_view header, std::string_view value) { headers.emplace(std::move(header), std::move(value)); }
 
   private:
     verb v;                                          // The HTTP verb of the request

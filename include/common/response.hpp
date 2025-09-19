@@ -72,12 +72,7 @@ namespace network
         is.get(); // consume '\r'
         is.get(); // consume '\n'
 
-        // convert header to lowercase
-        std::transform(header.begin(), header.end(), header.begin(), [](unsigned char c)
-                       { return std::tolower(c); });
-
-        // add header to the map
-        headers.emplace(std::move(header), std::move(value));
+        add_header(header, value);
       }
       is.get(); // consume '\r'
       is.get(); // consume '\n'
@@ -92,6 +87,13 @@ namespace network
     [[nodiscard]] status_code get_status_code() const { return code; }
 
     /**
+     * @brief Gets the HTTP version of the response.
+     *
+     * @return The HTTP version.
+     */
+    [[nodiscard]] const std::string &get_version() const { return version; }
+
+    /**
      * @brief Gets the headers of the response.
      *
      * @return The headers.
@@ -104,14 +106,75 @@ namespace network
      * @param key The header key.
      * @param value The header value.
      */
-    void add_header(std::string_view header, std::string_view value) { headers.emplace(std::move(header), std::move(value)); }
+    void add_header(std::string_view header, std::string_view value)
+    {
+      // Normalize header to lowercase
+      std::string header_str(header);
+      std::transform(header_str.begin(), header_str.end(), header_str.begin(), [](unsigned char c)
+                     { return std::tolower(c); });
+
+      // Trim whitespace from value
+      std::string value_str(value);
+      size_t start = value_str.find_first_not_of(" \t");
+      size_t end = value_str.find_last_not_of(" \t");
+      if (start != std::string::npos && end != std::string::npos)
+        value_str = value_str.substr(start, end - start + 1);
+      else // value is all whitespace
+        value_str.clear();
+
+      headers.emplace(std::move(header_str), std::move(value_str));
+    }
 
     /**
-     * @brief Gets the HTTP version of the response.
+     * @brief Checks if the response uses chunked transfer encoding.
      *
-     * @return The HTTP version.
+     * This function examines the "transfer-encoding" header in the response.
+     * If the header exists and its value is "chunked" (case-insensitive),
+     * the function returns true, indicating that the response is chunked.
+     *
+     * @return true if the "transfer-encoding" header is set to "chunked", false otherwise.
      */
-    [[nodiscard]] const std::string &get_version() const { return version; }
+    [[nodiscard]] bool is_chunked() const
+    {
+      auto te_it = headers.find("transfer-encoding");
+      if (te_it == headers.end())
+        return false;
+      return std::equal(te_it->second.begin(), te_it->second.end(), "chunked", [](char a, char b)
+                        { return std::tolower(a) == std::tolower(b); });
+    }
+
+    /**
+     * @brief Checks if the response content type is JSON.
+     *
+     * This function examines the headers to determine if the "content-type"
+     * header contains "application/json". Returns true if the header exists
+     * and indicates JSON content, otherwise returns false.
+     *
+     * @return true if the content type is JSON, false otherwise.
+     */
+    [[nodiscard]] bool is_json() const
+    {
+      auto ct_it = headers.find("content-type");
+      if (ct_it == headers.end())
+        return false;
+      return ct_it->second.find("application/json") != std::string::npos;
+    }
+
+    /**
+     * Checks if the response indicates that the connection should be closed.
+     * A response is considered to indicate a closed connection if it contains the "Connection" header
+     * with a value of "close".
+     *
+     * @return true if the response indicates a closed connection, false otherwise.
+     */
+    [[nodiscard]] bool is_closed() const
+    {
+      auto connection_it = headers.find("connection");
+      if (connection_it == headers.end())
+        return false;
+      return std::equal(connection_it->second.begin(), connection_it->second.end(), "close", [](char a, char b)
+                        { return std::tolower(a) == std::tolower(b); });
+    }
 
     /**
      * @brief Writes the response to an output stream.

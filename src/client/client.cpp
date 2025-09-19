@@ -55,9 +55,9 @@ namespace network
 
         auto res = std::make_unique<response>(buffer);
 
-        if (auto cl_range = res->get_headers().equal_range("content-length"); cl_range.first != cl_range.second)
+        if (auto cl_i = res->get_headers().find("content-length"); cl_i != res->get_headers().end())
         { // read body based on content-length
-            auto len = std::stoul(cl_range.first->second);
+            auto len = std::stoul(cl_i->second);
             if (len > additional_bytes)
             { // read the remaining body
                 read(buffer, len - additional_bytes);
@@ -69,7 +69,7 @@ namespace network
             }
 
             std::istream is(&buffer);
-            if (auto ct_range = res->get_headers().equal_range("content-type"); ct_range.first != ct_range.second && ct_range.first->second == "application/json")
+            if (res->is_json())
                 res = std::make_unique<json_response>(json::load(is), res->get_status_code(), std::move(res->headers));
             else
             {
@@ -80,7 +80,7 @@ namespace network
                 res = std::make_unique<string_response>(std::move(body), res->get_status_code(), std::move(res->headers));
             }
         }
-        else if (auto te_range = res->get_headers().equal_range("transfer-encoding"); te_range.first != te_range.second && te_range.first->second == "chunked")
+        else if (res->is_chunked())
         {
             while (true)
             {
@@ -140,13 +140,13 @@ namespace network
                 res->accumulated_body.append(asio::buffers_begin(buffer.data()), asio::buffers_begin(buffer.data()) + size);
                 buffer.consume(size + 2); // consume chunk and '\r\n'
             }
-            if (auto ct_range = res->get_headers().equal_range("content-type"); ct_range.first != ct_range.second && ct_range.first->second == "application/json")
+            if (res->is_json())
                 res = std::make_unique<json_response>(json::load(res->accumulated_body), res->get_status_code(), std::move(res->headers));
             else
                 res = std::make_unique<string_response>(std::move(res->accumulated_body), res->get_status_code(), std::move(res->headers));
         }
 
-        if (auto connection = res->get_headers().equal_range("connection"); connection.first != connection.second && connection.first->second == "close")
+        if (res->is_closed())
             disconnect(); // close the connection
         return res;
     }
