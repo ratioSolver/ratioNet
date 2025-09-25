@@ -243,8 +243,20 @@ namespace network
      */
     string_response(std::string &&b, status_code code = status_code::ok, std::multimap<std::string, std::string> &&hdrs = {}, std::string &&ver = "HTTP/1.1") : response(code, std::move(hdrs), std::move(ver)), body(std::move(b))
     {
-      add_header("content-type", "text/plain");
-      add_header("content-length", std::to_string(body.size()));
+      if (auto it = headers.find("content-type"); it != headers.end())
+      {
+        if (it->second.find("text/plain") == std::string::npos)
+          throw std::invalid_argument("content-type header must be text/plain");
+      }
+      else
+        add_header("content-type", "text/plain");
+      if (auto it = headers.find("content-length"); it != headers.end())
+      {
+        if (it->second != std::to_string(body.size()))
+          throw std::invalid_argument("content-length header does not match body size");
+      }
+      else
+        add_header("content-length", std::to_string(body.size()));
     }
 
     /**
@@ -289,8 +301,20 @@ namespace network
      */
     html_response(std::string &&b, status_code code = status_code::ok, std::multimap<std::string, std::string> &&hdrs = {}, std::string &&ver = "HTTP/1.1") : response(code, std::move(hdrs), std::move(ver)), body(std::move(b))
     {
-      add_header("content-type", "text/html");
-      add_header("content-length", std::to_string(body.size()));
+      if (auto it = headers.find("content-type"); it != headers.end())
+      {
+        if (it->second.find("text/html") == std::string::npos)
+          throw std::invalid_argument("content-type header must be text/html");
+      }
+      else
+        add_header("content-type", "text/html");
+      if (auto it = headers.find("content-length"); it != headers.end())
+      {
+        if (it->second != std::to_string(body.size()))
+          throw std::invalid_argument("content-length header does not match body size");
+      }
+      else
+        add_header("content-length", std::to_string(body.size()));
     }
 
     /**
@@ -345,7 +369,13 @@ namespace network
         throw std::invalid_argument("Could not open file: " + file);
 
       fs.seekg(0, std::ios::end);
-      add_header("content-length", std::to_string(fs.tellg()));
+      if (auto it = headers.find("content-length"); it != headers.end())
+      {
+        if (it->second != std::to_string(fs.tellg()))
+          throw std::invalid_argument("content-length header does not match file size");
+      }
+      else
+        add_header("content-length", std::to_string(fs.tellg()));
 
       if (headers.find("content-type") == headers.end())
       { // If content-type is not set, try to determine it from the file extension..
@@ -405,8 +435,20 @@ namespace network
      */
     json_response(json::json &&b, status_code code = status_code::ok, std::multimap<std::string, std::string> &&hdrs = {}, std::string &&ver = "HTTP/1.1") : response(code, std::move(hdrs), std::move(ver)), body(std::move(b)), str_body(body.dump())
     {
-      add_header("content-type", "application/json");
-      add_header("content-length", std::to_string(str_body.size()));
+      if (auto it = headers.find("content-type"); it != headers.end())
+      {
+        if (it->second.find("application/json") == std::string::npos)
+          throw std::invalid_argument("content-type header must be application/json");
+      }
+      else
+        add_header("content-type", "application/json");
+      if (auto it = headers.find("content-length"); it != headers.end())
+      {
+        if (it->second != std::to_string(str_body.size()))
+          throw std::invalid_argument("content-length header does not match body size");
+      }
+      else
+        add_header("content-length", std::to_string(str_body.size()));
     }
     /**
      * @brief Constructs a `json_response` object with the given JSON body, status code, headers, and version.
@@ -418,8 +460,20 @@ namespace network
      */
     json_response(const json::json &b, status_code code = status_code::ok, std::multimap<std::string, std::string> &&hdrs = {}, std::string &&ver = "HTTP/1.1") : response(code, std::move(hdrs), std::move(ver)), body(b), str_body(body.dump())
     {
-      add_header("content-type", "application/json");
-      add_header("content-length", std::to_string(str_body.size()));
+      if (auto it = headers.find("content-type"); it != headers.end())
+      {
+        if (it->second.find("application/json") == std::string::npos)
+          throw std::invalid_argument("content-type header must be application/json");
+      }
+      else
+        add_header("content-type", "application/json");
+      if (auto it = headers.find("content-length"); it != headers.end())
+      {
+        if (it->second != std::to_string(str_body.size()))
+          throw std::invalid_argument("content-length header does not match body size");
+      }
+      else
+        add_header("content-length", std::to_string(str_body.size()));
     }
 
     /**

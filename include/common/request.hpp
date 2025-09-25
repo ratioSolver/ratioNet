@@ -263,12 +263,16 @@ namespace network
     }
 
   private:
-    verb v;                                          // The HTTP verb of the request
-    std::string target;                              // The target of the request
-    std::string version;                             // The HTTP version of the request
+    verb v;              // The HTTP verb of the request
+    std::string target;  // The target of the request
+    std::string version; // The HTTP version of the request
+
+  protected:
     std::multimap<std::string, std::string> headers; // The headers of the request
-    asio::streambuf buffer;                          // The buffer containing the request
-    std::string accumulated_body;                    // Accumulated body for chunked requests
+
+  private:
+    asio::streambuf buffer;       // The buffer containing the request
+    std::string accumulated_body; // Accumulated body for chunked requests
   };
 
   class string_request : public request
@@ -276,8 +280,20 @@ namespace network
   public:
     string_request(verb v, std::string_view trgt, std::string_view ver, std::multimap<std::string, std::string> &&hdrs, std::string &&b) : request(v, std::move(trgt), std::move(ver), std::move(hdrs)), body(std::move(b))
     {
-      add_header("content-type", "text/plain");
-      add_header("content-length", std::to_string(body.size()));
+      if (auto it = headers.find("content-type"); it != headers.end())
+      {
+        if (it->second.find("text/plain") == std::string::npos)
+          throw std::invalid_argument("content-type header must be text/plain");
+      }
+      else
+        add_header("content-type", "text/plain");
+      if (auto it = headers.find("content-length"); it != headers.end())
+      {
+        if (it->second != std::to_string(body.size()))
+          throw std::invalid_argument("content-length header does not match body size");
+      }
+      else
+        add_header("content-length", std::to_string(body.size()));
     }
 
     const std::string &get_body() const { return body; }
@@ -298,8 +314,20 @@ namespace network
   public:
     json_request(verb v, std::string_view trgt, std::string_view ver, std::multimap<std::string, std::string> &&hdrs, json::json &&b) : request(v, std::move(trgt), std::move(ver), std::move(hdrs)), body(b), str_body(body.dump())
     {
-      add_header("content-type", "application/json");
-      add_header("content-length", std::to_string(str_body.size()));
+      if (auto it = headers.find("content-type"); it != headers.end())
+      {
+        if (it->second.find("application/json") == std::string::npos)
+          throw std::invalid_argument("content-type header must be application/json");
+      }
+      else
+        add_header("content-type", "application/json");
+      if (auto it = headers.find("content-length"); it != headers.end())
+      {
+        if (it->second != std::to_string(str_body.size()))
+          throw std::invalid_argument("content-length header does not match body size");
+      }
+      else
+        add_header("content-length", std::to_string(str_body.size()));
     }
 
     const json::json &get_body() const { return body; }
