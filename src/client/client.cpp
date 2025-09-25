@@ -141,7 +141,7 @@ namespace network
                 buffer.consume(size + 2); // consume chunk and '\r\n'
             }
             if (res->is_json())
-                res = std::make_unique<json_response>(json::load(res->accumulated_body), res->get_status_code(), std::move(res->headers));
+                res = std::make_unique<json_response>(std::move(res->accumulated_body), res->get_status_code(), std::move(res->headers));
             else
                 res = std::make_unique<string_response>(std::move(res->accumulated_body), res->get_status_code(), std::move(res->headers));
         }

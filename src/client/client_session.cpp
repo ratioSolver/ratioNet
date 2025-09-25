@@ -107,14 +107,14 @@ namespace network
             body.assign(asio::buffers_begin(buffer.data()), asio::buffers_begin(buffer.data()) + content_length);
             buffer.consume(content_length); // Consume the body from the buffer
             if (current_response->is_json())
-                current_response = std::make_unique<json_response>(json::load(body), current_response->get_status_code(), std::move(current_response->headers), std::move(current_response->version)); // If the response is JSON, parse it..
+                current_response = std::make_unique<json_response>(std::move(body), current_response->get_status_code(), std::move(current_response->headers), std::move(current_response->version)); // If the response is JSON, parse it..
             else
                 current_response = std::make_unique<string_response>(std::move(body), current_response->get_status_code(), std::move(current_response->headers), std::move(current_response->version)); // Handle string response
         }
         else
         {
             if (current_response->is_json())
-                current_response = std::make_unique<json_response>(json::load(current_response->accumulated_body), current_response->get_status_code(), std::move(current_response->headers), std::move(current_response->version)); // If the response is JSON, parse it..
+                current_response = std::make_unique<json_response>(std::move(current_response->accumulated_body), current_response->get_status_code(), std::move(current_response->headers), std::move(current_response->version)); // If the response is JSON, parse it..
             else
                 current_response = std::make_unique<string_response>(std::move(current_response->accumulated_body), current_response->get_status_code(), std::move(current_response->headers), std::move(current_response->version)); // Handle string response
         }

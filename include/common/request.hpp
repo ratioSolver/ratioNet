@@ -280,19 +280,9 @@ namespace network
   public:
     string_request(verb v, std::string_view trgt, std::string_view ver, std::multimap<std::string, std::string> &&hdrs, std::string &&b) : request(v, std::move(trgt), std::move(ver), std::move(hdrs)), body(std::move(b))
     {
-      if (auto it = headers.find("content-type"); it != headers.end())
-      {
-        if (it->second.find("text/plain") == std::string::npos)
-          throw std::invalid_argument("content-type header must be text/plain");
-      }
-      else
+      if (auto it = headers.find("content-type"); it == headers.end() || it->second.find("text/plain") == std::string::npos)
         add_header("content-type", "text/plain");
-      if (auto it = headers.find("content-length"); it != headers.end())
-      {
-        if (it->second != std::to_string(body.size()))
-          throw std::invalid_argument("content-length header does not match body size");
-      }
-      else
+      if (auto it = headers.find("content-length"); it == headers.end() || it->second != std::to_string(body.size()))
         add_header("content-length", std::to_string(body.size()));
     }
 
@@ -312,21 +302,19 @@ namespace network
   class json_request : public request
   {
   public:
+    json_request(verb v, std::string_view trgt, std::string_view ver, std::multimap<std::string, std::string> &&hdrs, std::string &&b) : request(v, std::move(trgt), std::move(ver), std::move(hdrs)), body(json::load(b)), str_body(body.dump())
+    {
+      if (auto it = headers.find("content-type"); it == headers.end() || it->second.find("application/json") == std::string::npos)
+        add_header("content-type", "application/json");
+      if (auto it = headers.find("content-length"); it == headers.end() || it->second != std::to_string(str_body.size()))
+        add_header("content-length", std::to_string(str_body.size()));
+    }
+
     json_request(verb v, std::string_view trgt, std::string_view ver, std::multimap<std::string, std::string> &&hdrs, json::json &&b) : request(v, std::move(trgt), std::move(ver), std::move(hdrs)), body(b), str_body(body.dump())
     {
-      if (auto it = headers.find("content-type"); it != headers.end())
-      {
-        if (it->second.find("application/json") == std::string::npos)
-          throw std::invalid_argument("content-type header must be application/json");
-      }
-      else
+      if (auto it = headers.find("content-type"); it == headers.end() || it->second.find("application/json") == std::string::npos)
         add_header("content-type", "application/json");
-      if (auto it = headers.find("content-length"); it != headers.end())
-      {
-        if (it->second != std::to_string(str_body.size()))
-          throw std::invalid_argument("content-length header does not match body size");
-      }
-      else
+      if (auto it = headers.find("content-length"); it == headers.end() || it->second != std::to_string(str_body.size()))
         add_header("content-length", std::to_string(str_body.size()));
     }
 

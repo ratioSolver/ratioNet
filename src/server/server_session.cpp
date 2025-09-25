@@ -111,14 +111,14 @@ namespace network
             body.assign(asio::buffers_begin(buffer.data()), asio::buffers_begin(buffer.data()) + content_length);
             buffer.consume(content_length); // Consume the body from the buffer
             if (current_request->is_json())
-                current_request = std::make_unique<json_request>(current_request->v, std::move(current_request->target), std::move(current_request->version), std::move(current_request->headers), json::load(body));
+                current_request = std::make_unique<json_request>(current_request->v, std::move(current_request->target), std::move(current_request->version), std::move(current_request->headers), std::move(body));
             else
                 current_request = std::make_unique<string_request>(current_request->v, std::move(current_request->target), std::move(current_request->version), std::move(current_request->headers), std::move(body));
         }
         else
         {
             if (current_request->is_json())
-                current_request = std::make_unique<json_request>(current_request->v, std::move(current_request->target), std::move(current_request->version), std::move(current_request->headers), json::load(current_request->accumulated_body));
+                current_request = std::make_unique<json_request>(current_request->v, std::move(current_request->target), std::move(current_request->version), std::move(current_request->headers), std::move(current_request->accumulated_body));
             else
                 current_request = std::make_unique<string_request>(current_request->v, std::move(current_request->target), std::move(current_request->version), std::move(current_request->headers), std::move(current_request->accumulated_body));
         }
