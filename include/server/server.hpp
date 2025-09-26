@@ -10,6 +10,7 @@
 #ifdef ENABLE_SSL
 #include <asio/ssl.hpp>
 #endif
+#include <typeindex>
 
 namespace network
 {
@@ -112,11 +113,37 @@ namespace network
      * @param args Arguments to forward to the middleware's constructor.
      */
     template <typename Tp, typename... Args>
-    void add_middleware(Args &&...args)
+    Tp &add_middleware(Args &&...args)
     {
       static_assert(std::is_base_of<middleware, Tp>::value, "Middleware must inherit from network::middleware");
-      auto m = std::make_unique<Tp>(std::forward<Args>(args)...);
-      middlewares.push_back(std::move(m));
+      if (auto it = middlewares.find(typeid(Tp)); it == middlewares.end())
+      {
+        auto m = std::make_unique<Tp>(std::forward<Args>(args)...);
+        auto &ref = *m;
+        middlewares.emplace(typeid(Tp), std::move(m));
+        return ref;
+      }
+      else
+        throw std::runtime_error("Module already exists");
+    }
+
+    /**
+     * @brief Retrieves a middleware of the specified type.
+     *
+     * This function returns a reference to the middleware of type Tp if it exists.
+     * The middleware type Tp must inherit from network::middleware.
+     *
+     * @tparam Tp The type of the middleware to retrieve. Must derive from network::middleware.
+     * @return A reference to the middleware of type Tp.
+     * @throws std::runtime_error if the middleware of type Tp is not found.
+     */
+    template <typename Tp>
+    [[nodiscard]] Tp &get_middleware() const
+    {
+      static_assert(std::is_base_of<middleware, Tp>::value, "Middleware must inherit from network::middleware");
+      if (auto it = middlewares.find(typeid(Tp)); it != middlewares.end())
+        return *static_cast<Tp *>(it->second.get());
+      throw std::runtime_error("Middleware not found");
     }
 
   protected:
@@ -133,14 +160,14 @@ namespace network
     void on_error(ws_server_session_base &s, const std::error_code &ec);
 
   private:
-    asio::io_context io_ctx;                              // The io_context is required for all I/O
-    asio::signal_set signals;                             // The signal_set is used to handle signals
-    std::vector<std::thread> threads;                     // The thread pool
-    const asio::ip::tcp::endpoint endpoint;               // The endpoint for the server
-    asio::ip::tcp::acceptor acceptor;                     // The acceptor for the server
-    std::map<verb, std::vector<route>> routes;            // The routes of the server
-    std::map<std::string, ws_handler> ws_routes;          // The WebSocket routes of the server
-    std::vector<std::unique_ptr<middleware>> middlewares; // The middlewares of the server
+    asio::io_context io_ctx;                                            // The io_context is required for all I/O
+    asio::signal_set signals;                                           // The signal_set is used to handle signals
+    std::vector<std::thread> threads;                                   // The thread pool
+    const asio::ip::tcp::endpoint endpoint;                             // The endpoint for the server
+    asio::ip::tcp::acceptor acceptor;                                   // The acceptor for the server
+    std::map<verb, std::vector<route>> routes;                          // The routes of the server
+    std::map<std::string, ws_handler> ws_routes;                        // The WebSocket routes of the server
+    std::map<std::type_index, std::unique_ptr<middleware>> middlewares; // The middlewares of the server
   };
 
   class server : public server_base

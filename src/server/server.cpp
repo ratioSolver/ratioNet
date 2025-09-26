@@ -74,7 +74,7 @@ namespace network
     void server_base::add_route(verb v, std::string_view path, std::function<std::unique_ptr<response>(request &)> &&handler) noexcept
     {
         routes[v].emplace_back(path, std::move(handler));
-        for (auto &m : middlewares)
+        for (auto &[tp, m] : middlewares)
             m->added_route(v, routes[v].back());
         LOG_DEBUG("Added route: " + std::string(path) + " for verb: " + to_string(v));
     }
@@ -89,7 +89,7 @@ namespace network
                 {
                     try
                     {
-                        for (auto &m : middlewares)
+                        for (auto &[tp, m] : middlewares)
                             if (auto res = m->before_request(req); res)
                             {
                                 s.enqueue(std::move(res));
@@ -97,7 +97,7 @@ namespace network
                             }
                         // call the route handler
                         auto res = r.get_handler()(req);
-                        for (auto &m : middlewares)
+                        for (auto &[tp, m] : middlewares)
                             m->after_request(req, *res);
                         s.enqueue(std::move(res));
                     }
