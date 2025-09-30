@@ -195,15 +195,7 @@ namespace network
     std::size_t client::write(asio::streambuf &buffer) { return asio::write(socket, buffer, ec); }
 
 #ifdef ENABLE_SSL
-    ssl_client::ssl_client(std::string_view host, unsigned short port) : client_base(host, port), ssl_ctx(asio::ssl::context::TLS_VERSION), socket(io_ctx, ssl_ctx)
-    {
-        ssl_ctx.set_default_verify_paths();
-        if (!SSL_set_tlsext_host_name(socket.native_handle(), host.data()))
-        {
-            LOG_ERR("SSL_set_tlsext_host_name failed");
-            throw std::runtime_error("SSL_set_tlsext_host_name failed");
-        }
-    }
+    ssl_client::ssl_client(std::string_view host, unsigned short port) : client_base(host, port), ssl_ctx(asio::ssl::context::TLS_VERSION) { ssl_ctx.set_default_verify_paths(); }
     ssl_client::~ssl_client()
     {
         if (is_connected())
@@ -212,22 +204,22 @@ namespace network
             LOG_ERR("Failed to disconnect: " << ec.message());
     }
 
-    bool ssl_client::is_connected() const { return socket.lowest_layer().is_open(); }
+    bool ssl_client::is_connected() const { return socket && socket->lowest_layer().is_open(); }
     asio::ip::tcp::endpoint ssl_client::connect(const asio::ip::basic_resolver_results<asio::ip::tcp> &endpoints)
     {
-        socket = asio::ssl::stream<asio::ip::tcp::socket>(io_ctx, ssl_ctx);
-        if (!SSL_set_tlsext_host_name(socket.native_handle(), host.data()))
+        socket = std::make_unique<asio::ssl::stream<asio::ip::tcp::socket>>(io_ctx, ssl_ctx);
+        if (!SSL_set_tlsext_host_name(socket->native_handle(), host.data()))
         {
             LOG_ERR("SSL_set_tlsext_host_name failed");
             throw std::runtime_error("SSL_set_tlsext_host_name failed");
         }
-        auto endpoint = asio::connect(socket.lowest_layer(), endpoints, ec);
+        auto endpoint = asio::connect(socket->lowest_layer(), endpoints, ec);
         if (ec)
             return endpoint;
         LOG_DEBUG("Connected to " << endpoint);
-        socket.set_verify_mode(asio::ssl::verify_peer);
-        socket.set_verify_callback(asio::ssl::host_name_verification(host));
-        socket.handshake(asio::ssl::stream_base::client, ec);
+        socket->set_verify_mode(asio::ssl::verify_peer);
+        socket->set_verify_callback(asio::ssl::host_name_verification(host));
+        socket->handshake(asio::ssl::stream_base::client, ec);
         if (ec)
             return endpoint;
         LOG_DEBUG("SSL handshake completed with " << host);
@@ -235,14 +227,14 @@ namespace network
     }
     void ssl_client::disconnect()
     {
-        socket.lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both, ec);
+        socket->lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both, ec);
         if (ec && ec != asio::error::not_connected)
             return;
-        socket.lowest_layer().close(ec);
+        socket->lowest_layer().close(ec);
     }
 
-    std::size_t ssl_client::read(asio::streambuf &buffer, std::size_t size) { return asio::read(socket, buffer, asio::transfer_exactly(size), ec); }
-    std::size_t ssl_client::read_until(asio::streambuf &buffer, std::string_view delim) { return asio::read_until(socket, buffer, delim, ec); }
-    std::size_t ssl_client::write(asio::streambuf &buffer) { return asio::write(socket, buffer, ec); }
+    std::size_t ssl_client::read(asio::streambuf &buffer, std::size_t size) { return asio::read(*socket, buffer, asio::transfer_exactly(size), ec); }
+    std::size_t ssl_client::read_until(asio::streambuf &buffer, std::string_view delim) { return asio::read_until(*socket, buffer, delim, ec); }
+    std::size_t ssl_client::write(asio::streambuf &buffer) { return asio::write(*socket, buffer, ec); }
 #endif
 } // namespace network

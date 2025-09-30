@@ -174,8 +174,8 @@ namespace network
     std::size_t write(asio::streambuf &buffer) override;
 
   private:
-    asio::ssl::context ssl_ctx;                      // The SSL context used for secure communication.
-    asio::ssl::stream<asio::ip::tcp::socket> socket; // The SSL socket used to communicate with the server.
+    asio::ssl::context ssl_ctx;                                       // The SSL context used for secure communication.
+    std::unique_ptr<asio::ssl::stream<asio::ip::tcp::socket>> socket; // The SSL socket used to communicate with the server.
   };
 #endif
 } // namespace network
