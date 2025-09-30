@@ -11,6 +11,14 @@ namespace network
 
         if (!is_connected())
             connect(endpoints);
+#ifdef ENABLE_SSL
+        if (ec == asio::ssl::error::stream_truncated)
+        { // connection closed by server
+            LOG_DEBUG("Connection closed by server");
+            disconnect();
+            connect(endpoints);
+        }
+#endif
         if (ec)
         {
             LOG_ERR(ec.message());
@@ -222,6 +230,12 @@ namespace network
         if (ec && ec != asio::error::not_connected)
             return;
         socket.lowest_layer().close(ec);
+        socket = asio::ssl::stream<asio::ip::tcp::socket>(io_ctx, ssl_ctx);
+        if (!SSL_set_tlsext_host_name(socket.native_handle(), host.data()))
+        {
+            LOG_ERR("SSL_set_tlsext_host_name failed");
+            throw std::runtime_error("SSL_set_tlsext_host_name failed");
+        }
     }
 
     std::size_t ssl_client::read(asio::streambuf &buffer, std::size_t size) { return asio::read(socket, buffer, asio::transfer_exactly(size), ec); }
