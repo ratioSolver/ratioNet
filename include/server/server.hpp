@@ -300,4 +300,32 @@ namespace network
       }
     return decoded.str();
   }
+
+  /**
+   * @brief Splits a string into a vector of substrings based on a delimiter.
+   *
+   * This function takes a string and a delimiter character, and splits the string
+   * into substrings wherever the delimiter is found. The resulting substrings are
+   * returned as a vector of strings.
+   *
+   * @param str The input string to be split.
+   * @param delimiter The character used to delimit the substrings.
+   * @return A vector containing the substrings obtained by splitting the input string.
+   */
+  [[nodiscard]] inline std::vector<std::string> split_string(std::string_view str, char delimiter)
+  {
+    std::vector<std::string> result;
+    std::string::size_type start = 0;
+    std::string::size_type end = str.find(delimiter);
+
+    while (end != std::string::npos)
+    {
+      result.emplace_back(str.substr(start, end - start));
+      start = end + 1;
+      end = str.find(delimiter, start);
+    }
+
+    result.emplace_back(str.substr(start));
+    return result;
+  }
 } // namespace network
