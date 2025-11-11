@@ -1,7 +1,4 @@
 #include "server.hpp"
-#ifdef ENABLE_CORS
-#include "cors.hpp"
-#endif
 #include <thread>
 
 /**
@@ -126,24 +123,6 @@ void test_cors_server()
     t.join();
 }
 
-#ifdef ENABLE_CORS
-void test_cors_middleware()
-{
-    network::server server;
-    server.add_middleware<network::cors>(server);
-    server.add_route(network::verb::Get, "/json", [](network::request &)
-                     { return std::make_unique<network::json_response>(json::json{{"message", "Hello, World!"}}); });
-    server.add_route(network::verb::Post, "/json", [](network::request &)
-                     { return std::make_unique<network::json_response>(json::json{{"message", "Hello, World!"}}); });
-
-    std::thread t{[&server]
-                  { server.start(); }};
-    std::this_thread::sleep_for(std::chrono::seconds(5));
-    server.stop();
-    t.join();
-}
-#endif
-
 int main()
 {
     test_rest_server();
@@ -153,10 +132,6 @@ int main()
 #endif
 
     test_cors_server();
-
-#ifdef ENABLE_CORS
-    test_cors_middleware();
-#endif
 
     return 0;
 }

@@ -1,6 +1,12 @@
 #include "server.hpp"
 #include "server_session.hpp"
 #include "ws_server_session.hpp"
+#ifdef ENABLE_CORS
+#include "cors.hpp"
+#endif
+#ifdef ENABLE_LOG
+#include "log.hpp"
+#endif
 #include "logging.hpp"
 
 namespace network
@@ -15,6 +21,12 @@ namespace network
                                    LOG_DEBUG("Received signal " + std::to_string(signal));
                                    stop();
                                } });
+#ifdef ENABLE_CORS
+        add_middleware<cors>(*this);
+#endif
+#ifdef ENABLE_LOG
+        add_middleware<log>(*this);
+#endif
     }
 
     server_base::~server_base()
