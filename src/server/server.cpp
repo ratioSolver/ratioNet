@@ -1,12 +1,6 @@
 #include "server.hpp"
 #include "server_session.hpp"
 #include "ws_server_session.hpp"
-#ifdef ENABLE_CORS
-#include "cors.hpp"
-#endif
-#ifdef ENABLE_LOG
-#include "log.hpp"
-#endif
 #include "logging.hpp"
 
 namespace network
@@ -21,12 +15,6 @@ namespace network
                                    LOG_DEBUG("Received signal " + std::to_string(signal));
                                    stop();
                                } });
-#ifdef ENABLE_CORS
-        add_middleware<cors>(*this);
-#endif
-#ifdef ENABLE_LOG
-        add_middleware<log>(*this);
-#endif
     }
 
     server_base::~server_base()
@@ -186,7 +174,7 @@ namespace network
         do_accept();
     }
 
-#ifdef ENABLE_SSL
+#ifdef RATIONET_SSL
     ssl_server::ssl_server(std::string_view host, unsigned short port, std::size_t concurrency_hint) : server_base(host, port, concurrency_hint), ssl_ctx(asio::ssl::context::TLS_VERSION) {}
 
     void ssl_server::load_certificate(std::string_view cert_file, std::string_view key_file)

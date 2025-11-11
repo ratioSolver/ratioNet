@@ -1,7 +1,7 @@
 #pragma once
 
 #include "message.hpp"
-#ifdef ENABLE_SSL
+#ifdef RATIONET_SSL
 #include <asio/ssl.hpp>
 #endif
 #include <queue>
@@ -134,7 +134,7 @@ namespace network
     bool connecting{false};       // Flag to track if a connection attempt is in progress
   };
 
-#ifdef ENABLE_SSL
+#ifdef RATIONET_SSL
   class wss_client_session : public ws_client_session_base
   {
   public:

@@ -57,7 +57,7 @@ namespace network
     {
         if (ec == asio::error::eof)
             return; // connection closed by client
-#ifdef ENABLE_SSL
+#ifdef RATIONET_SSL
         else if (ec == asio::ssl::error::stream_truncated)
             return; // connection closed by client
 #endif
@@ -237,7 +237,7 @@ namespace network
     void server_session::read_until(asio::streambuf &buffer, std::string_view delimiter, std::function<void(const std::error_code &, std::size_t)> callback) { asio::async_read_until(socket, buffer, delimiter, callback); }
     void server_session::write(asio::streambuf &buffer, std::function<void(const std::error_code &, std::size_t)> callback) { asio::async_write(socket, buffer, callback); }
 
-#ifdef ENABLE_SSL
+#ifdef RATIONET_SSL
     ssl_server_session::ssl_server_session(server_base &server, asio::ssl::stream<asio::ip::tcp::socket> &&socket) : server_session_base(server), socket(std::move(socket)) {}
     ssl_server_session::~ssl_server_session()
     {

@@ -3,7 +3,7 @@
 #include "request.hpp"
 #include "response.hpp"
 #include <asio.hpp>
-#ifdef ENABLE_SSL
+#ifdef RATIONET_SSL
 #include <asio/ssl.hpp>
 #endif
 #include <queue>
@@ -237,7 +237,7 @@ namespace network
     bool connecting{false};       // Flag to track if a connection attempt is in progress
   };
 
-#ifdef ENABLE_SSL
+#ifdef RATIONET_SSL
   /**
    * @brief Represents a secure session in the client context.
    *

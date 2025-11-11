@@ -42,7 +42,7 @@ namespace network
     std::shared_ptr<ws_client_session_base> create_ws_session(std::string_view host, unsigned short port, std::string_view target) override;
   };
 
-#ifdef ENABLE_SSL
+#ifdef RATIONET_SSL
   class ssl_async_client : public async_client_base
   {
   public:

@@ -3,7 +3,7 @@
 #include "request.hpp"
 #include "response.hpp"
 #include <queue>
-#ifdef ENABLE_SSL
+#ifdef RATIONET_SSL
 #include <asio/ssl.hpp>
 #endif
 
@@ -151,7 +151,7 @@ namespace network
     asio::ip::tcp::socket socket; // The TCP socket used to communicate with the server.
   };
 
-#ifdef ENABLE_SSL
+#ifdef RATIONET_SSL
   class ssl_client : public client_base
   {
   public:

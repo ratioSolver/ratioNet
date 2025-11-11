@@ -11,7 +11,7 @@ namespace network
 
         if (!is_connected())
             connect(endpoints);
-#ifdef ENABLE_SSL
+#ifdef RATIONET_SSL
         if (ec == asio::ssl::error::stream_truncated)
         { // connection closed by server
             LOG_DEBUG("Connection closed by server");
@@ -194,7 +194,7 @@ namespace network
     std::size_t client::read_until(asio::streambuf &buffer, std::string_view delim) { return asio::read_until(socket, buffer, delim, ec); }
     std::size_t client::write(asio::streambuf &buffer) { return asio::write(socket, buffer, ec); }
 
-#ifdef ENABLE_SSL
+#ifdef RATIONET_SSL
     ssl_client::ssl_client(std::string_view host, unsigned short port) : client_base(host, port), ssl_ctx(asio::ssl::context::TLS_VERSION) { ssl_ctx.set_default_verify_paths(); }
     ssl_client::~ssl_client()
     {

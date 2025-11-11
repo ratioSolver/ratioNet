@@ -2,7 +2,7 @@
 
 #include "message.hpp"
 #include <asio.hpp>
-#ifdef ENABLE_SSL
+#ifdef RATIONET_SSL
 #include <asio/ssl.hpp>
 #endif
 #include <queue>
@@ -115,7 +115,7 @@ namespace network
     asio::ip::tcp::socket socket; // The socket used to communicate with the client.
   };
 
-#ifdef ENABLE_SSL
+#ifdef RATIONET_SSL
   class wss_server_session : public ws_server_session_base
   {
   public:

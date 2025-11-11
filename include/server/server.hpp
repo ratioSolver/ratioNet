@@ -7,7 +7,7 @@
 #include "ws_server_session.hpp"
 #include "middleware.hpp"
 #include <asio.hpp>
-#ifdef ENABLE_SSL
+#ifdef RATIONET_SSL
 #include <asio/ssl.hpp>
 #endif
 #include <typeindex>
@@ -195,7 +195,7 @@ namespace network
     void on_accept(const std::error_code &ec, asio::ip::tcp::socket socket) override;
   };
 
-#ifdef ENABLE_SSL
+#ifdef RATIONET_SSL
   class ssl_server : public server_base
   {
   public:

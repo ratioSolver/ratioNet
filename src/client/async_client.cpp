@@ -48,7 +48,7 @@ namespace network
 
     std::shared_ptr<ws_client_session_base> async_client::create_ws_session(std::string_view host, unsigned short port, std::string_view target) { return std::make_shared<ws_client_session>(*this, host, port, target, asio::ip::tcp::socket(io_ctx)); }
 
-#ifdef ENABLE_SSL
+#ifdef RATIONET_SSL
     ssl_async_client::ssl_async_client() : async_client_base(), ssl_ctx(asio::ssl::context::TLS_VERSION) { ssl_ctx.set_default_verify_paths(); }
 
     std::shared_ptr<client_session_base> ssl_async_client::create_session(std::string_view host, unsigned short port) { return std::make_shared<ssl_client_session>(*this, host, port, asio::ssl::stream<asio::ip::tcp::socket>(asio::ip::tcp::socket(io_ctx), ssl_ctx)); }

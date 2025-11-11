@@ -226,7 +226,7 @@ namespace network
     void ws_client_session::read_until(asio::streambuf &buffer, std::string_view delimiter, std::function<void(const std::error_code &, std::size_t)> callback) { asio::async_read_until(socket, buffer, delimiter, callback); }
     void ws_client_session::write(asio::streambuf &buffer, std::function<void(const std::error_code &, std::size_t)> callback) { asio::async_write(socket, buffer, callback); }
 
-#ifdef ENABLE_SSL
+#ifdef RATIONET_SSL
     wss_client_session::wss_client_session(async_client_base &client, std::string_view host, unsigned short port, std::string_view target, asio::ssl::stream<asio::ip::tcp::socket> &&socket) : ws_client_session_base(client, host, port, target, socket.get_executor()), socket(std::move(socket))
     {
         if (!SSL_set_tlsext_host_name(socket.native_handle(), host.data()))
