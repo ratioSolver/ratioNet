@@ -4,7 +4,7 @@
 #include "logging.hpp"
 #include <thread>
 
-#ifdef ENABLE_SSL
+#ifdef RATIONET_SSL
 void test_weather_client()
 {
     network::ssl_client client("api.open-meteo.com", 443);
@@ -60,7 +60,7 @@ void test_ws_client()
 
 int main()
 {
-#ifdef ENABLE_SSL
+#ifdef RATIONET_SSL
     test_weather_client();
     test_async_weather_client();
 #endif

@@ -47,7 +47,7 @@ void test_rest_server()
     t.join();
 }
 
-#ifdef ENABLE_SSL
+#ifdef RATIONET_SSL
 /**
  * @brief Test function to set up and run an SSL server with various routes.
  *
@@ -127,7 +127,7 @@ int main()
 {
     test_rest_server();
 
-#ifdef ENABLE_SSL
+#ifdef RATIONET_SSL
     test_ssl_server();
 #endif
 

@@ -8,7 +8,7 @@ jobs:
 
     strategy:
       matrix:
-        ENABLE_SSL: [ON, OFF]
+        RATIONET_SSL: [ON, OFF]
 
     steps:
       - uses: actions/checkout@v4
@@ -21,7 +21,7 @@ jobs:
           sudo apt-get install -y lcov
 
       - name: Configure CMake
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DENABLE_ASAN=ON -DENABLE_UBSAN=ON -DENABLE_COV=ON -DENABLE_SSL=${{matrix.ENABLE_SSL}}
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DENABLE_ASAN=ON -DENABLE_UBSAN=ON -DENABLE_COV=ON -DRATIONET_SSL=${{matrix.RATIONET_SSL}}
 
       - name: Build
         run: cmake --build build --config Debug
@@ -46,7 +46,7 @@ jobs:
 
     strategy:
       matrix:
-        ENABLE_SSL: [ON, OFF]
+        RATIONET_SSL: [ON, OFF]
 
     steps:
       - uses: actions/checkout@v4
@@ -59,7 +59,7 @@ jobs:
           sudo apt-get install -y valgrind
 
       - name: Configure CMake
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DENABLE_SSL=${{matrix.ENABLE_SSL}}
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DRATIONET_SSL=${{matrix.RATIONET_SSL}}
 
       - name: Build
         run: cmake --build build --config Debug
@@ -73,7 +73,7 @@ jobs:
 
     strategy:
       matrix:
-        ENABLE_SSL: [ON, OFF]
+        RATIONET_SSL: [ON, OFF]
 
     steps:
       - uses: actions/checkout@v4
@@ -81,7 +81,7 @@ jobs:
           submodules: recursive
 
       - name: Configure CMake
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DENABLE_SSL=${{matrix.ENABLE_SSL}}
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DRATIONET_SSL=${{matrix.RATIONET_SSL}}
 
       - name: Build
         run: cmake --build build --config Debug
@@ -95,7 +95,7 @@ jobs:
 
     strategy:
       matrix:
-        ENABLE_SSL: [ON, OFF]
+        RATIONET_SSL: [ON, OFF]
 
     steps:
       - uses: actions/checkout@v4
@@ -103,7 +103,7 @@ jobs:
           submodules: recursive
 
       - name: Configure CMake
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DENABLE_ASAN=ON -DENABLE_UBSAN=ON -DENABLE_SSL=${{matrix.ENABLE_SSL}}
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DENABLE_ASAN=ON -DENABLE_UBSAN=ON -DRATIONET_SSL=${{matrix.RATIONET_SSL}}
 
       - name: Build
         run: cmake --build build --config Debug
@@ -117,7 +117,7 @@ jobs:
 
     strategy:
       matrix:
-        ENABLE_SSL: [ON, OFF]
+        RATIONET_SSL: [ON, OFF]
 
     steps:
       - uses: actions/checkout@v4
@@ -125,7 +125,7 @@ jobs:
           submodules: recursive
 
       - name: Configure CMake
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_SSL=${{matrix.ENABLE_SSL}}
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DRATIONET_SSL=${{matrix.RATIONET_SSL}}
 
       - name: Build
         run: cmake --build build --config Release
@@ -139,7 +139,7 @@ jobs:
 
     strategy:
       matrix:
-        ENABLE_SSL: [ON, OFF]
+        RATIONET_SSL: [ON, OFF]
 
     steps:
       - uses: actions/checkout@v4
@@ -147,7 +147,7 @@ jobs:
           submodules: recursive
 
       - name: Configure CMake
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_SSL=${{matrix.ENABLE_SSL}}
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DRATIONET_SSL=${{matrix.RATIONET_SSL}}
 
       - name: Build
         run: cmake --build build --config Release
@@ -161,7 +161,7 @@ jobs:
 
     strategy:
       matrix:
-        ENABLE_SSL: [ON, OFF]
+        RATIONET_SSL: [ON, OFF]
 
     steps:
       - uses: actions/checkout@v4
@@ -169,7 +169,7 @@ jobs:
           submodules: recursive
 
       - name: Configure CMake
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_SSL=${{matrix.ENABLE_SSL}}
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DRATIONET_SSL=${{matrix.RATIONET_SSL}}
 
       - name: Build
         run: cmake --build build --config Release
