@@ -306,7 +306,9 @@ namespace network
     {
       if (auto it = headers.find("content-type"); it == headers.end() || it->second.find("application/json") == std::string::npos)
         add_header("content-type", "application/json");
-      if (auto it = headers.find("content-length"); it == headers.end() || it->second != std::to_string(str_body.size()))
+      if (auto it = headers.find("content-length"); it != headers.end())
+        it->second = std::to_string(str_body.size());
+      else
         add_header("content-length", std::to_string(str_body.size()));
     }
 
@@ -314,7 +316,9 @@ namespace network
     {
       if (auto it = headers.find("content-type"); it == headers.end() || it->second.find("application/json") == std::string::npos)
         add_header("content-type", "application/json");
-      if (auto it = headers.find("content-length"); it == headers.end() || it->second != std::to_string(str_body.size()))
+      if (auto it = headers.find("content-length"); it != headers.end())
+        it->second = std::to_string(str_body.size());
+      else
         add_header("content-length", std::to_string(str_body.size()));
     }
 
