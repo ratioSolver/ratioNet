@@ -1,86 +1,137 @@
 #include "server.hpp"
+#include <thread>
 
-using string_req = boost::beast::http::request<boost::beast::http::string_body>;
-using string_res = boost::beast::http::response<boost::beast::http::string_body>;
-
-void test_plain()
+/**
+ * @brief Test function to set up and run a REST server with various routes.
+ *
+ * This function initializes a network server and sets up several routes:
+ * - A root route ("/") that returns an HTML response with "Hello, World!".
+ * - A JSON route ("/json") that returns a JSON response with a message "Hello, World!".
+ * - A file route ("/file") that serves a file named "test.zip".
+ * - A WebSocket route ("/ws") that returns an HTML page with a WebSocket client script.
+ *
+ * The WebSocket route ("/ws") also sets up handlers for WebSocket events:
+ * - on_open: Sends "Hello, World!" when a WebSocket connection is opened.
+ * - on_message: Echoes back any received message.
+ *
+ * The server runs in a separate thread for 5 seconds before stopping.
+ */
+void test_rest_server()
 {
-  network::server server;
+    network::server server;
 
-  server.add_route(boost::beast::http::verb::get, "/", std::function{[](const string_req &, string_res &res)
-                                                                     {
-                                                                       res.set(boost::beast::http::field::content_type, "html");
-                                                                       res.body() = R"(<html><body><h1>Hello, world!</h1></body></html>)";
-                                                                     }});
+    server.add_route(network::verb::Get, "/", [](network::request &)
+                     { return std::make_unique<network::html_response>("<html><body><h1>Hello, World!</h1></body></html>"); });
+    server.add_route(network::verb::Get, "/json", [](network::request &)
+                     { return std::make_unique<network::json_response>(json::json{{"message", "Hello, World!"}}); });
+    server.add_route(network::verb::Get, "/ws", [](network::request &)
+                     { return std::make_unique<network::html_response>(R"(<html><body><script>
+                        var ws = new WebSocket("ws://localhost:8080/ws");
+                        ws.onopen = function() { document.body.innerHTML += "<p>Connected!</p>"; ws.send("Hello, World!"); };
+                        ws.onmessage = function(event) { document.body.innerHTML += "<p>" + event.data + "</p>"; };
+                        ws.onclose = function() { document.body.innerHTML += "<p>Disconnected!</p>"; };
+                        ws.onerror = function() { document.body.innerHTML += "<p>Error!</p>"; };
+                        </script></body></html>)"); });
+    server.add_route(network::verb::Get, "/file", [](network::request &)
+                     { return std::make_unique<network::file_response>("test.zip"); });
 
-  std::thread t{[&server]
-                { server.start(); }};
+    server.add_ws_route("/ws").on_open([](network::ws_server_session_base &s)
+                                       { s.send("Hello, World!"); })
+        .on_message([](network::ws_server_session_base &s, const network::message &msg)
+                    { s.send(msg.get_payload()); });
 
-  std::this_thread::sleep_for(std::chrono::seconds(10));
-  server.stop();
-  t.join();
+    std::thread t{[&server]
+                  { server.start(); }};
+    std::this_thread::sleep_for(std::chrono::seconds(5));
+    server.stop();
+    t.join();
 }
 
-void test_ssl()
+#ifdef RATIONET_SSL
+/**
+ * @brief Test function to set up and run an SSL server with various routes.
+ *
+ * This function initializes a network SSL server and sets up several routes:
+ * - A root route ("/") that returns an HTML response with "Hello, World!".
+ * - A JSON route ("/json") that returns a JSON response with a message "Hello, World!".
+ * - A WebSocket route ("/ws") that returns an HTML page with a WebSocket client script.
+ *
+ * The WebSocket route ("/ws") also sets up handlers for WebSocket events:
+ * - on_open: Sends "Hello, World!" when a WebSocket connection is opened.
+ * - on_message: Echoes back any received message.
+ *
+ * The server runs in a separate thread for 5 seconds before stopping.
+ */
+void test_ssl_server()
 {
-  network::server server;
+    network::ssl_server server;
 
-  server.set_ssl_context("cert.pem", "key.pem", "dh.pem");
+    server.load_certificate("cert.pem", "key.pem");
 
-  server.add_route(boost::beast::http::verb::get, "/", std::function{[](const string_req &, string_res &res)
-                                                                     {
-                                                                       res.set(boost::beast::http::field::content_type, "html");
-                                                                       res.body() = R"(<html><body><h1>Hello, world!</h1></body></html>)";
-                                                                     }},
-                   true);
+    server.add_route(network::verb::Get, "/", [](network::request &)
+                     { return std::make_unique<network::html_response>("<html><body><h1>Hello, World!</h1></body></html>"); });
+    server.add_route(network::verb::Get, "/json", [](network::request &)
+                     { return std::make_unique<network::json_response>(json::json{{"message", "Hello, World!"}}); });
+    server.add_route(network::verb::Get, "/ws", [](network::request &)
+                     { return std::make_unique<network::html_response>(R"(<html><body><script>
+                        var ws = new WebSocket("ws://localhost:8080/ws");
+                        ws.onopen = function() { document.body.innerHTML += "<p>Connected!</p>"; ws.send("Hello, World!"); };
+                        ws.onmessage = function(event) { document.body.innerHTML += "<p>" + event.data + "</p>"; };
+                        ws.onclose = function() { document.body.innerHTML += "<p>Disconnected!</p>"; };
+                        ws.onerror = function() { document.body.innerHTML += "<p>Error!</p>"; };
+                        </script></body></html>)"); });
 
-  std::thread t{[&server]
-                { server.start(); }};
+    server.add_ws_route("/ws").on_open([](network::ws_server_session_base &s)
+                                       { s.send("Hello, World!"); })
+        .on_message([](network::ws_server_session_base &s, const network::message &msg)
+                    { s.send(msg.get_payload()); });
 
-  std::this_thread::sleep_for(std::chrono::seconds(10));
-  server.stop();
-  t.join();
+    std::thread t{[&server]
+                  { server.start(); }};
+    std::this_thread::sleep_for(std::chrono::seconds(5));
+    server.stop();
+    t.join();
 }
+#endif
 
-void test_websocket()
+/**
+ * @brief Tests the CORS (Cross-Origin Resource Sharing) functionality of the server.
+ *
+ * This function sets up a server with three routes:
+ * - A GET route at "/json" that returns a JSON response with a "Hello, World!" message and allows CORS from any origin.
+ * - A POST route at "/json" that returns a JSON response with a "Hello, World!" message and allows CORS from any origin.
+ * - An OPTIONS route at "/json" that returns the allowed methods (GET, POST, OPTIONS) and allowed headers (Content-Type) for CORS.
+ *
+ * The server runs in a separate thread for 5 seconds before stopping.
+ */
+void test_cors_server()
 {
-  network::server server;
+    network::server server;
+    server.add_route(network::verb::Get, "/json", [](network::request &)
+                     { return std::make_unique<network::json_response>(json::json{{"message", "Hello, World!"}}, network::ok, std::multimap<std::string, std::string>{{"Access-Control-Allow-Origin", "*"}}); });
 
-  server.add_route(boost::beast::http::verb::get, "/", std::function{[](const string_req &, string_res &res)
-                                                                     {
-                                                                       res.set(boost::beast::http::field::content_type, "html");
-                                                                       res.body() = R"(
-                                                                        <html>
-                                                                        <body>
-                                                                        <h1>Hello, world!</h1>
-                                                                        <script>
-                                                                        var ws = new WebSocket("ws://" + window.location.host + "/ws");
-                                                                        ws.onmessage = function(event) {
-                                                                          alert("Message from server: " + event.data);
-                                                                        };
-                                                                        </script>
-                                                                        </body>
-                                                                        </html>)";
-                                                                     }});
+    server.add_route(network::verb::Post, "/json", [](network::request &)
+                     { return std::make_unique<network::json_response>(json::json{{"message", "Hello, World!"}}, network::ok, std::multimap<std::string, std::string>{{"Access-Control-Allow-Origin", "*"}}); });
 
-  server.add_ws_route("/ws").on_open([](network::websocket_session &session)
-                                     { session.send("Hello, world!"); });
+    server.add_route(network::verb::Options, "/json", [](network::request &)
+                     { return std::make_unique<network::response>(network::ok, std::multimap<std::string, std::string>{{"Access-Control-Allow-Origin", "*"}, {"Access-Control-Allow-Methods", "GET, POST, OPTIONS"}, {"Access-Control-Allow-Headers", "Content-Type"}}); });
 
-  std::thread t{[&server]
-                { server.start(); }};
-
-  std::this_thread::sleep_for(std::chrono::seconds(10));
-  server.stop();
-  t.join();
+    std::thread t{[&server]
+                  { server.start(); }};
+    std::this_thread::sleep_for(std::chrono::seconds(5));
+    server.stop();
+    t.join();
 }
 
 int main()
 {
-  test_plain();
+    test_rest_server();
 
-  test_ssl();
+#ifdef RATIONET_SSL
+    test_ssl_server();
+#endif
 
-  test_websocket();
+    test_cors_server();
 
-  return 0;
+    return 0;
 }

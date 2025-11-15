@@ -1,0 +1,179 @@
+name: CMake
+
+on: [push, pull_request]
+
+jobs:
+  ubuntu-address-undefined-coverage:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        RATIONET_SSL: [ON, OFF]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lcov
+
+      - name: Configure CMake
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DENABLE_ASAN=ON -DENABLE_UBSAN=ON -DENABLE_COV=ON -DRATIONET_SSL=${{matrix.RATIONET_SSL}}
+
+      - name: Build
+        run: cmake --build build --config Debug
+
+      - name: Test with address sanitizer, undefined behavior sanitizer and coverage
+        working-directory: build
+        run: ctest -C Debug --rerun-failed --output-on-failure -T Test -T Coverage
+
+      - name: Make coverage report
+        run: |
+          lcov --capture --directory build --output-file coverage.info
+          lcov --remove coverage.info '/usr/*' --output-file coverage.info
+          lcov --list coverage.info
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v4.0.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  ubuntu-memcheck:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        RATIONET_SSL: [ON, OFF]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y valgrind
+
+      - name: Configure CMake
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DRATIONET_SSL=${{matrix.RATIONET_SSL}}
+
+      - name: Build
+        run: cmake --build build --config Debug
+
+      - name: Test with memory checker
+        working-directory: build
+        run: ctest -C Debug --rerun-failed --output-on-failure -T Test -T MemCheck
+
+  windows-debug:
+    runs-on: windows-latest
+
+    strategy:
+      matrix:
+        RATIONET_SSL: [ON, OFF]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Configure CMake
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DRATIONET_SSL=${{matrix.RATIONET_SSL}}
+
+      - name: Build
+        run: cmake --build build --config Debug
+
+      - name: Test
+        working-directory: build
+        run: ctest -C Debug --rerun-failed --output-on-failure -T Test
+
+  macos-address-undefined:
+    runs-on: macos-latest
+
+    strategy:
+      matrix:
+        RATIONET_SSL: [ON, OFF]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Configure CMake
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DENABLE_ASAN=ON -DENABLE_UBSAN=ON -DRATIONET_SSL=${{matrix.RATIONET_SSL}}
+
+      - name: Build
+        run: cmake --build build --config Debug
+
+      - name: Test with address sanitizer and undefined behavior sanitizer
+        working-directory: build
+        run: ctest -C Debug --rerun-failed --output-on-failure -T Test
+
+  ubuntu-release:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        RATIONET_SSL: [ON, OFF]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Configure CMake
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DRATIONET_SSL=${{matrix.RATIONET_SSL}}
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Test
+        working-directory: build
+        run: ctest -C Release --rerun-failed --output-on-failure -T Test
+
+  windows-release:
+    runs-on: windows-latest
+
+    strategy:
+      matrix:
+        RATIONET_SSL: [ON, OFF]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Configure CMake
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DRATIONET_SSL=${{matrix.RATIONET_SSL}}
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Test
+        working-directory: build
+        run: ctest -C Release --rerun-failed --output-on-failure -T Test
+
+  macos-release:
+    runs-on: macos-latest
+
+    strategy:
+      matrix:
+        RATIONET_SSL: [ON, OFF]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Configure CMake
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DRATIONET_SSL=${{matrix.RATIONET_SSL}}
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Test
+        working-directory: build
+        run: ctest -C Release --rerun-failed --output-on-failure -T Test
