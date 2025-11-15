@@ -63,6 +63,8 @@ namespace network
       return "403 Forbidden";
     case not_found:
       return "404 Not Found";
+    case method_not_allowed:
+      return "405 Method Not Allowed";
     case conflict:
       return "409 Conflict";
     case internal_server_error:
