@@ -17,6 +17,22 @@ namespace network
   class server_session_base;
   class ws_server_session_base;
 
+  [[nodiscard]] inline std::string default_server_host() noexcept
+  {
+    const char *host = std::getenv("SERVER_HOST");
+    if (host)
+      return std::string(host);
+    return "0.0.0.0";
+  }
+
+  [[nodiscard]] inline unsigned short default_server_port() noexcept
+  {
+    const char *port = std::getenv("SERVER_PORT");
+    if (port)
+      return static_cast<unsigned short>(std::stoi(port));
+    return 8080;
+  }
+
   class server_base
   {
     friend class server_session_base;
@@ -26,12 +42,12 @@ namespace network
     /**
      * @brief Constructs a server_base instance with the specified host, port, and concurrency hint.
      *
-     * @param host The hostname or IP address to bind the server to. Defaults to SERVER_HOST.
-     * @param port The port number to listen on. Defaults to SERVER_PORT.
+     * @param host The host address to bind the server to. Defaults to "0.0.0.0".
+     * @param port The port number to listen on. Defaults to 8080.
      * @param concurrency_hint The suggested number of threads for handling server operations.
      *        Defaults to the number of hardware threads available.
      */
-    server_base(std::string_view host = SERVER_HOST, unsigned short port = SERVER_PORT, std::size_t concurrency_hint = std::thread::hardware_concurrency());
+    server_base(std::string_view host = default_server_host(), unsigned short port = default_server_port(), std::size_t concurrency_hint = std::thread::hardware_concurrency());
     /**
      * @brief Destroys the server_base instance.
      *
