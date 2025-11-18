@@ -18,6 +18,11 @@ namespace network
             connect(endpoints);
         }
 #endif
+        if (ec == asio::error::broken_pipe)
+        { // connection closed by server
+            LOG_DEBUG("Connection closed by server");
+            connect(endpoints);
+        }
         if (ec)
         {
             LOG_ERR(ec.message());
