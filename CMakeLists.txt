@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.21)
 project(ratioNet VERSION 0.2.0 LANGUAGES CXX)
 
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers) 
+
 include(CTest)
 enable_testing()
 
@@ -35,7 +38,7 @@ endif()
 
 add_library(ratioNet src/server/server.cpp src/server/server_session.cpp src/server/ws_server_session.cpp src/middlewares/cors.cpp src/middlewares/log.cpp src/client/async_client.cpp src/client/client_session.cpp src/client/ws_client_session.cpp src/client/client.cpp)
 target_compile_features(ratioNet PUBLIC cxx_std_17)
-target_include_directories(ratioNet PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/common> $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/server> $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/client> $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/middlewares>)
+target_include_directories(ratioNet PUBLIC $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include/common> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include/server> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include/client> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include/middlewares> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 target_compile_definitions(ratioNet PUBLIC SERVER_HOST="${SERVER_HOST}" SERVER_PORT=${SERVER_PORT})
 if(NOT TARGET json)
     add_subdirectory(extern/json)
@@ -53,6 +56,13 @@ if(BUILD_TESTING)
 endif()
 
 setup_sanitizers(ratioNet)
+
+install(TARGETS ratioNet EXPORT ratioNet-targets LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(DIRECTORY "${PROJECT_SOURCE_DIR}/include/" DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(EXPORT ratioNet-targets FILE ratioNet-targets.cmake NAMESPACE ratio:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/ratioNet)
+configure_package_config_file(cmake/ratioNet-config.cmake.in ratioNet-config.cmake INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/ratioNet)
+write_basic_package_version_file(ratioNet-version.cmake COMPATIBILITY SameMajorVersion)
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/ratioNet-config.cmake" "${CMAKE_CURRENT_BINARY_DIR}/ratioNet-version.cmake" DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/ratioNet)
 
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})
 set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})
